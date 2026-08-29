@@ -50,11 +50,12 @@ def create_post(data: PostIn, db: Session = Depends(get_db),
     _owned_accounts(db, user, data.account_ids)
     created = []
     group = uuid.uuid4().hex[:16]
+    post_status = PostStatus.draft if data.status == "draft" else PostStatus.scheduled
     for aid in data.account_ids:
         p = Post(user_id=user.id, account_id=aid, caption=data.caption,
                  media_url=data.media_url, post_type=(data.post_type or "feed"),
                  scheduled_at=_aware(data.scheduled_at),
-                 status=PostStatus.scheduled, group_id=group)
+                 status=post_status, group_id=group)
         db.add(p)
         created.append(p)
     db.commit()

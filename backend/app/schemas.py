@@ -65,6 +65,7 @@ class PostIn(BaseModel):
     media_url: str = ""
     post_type: str = "feed"   # feed | video | short | community
     scheduled_at: datetime
+    status: str | None = None   # optional: pass "draft" to save without scheduling
 
 
 class BulkPostIn(BaseModel):
