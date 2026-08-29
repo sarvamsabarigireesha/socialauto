@@ -462,6 +462,7 @@
           <option value="linkedin">💼 LinkedIn</option>
         </select>
         <button class="btn green sm" style="padding:9px 16px" onclick="syncCommunity()">🔄 Fetch latest comments</button>
+        <button class="btn ghost sm" style="padding:9px 16px" onclick="importChannel()">📥 Import my videos</button>
         <button class="btn ghost sm" style="padding:9px 16px" onclick="openSim()">🧪 Simulate comment</button>
       </div>
     </div>
@@ -948,6 +949,24 @@ async function openSim(){
   await api('/api/comments/simulate',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({post_id:posts[0].id, author:'manual_tester', text})});
   toast('Comment added — auto-replied 🤖'); loadCommunity();
+}
+
+async function importChannel(){
+  const accs = ACCOUNTS;
+  const yt = accs.filter(a=>a.platform==='youtube');
+  const opts = yt.length
+    ? yt.map((a,i)=>`${i+1}. ${a.display_name}`).join('\n')
+    : '';
+  if(!yt.length) return toast('Connect a YouTube/channel account first', false);
+  let pick = yt.length>1 ? prompt('Which channel? (enter number)\n'+opts, '1') : '1';
+  const acc = yt[(parseInt(pick)-1)||0];
+  if(!acc) return;
+  toast('📥 Importing your videos + their comments…');
+  try{
+    const r = await api(`/api/community/import/${acc.id}`,{method:'POST'});
+    toast(r.imported ? `Imported ${r.imported} videos — comments loaded ✅` : 'No new videos to import (already synced) ✅');
+    loadCommunity();
+  }catch(e){ toast(e.message,false); }
 }
 
 /* ================= templates ================= */

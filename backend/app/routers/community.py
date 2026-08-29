@@ -67,6 +67,13 @@ async def pull_latest(db: Session = Depends(get_db), user: User = Depends(get_cu
     return await engine.sync_comments(db, user.id)
 
 
+@router.post("/import/{account_id}")
+async def import_channel(account_id: int,
+                         db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Import a connected channel's existing videos so their comments appear here."""
+    return await engine.import_channel_content(db, user.id, account_id)
+
+
 @router.post("/comments/{comment_id}/reply")
 async def manual_reply(comment_id: int, data: ReplyIn,
                        db: Session = Depends(get_db), user: User = Depends(get_current_user)):

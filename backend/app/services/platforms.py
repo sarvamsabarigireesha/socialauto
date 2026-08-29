@@ -56,6 +56,19 @@ class _MockClient(Client):
         await _sleep()
         return True
 
+    async def list_recent_videos(self, account):
+        from datetime import datetime, timedelta, timezone
+        await _sleep()
+        now = datetime.now(timezone.utc)
+        return [
+            {"id": f"mock_yt_{account.id}_v1",
+             "title": "Sabarimala Live — latest darshanam 🚩",
+             "published_at": (now - timedelta(days=2)).isoformat()},
+            {"id": f"mock_yt_{account.id}_v2",
+             "title": "Ayyappa Swamy devotional songs 🕉",
+             "published_at": (now - timedelta(days=5)).isoformat()},
+        ]
+
     async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
         await _sleep()
         # random number of NEW comments (0-4) on each poll
@@ -232,6 +245,36 @@ class _YouTubeClient(Client):
                 return True
         except Exception:
             return False
+
+    async def list_recent_videos(self, account: Account) -> list[dict]:
+        """Fetch the channel's most recent uploads (from live YouTube channel id)."""
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                h = {"Authorization": f"Bearer {account.access_token}"}
+                r = await c.get("https://www.googleapis.com/youtube/v3/channels",
+                                params={"part": "contentDetails", "id": account.external_id},
+                                headers=h)
+                r.raise_for_status()
+                uploads = (r.json()["items"][0]["contentDetails"]
+                           .get("uploadsPlaylistId"))
+                if not uploads:
+                    return []
+                r2 = await c.get("https://www.googleapis.com/youtube/v3/playlistItems",
+                                 params={"part": "snippet", "playlistId": uploads,
+                                         "maxResults": 10}, headers=h)
+                r2.raise_for_status()
+                out = []
+                for it in r2.json().get("items", []):
+                    sn = it["snippet"]
+                    vid = sn.get("resourceId", {}).get("videoId", "")
+                    if vid:
+                        out.append({"id": vid, "title": sn.get("title", "video"),
+                                    "published_at": sn.get("publishedAt", ""),
+                                    "thumb": (sn.get("thumbnails", {}) or {}).get("high", {})
+                                              .get("url", "")})
+                return out
+        except Exception:
+            return []
 
 
 class _XClient(Client):

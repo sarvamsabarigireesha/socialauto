@@ -150,6 +150,45 @@ async def sync_metrics(db: Session, user_id: int | None = None) -> dict:
     return {"posts_scanned": len(posts), "snapshots": updated}
 
 
+async def import_channel_content(db: Session, user_id: int, account_id: int) -> dict:
+    """Import an account's existing videos/posts as 'published' posts so their
+    comments show up in the Community inbox. Then sync comments + metrics."""
+    acc = db.query(Account).filter(Account.id == account_id,
+                                   Account.user_id == user_id).first()
+    if not acc:
+        return {"imported": 0, "error": "account not found"}
+    client = platforms.get_client(acc.platform)
+    if not hasattr(client, "list_recent_videos"):
+        return {"imported": 0, "error": "import not supported on this platform"}
+    videos = await client.list_recent_videos(acc)
+    imported = 0
+    for v in videos:
+        exists = db.query(Post).filter(
+            Post.account_id == acc.id,
+            Post.platform_post_id == v["id"]).first()
+        if exists:
+            continue
+        pub_at = datetime.now(timezone.utc)
+        try:
+            dt = datetime.fromisoformat(str(v["published_at"]).replace("Z", "+00:00"))
+            if dt.tzinfo:
+                pub_at = dt
+        except Exception:
+            pass
+        p = Post(user_id=user_id, account_id=acc.id,
+                 platform_post_id=v["id"],
+                 caption=v.get("title", "imported post"),
+                 media_url=v.get("thumb", ""),
+                 scheduled_at=pub_at, published_at=pub_at,
+                 status=PostStatus.published)
+        db.add(p)
+        imported += 1
+    db.commit()
+    await sync_comments(db, user_id)
+    await sync_metrics(db, user_id)
+    return {"imported": imported, "scanned": len(videos)}
+
+
 def analytics_summary(db: Session, user_id: int | None = None) -> dict:
     """Aggregate dashboard numbers for one user."""
     q = db.query(Post).filter(Post.status == PostStatus.published)
