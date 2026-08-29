@@ -22,6 +22,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(200), default="")
     password_hash = Column(String(255), nullable=False)
+    reset_token = Column(String(120), default="", index=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")

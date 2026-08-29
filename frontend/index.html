@@ -322,10 +322,40 @@
     <input type="password" id="authPassword" placeholder="Password (min 6 chars)" autocomplete="current-password">
     <input type="text" id="authName" placeholder="Your name (signup only)" style="display:none">
     <button class="btn" id="authSubmit" onclick="submitAuth()">Log in</button>
+    <div class="auth-switch" id="authForgotWrap">
+      <a onclick="openForgotPassword()">Forgot password?</a>
+    </div>
     <div class="auth-switch" id="authSwitch">
       No account? <a onclick="toggleAuth()">Sign up free</a>
     </div>
     <div class="demo-hint" onclick="demoLogin()">🎯 Try demo instantly — click to log in as <b>demo@socialauto.app</b></div>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD -->
+<div class="auth-overlay" id="forgotOverlay" style="display:none">
+  <div class="auth-card">
+    <div class="big">🔑</div>
+    <h2>Reset your password</h2>
+    <div class="sub">Enter the email on your account and we'll send a reset link</div>
+    <input type="email" id="forgotEmail" placeholder="Email" autocomplete="username">
+    <button class="btn" onclick="submitForgotPassword()">Send reset link</button>
+    <div id="forgotResult" style="display:none;margin-top:12px;font-size:12.5px;color:var(--muted);text-align:left;
+      background:#f7f9fc;border:1px solid var(--border);border-radius:10px;padding:10px"></div>
+    <div class="auth-switch"><a onclick="closeForgotPassword()">Back to log in</a></div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD -->
+<div class="auth-overlay" id="resetOverlay" style="display:none">
+  <div class="auth-card">
+    <div class="big">🔒</div>
+    <h2>Choose a new password</h2>
+    <div class="sub" id="resetSub">Reset link found — set a new password below</div>
+    <input type="text" id="resetToken" placeholder="Reset token (from your email)">
+    <input type="password" id="resetNewPassword" placeholder="New password (min 6 chars)" autocomplete="new-password">
+    <button class="btn" onclick="submitResetPassword()">Reset password</button>
+    <div class="auth-switch"><a onclick="closeResetPassword()">Back to log in</a></div>
   </div>
 </div>
 <div class="oauth-result" id="oauthResult">✅ Social account connected!</div>
@@ -363,6 +393,7 @@
     <div id="avatarMenu" class="avatar-menu">
       <button class="av-menu-item" data-view="accounts">🔗 Channels</button>
       <button class="av-menu-item" data-view="deploy">⚙️ Settings</button>
+      <button class="av-menu-item" onclick="openChangePassword()">🔑 Change password</button>
       <button class="av-menu-item" disabled>💳 Billing <span class="soon">soon</span></button>
       <button class="av-menu-item" disabled>👥 Team <span class="soon">soon</span></button>
       <div class="av-menu-sep"></div>
@@ -370,6 +401,26 @@
     </div>
   </div>
 </aside>
+
+<!-- CHANGE PASSWORD -->
+<div class="overlay" id="changePwOverlay">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head"><h3>🔑 Change password</h3>
+      <button class="x" onclick="closeChangePassword()">✕</button></div>
+    <div style="padding:20px 22px">
+      <label class="f">Current password</label>
+      <input type="password" id="cpgCurrent" autocomplete="current-password"
+        style="width:100%;margin-bottom:12px;border:1px solid var(--border2);border-radius:9px;padding:10px">
+      <label class="f">New password</label>
+      <input type="password" id="cpgNew" autocomplete="new-password" placeholder="Min 6 characters"
+        style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:10px">
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeChangePassword()">Cancel</button>
+      <button class="btn green" onclick="submitChangePassword()">Update password</button>
+    </div>
+  </div>
+</div>
 
 <!-- ================= MAIN ================= -->
 <div class="main">
@@ -848,6 +899,7 @@ function toggleAuth(){
     ? 'No account? <a onclick="toggleAuth()">Sign up free</a>'
     : 'Already have an account? <a onclick="toggleAuth()">Log in</a>';
   document.getElementById('authName').style.display = authMode==='signup' ? 'block' : 'none';
+  document.getElementById('authForgotWrap').style.display = authMode==='signup' ? 'none' : 'block';
 }
 async function submitAuth(){
   const email = document.getElementById('authEmail').value.trim().toLowerCase();
@@ -872,6 +924,85 @@ function demoLogin(){
 function logout(){
   localStorage.removeItem('sa_token'); TOKEN = null; ME = null;
   location.reload();
+}
+
+/* ---------- forgot / reset password ---------- */
+function openForgotPassword(){
+  document.getElementById('authOverlay').style.display = 'none';
+  document.getElementById('forgotOverlay').style.display = 'flex';
+  document.getElementById('forgotResult').style.display = 'none';
+  document.getElementById('forgotEmail').value = document.getElementById('authEmail').value || '';
+}
+function closeForgotPassword(){
+  document.getElementById('forgotOverlay').style.display = 'none';
+  document.getElementById('authOverlay').style.display = 'flex';
+}
+async function submitForgotPassword(){
+  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  if(!email) return toast('Enter your email', false);
+  try{
+    const r = await api('/api/auth/forgot-password',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})});
+    const box = document.getElementById('forgotResult');
+    box.style.display = 'block';
+    if(r.reset_token){
+      // MOCK_MODE: no mailer configured yet, so the token is shown directly
+      // instead of being emailed — click below to jump straight to reset.
+      box.innerHTML = `${esc(r.message)}<br><br><b>Dev token:</b> <code style="word-break:break-all">${esc(r.reset_token)}</code>
+        <br><a onclick="openResetPassword('${esc(r.reset_token)}')" style="display:inline-block;margin-top:8px">Reset password now →</a>`;
+    } else {
+      box.textContent = r.message;
+    }
+  }catch(e){ toast(e.message, false); }
+}
+function openResetPassword(prefillToken){
+  document.getElementById('forgotOverlay').style.display = 'none';
+  document.getElementById('authOverlay').style.display = 'none';
+  document.getElementById('resetOverlay').style.display = 'flex';
+  document.getElementById('resetToken').value = prefillToken || '';
+  document.getElementById('resetNewPassword').value = '';
+}
+function closeResetPassword(){
+  document.getElementById('resetOverlay').style.display = 'none';
+  document.getElementById('authOverlay').style.display = 'flex';
+}
+async function submitResetPassword(){
+  const token = document.getElementById('resetToken').value.trim();
+  const new_password = document.getElementById('resetNewPassword').value;
+  if(!token) return toast('Paste your reset token', false);
+  if(!new_password || new_password.length < 6) return toast('New password needs at least 6 characters', false);
+  try{
+    const r = await api('/api/auth/reset-password',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token, new_password})});
+    TOKEN = r.access_token; localStorage.setItem('sa_token', TOKEN);
+    ME = r.user;
+    document.getElementById('resetOverlay').style.display = 'none';
+    enterApp();
+    toast('Password reset — you\'re logged in 🔒');
+  }catch(e){ toast(e.message, false); }
+}
+
+/* ---------- change password (logged in) ---------- */
+function openChangePassword(){
+  document.getElementById('avatarMenu').classList.remove('open');
+  document.getElementById('cpgCurrent').value = '';
+  document.getElementById('cpgNew').value = '';
+  document.getElementById('changePwOverlay').classList.add('open');
+}
+function closeChangePassword(){
+  document.getElementById('changePwOverlay').classList.remove('open');
+}
+async function submitChangePassword(){
+  const current_password = document.getElementById('cpgCurrent').value;
+  const new_password = document.getElementById('cpgNew').value;
+  if(!current_password) return toast('Enter your current password', false);
+  if(!new_password || new_password.length < 6) return toast('New password needs at least 6 characters', false);
+  try{
+    await api('/api/auth/change-password',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({current_password, new_password})});
+    closeChangePassword();
+    toast('Password updated ✅');
+  }catch(e){ toast(e.message, false); }
 }
 function enterApp(){
   document.getElementById('authOverlay').style.display = 'none';

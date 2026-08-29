@@ -1,5 +1,6 @@
 """Password hashing (bcrypt) + JWT auth."""
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -34,6 +35,13 @@ def create_token(user_id: int) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS),
     }
     return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+
+RESET_TOKEN_TTL_MINUTES = 30
+
+
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)
 
 
 def decode_token(token: str) -> int:

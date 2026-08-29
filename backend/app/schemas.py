@@ -19,6 +19,28 @@ class LoginIn(BaseModel):
     password: str
 
 
+class ForgotPasswordIn(BaseModel):
+    email: str
+
+
+class ForgotPasswordOut(BaseModel):
+    message: str
+    # MOCK_MODE only: no email service is wired up yet, so the reset link is
+    # handed back directly instead of being emailed. Remove this field once
+    # a real mailer (SendGrid/SES free tier etc.) sends the link instead.
+    reset_token: Optional[str] = None
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6, max_length=200)
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6, max_length=200)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

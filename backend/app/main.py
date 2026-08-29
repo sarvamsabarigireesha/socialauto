@@ -108,6 +108,10 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE accounts ADD COLUMN refresh_token VARCHAR(500) NOT NULL DEFAULT ''"))
         if "posts" in cols and "post_type" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN post_type VARCHAR(12) NOT NULL DEFAULT 'feed'"))
+        if "users" in cols and "reset_token" not in cols["users"]:
+            conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(120) NOT NULL DEFAULT ''"))
+        if "users" in cols and "reset_token_expires" not in cols["users"]:
+            conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP"))
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
