@@ -102,15 +102,19 @@
   /* ---------- bottom-left avatar menu ---------- */
   .av-circle{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--purple));
     color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .avatar-menu{display:none;position:absolute;bottom:calc(100% + 6px);left:6px;right:6px;background:#fff;
-    border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:50}
+  .avatar-menu{display:none;position:absolute;bottom:calc(100% + 10px);left:0;right:0;background:#fff;
+    border:1px solid #e5e0d8;border-radius:20px;box-shadow:0 18px 40px rgba(16,24,40,.12);padding:14px;z-index:60}
   .avatar-menu.open{display:block}
-  .av-menu-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;
-    padding:9px 10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--txt)}
-  .av-menu-item:hover{background:#f2f4f9}
+  .avatar-menu-email{font-size:14px;color:#5f6368;margin-bottom:16px;word-break:break-all}
+  .avatar-menu-org{padding-bottom:14px}
+  .avatar-menu-org h4{font-size:18px;line-height:1.2;font-weight:800;margin:0 0 6px}
+  .avatar-menu-org p{font-size:14px;color:#666;margin:0}
+  .av-menu-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:none;
+    padding:12px 10px;border-radius:12px;font-size:14px;font-weight:700;color:var(--txt)}
+  .av-menu-item:hover{background:#f7f5f1}
   .av-menu-item:disabled{color:var(--muted);cursor:default}
   .av-menu-item .soon{margin-left:auto;font-size:10px;color:var(--muted);font-weight:700}
-  .av-menu-sep{height:1px;background:var(--border);margin:5px 2px}
+  .av-menu-sep{height:1px;background:#ebe6df;margin:10px 0}
 
   .main{margin-left:282px;padding:24px 24px 56px;min-height:100vh}
   .topbar{display:flex;align-items:center;gap:14px;margin-bottom:22px;position:sticky;top:10px;z-index:30;background:rgba(243,245,249,.85);backdrop-filter:blur(10px);padding:12px 0 14px}
@@ -693,18 +697,23 @@
     <button id="avatarBtn" onclick="toggleAvatarMenu()" class="org-btn">
       <div class="av-circle" id="avatarCircle">S</div>
       <div style="flex:1;min-width:0;text-align:left">
-        <div id="userBox" class="org-name"></div>
+        <div id="userBox" class="org-name">My Organization</div>
         <div class="org-plan">Free Plan <span class="mock-pill" id="modePill" style="margin-left:6px;padding:0 6px">MOCK</span></div>
       </div>
       <span style="color:var(--muted)">⋯</span>
     </button>
     <div id="avatarMenu" class="avatar-menu">
-      <button class="av-menu-item" data-view="accounts">🔗 Channels</button>
-      <button class="av-menu-item" onclick="openTagManager()">🏷 Tags</button>
-      <button class="av-menu-item" onclick="openLinkManager()">🔗 Short links</button>
-      <button class="av-menu-item" onclick="openProfile()">🌍 Profile &amp; timezone</button>
+      <div class="avatar-menu-email" id="menuEmail">demo@socialauto.app</div>
+      <div class="avatar-menu-org">
+        <h4>My Organization</h4>
+        <p>Free plan · <span id="menuChannelCount">0</span> channels</p>
+      </div>
+      <div class="av-menu-sep"></div>
       <button class="av-menu-item" data-view="deploy">⚙️ Settings</button>
+      <button class="av-menu-item" data-view="accounts">🔗 Channels</button>
+      <button class="av-menu-item" onclick="openProfile()">🌍 Profile &amp; timezone</button>
       <button class="av-menu-item" onclick="openChangePassword()">🔑 Change password</button>
+      <button class="av-menu-item" onclick="openHelpSupport()">❓ Help &amp; support</button>
       <div class="av-menu-sep"></div>
       <button class="av-menu-item" onclick="logout()">🚪 Log out</button>
     </div>
@@ -1638,7 +1647,9 @@ async function submitChangePassword(){
 }
 function enterApp(){
   document.getElementById('authOverlay').style.display = 'none';
-  document.getElementById('userBox').textContent = ME.name || ME.email;
+  const menuEmail = document.getElementById('menuEmail');
+  if(menuEmail) menuEmail.textContent = ME.email || '';
+  document.getElementById('userBox').textContent = 'My Organization';
   const initial = (ME.name || ME.email || 'S').trim()[0].toUpperCase();
   const circle = document.getElementById('avatarCircle');
   if (circle) circle.textContent = initial;
@@ -1857,6 +1868,8 @@ function renderSidebarChannels(summary){
   document.getElementById('sideStreakBadge').textContent = streak;
   const chCount = document.getElementById('sideChannelCount');
   if(chCount) chCount.textContent = ACCOUNTS.length;
+  const menuCount = document.getElementById('menuChannelCount');
+  if(menuCount) menuCount.textContent = ACCOUNTS.length;
   wrap.innerHTML = sample.length ? sample.map(a=>{
     const m = PLAT_META[a.platform] || {ic:'•',label:a.platform};
     const initials = (a.display_name||m.label||'S').trim().slice(0,2).toUpperCase();
@@ -2147,6 +2160,10 @@ document.querySelectorAll('.av-menu-item[data-view]').forEach(b => b.onclick = (
 function toggleAvatarMenu(){
   document.getElementById('avatarMenu').classList.toggle('open');
 }
+function openHelpSupport(){
+  document.getElementById('avatarMenu').classList.remove('open');
+  toast('Help & support: use Settings / Channels for setup. More support options can be added next.');
+}
 document.addEventListener('click', (e)=>{
   const foot = document.querySelector('.side-foot');
   if (foot && !foot.contains(e.target)) document.getElementById('avatarMenu').classList.remove('open');
@@ -2392,7 +2409,8 @@ async function saveProfile(){
     ME = await api('/api/auth/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:document.getElementById('profName').value.trim(),
         timezone:document.getElementById('profTz').value})});
-    document.getElementById('userBox').textContent = ME.name||ME.email;
+    const menuEmail = document.getElementById('menuEmail');
+    if(menuEmail) menuEmail.textContent = ME.email || '';
     closeProfile();
     toast('Profile saved 🌍');
   }catch(e){ toast(e.message,false); }
