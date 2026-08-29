@@ -1,15 +1,20 @@
-# ⚡ SocialAuto — Free-Tier Social Media Automation Webapp (Publer-style)
+# ⚡ SocialAuto — Free-Tier Social Media Automation Webapp (Buffer-style)
 
-**Calendar view · Rich composer with live per-platform previews · Media library · Bulk CSV scheduling · Auto-comments (intent-based smart replies) · Analytics** — across **Instagram, Facebook, YouTube** (plus manual-helper support for Threads, Moj, ShareChat). Runs 100% on free tiers. Works in **MOCK MODE** with zero credentials so you can demo it instantly.
+**Calendar (Week + Month) · Queue with drag-to-reorder · Buffer-style publishing schedules · Rich composer with live per-platform previews + per-network customization · Media library · Bulk CSV scheduling · Tags · Link shortener · Auto-comments (intent-based smart replies) · Widget analytics with CSV export** — across **Instagram, Facebook, YouTube** (plus manual-helper support for Threads, Moj, ShareChat). Runs 100% on free tiers. Works in **MOCK MODE** with zero credentials so you can demo it instantly.
 
-### Dashboard features (like Publer)
-- 📅 **Monthly calendar** — color-coded posts per platform; click a day to create, click a post to edit
-- ✏️ **Composer modal** — multi-account selector, live platform preview cards, per-platform character counters (IG 2200 / FB 2200), attach media, schedule or *Publish now*
-- 🖼 **Media library** — upload images once (drag & drop), reuse in any post; demo images pre-seeded
+### Dashboard features (Buffer-style UI)
+- 📅 **Calendar — Week + Month toggle** — color-coded posts per platform; click a day (or a time in Week view) to create, click a post to edit
+- 📋 **Queue view** — drag posts to reorder; times auto-shift to your schedule slots (`POST /api/posts/reorder`)
+- ⏰ **Publishing Schedule** — per-channel weekly time slots + posting goal (queue/next posts fill slots automatically, per-channel timezone aware)
+- ✏️ **Composer modal** — multi-account selector, live platform preview cards, per-platform character counters, 4-option schedule dropdown (**Add to Queue / Share Next / Share Now / Schedule**), **Save Draft**, **Customize for each network** (per-account caption/media), 🏷 tags picker, 🔗 built-in link shortener with click stats, AI suggest (rules + optional Gemini vision)
+- 💾 **Drafts** — first-class citizens: save anytime, open from the Queue's Drafts tab
+- 🏷 **Tags** — create/manage tags, assign in composer or bulk CSV, tag-level performance in Analytics
+- 🖼 **Media library** — upload images/videos once (drag & drop), reuse in any post; demo images pre-seeded
 - ✏️ **Edit / delete / publish-now** any scheduled post (`PATCH /api/posts/:id`)
-- 📦 **Bulk CSV** upload — hundreds of posts × multiple accounts in one request
-- 💬 **Auto-comment inbox** with intent-based replies (question / praise / purchase / support)
-- 📊 **Analytics** — likes, comments, shares, impressions, reach per platform and per post
+- 📦 **Bulk CSV** upload — hundreds of posts × multiple accounts in one request (optional `post_type` + tags)
+- 💬 **Community inbox** — real comment sync, per-post threads with replied/total progress + unanswered highlights, auto-replies by intent (question / praise / purchase / support) + manual replies, resolve/reopen
+- 📊 **Analytics widgets** — totals, per-platform, per-tag, per-post table, date-range filter (7/30/90/365 days), **CSV export**, manual refresh from platforms
+- 🌍 **Profile & timezone** — posting schedule, queue slots and calendar all follow your timezone
 
 ## 🏗 Architecture
 
@@ -27,10 +32,13 @@
    (dashboard)      │           FastAPI app (Cloud Run free /      │
                     │           Fly.io / Render / GCP free tier)   │
                     │                                              │
-                    │  /api/posts     schedule + bulk CSV upload   │
+                    │  /api/posts     schedule + bulk CSV + reorder │
                     │  /api/comments  inbox + auto-reply engine    │
-                    │  /api/analytics aggregated dashboard stats   │
-                    │  /api/accounts  connect social accounts      │
+                    │  /api/community threads + manual replies     │
+                    │  /api/tags      labels + tag analytics       │
+                    │  /api/links     short links (+ /l/{code})    │
+                    │  /api/analytics widgets + CSV export         │
+                    │  /api/accounts  connect + schedule settings  │
                     │  /api/cron/tick protected scheduler endpoint │
                     │                                              │
                     │  Services layer:                             │

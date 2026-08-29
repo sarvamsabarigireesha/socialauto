@@ -308,6 +308,98 @@
   code{background:#f0f2f7;padding:2px 6px;border-radius:5px;font-size:12px}
   .thumb{width:44px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--border)}
   .acc-sel-wrap{border:1px solid var(--border);border-radius:10px;padding:10px}
+
+  /* ---------- Buffer parity: view toggle (Weekly/Monthly) ---------- */
+  .view-toggle{display:flex;gap:4px;background:#fff;border:1px solid var(--border2);border-radius:10px;padding:3px}
+  .view-toggle button{border:none;background:none;padding:6px 14px;border-radius:8px;font-weight:700;font-size:13px;color:var(--muted)}
+  .view-toggle button.active{background:var(--brand);color:#fff}
+
+  /* ---------- Buffer parity: weekly calendar ---------- */
+  .week-grid{display:grid;grid-template-columns:52px repeat(7,1fr);border:1px solid var(--border);border-radius:var(--radius);
+    overflow:hidden;background:#fff;box-shadow:var(--shadow)}
+  .week-gutter{background:#f7f9fc;border-right:1px solid var(--border)}
+  .week-hour{height:60px;font-size:10.5px;color:var(--muted);text-align:right;padding:4px 8px 0 0;border-bottom:1px solid #f0f2f7;
+    transform:translateY(-6px)}
+  .week-col{border-right:1px solid var(--border);min-height:840px;position:relative}
+  .week-col:last-child{border-right:none}
+  .week-col.out{background:#fafbfe}
+  .week-dayhead{padding:8px 6px;text-align:center;border-bottom:1px solid var(--border);background:#f7f9fc;
+    font-weight:700;font-size:12.5px;position:sticky;top:0;z-index:3}
+  .week-dayhead .dn{display:block;font-size:11px;color:var(--muted);font-weight:600}
+  .week-dayhead.today{background:#eef1ff;color:var(--brand-d)}
+  .week-post{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 7px;font-size:11px;font-weight:700;color:#fff;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);z-index:2}
+  .week-post small{display:block;font-weight:600;opacity:.85;font-size:10px}
+
+  /* ---------- Buffer parity: queue (drag-to-reorder) ---------- */
+  .queue-wrap{max-width:860px}
+  .queue-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .queue-header .hint{margin-left:auto}
+  .q-day{margin-bottom:20px}
+  .q-day-title{font-size:13.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px 2px}
+  .q-day-title .cnt{margin-left:8px;color:var(--brand)}
+  .q-task{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:12px;
+    padding:10px 14px;margin-bottom:8px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s;cursor:grab}
+  .q-task:hover{box-shadow:0 2px 10px rgba(16,24,40,.12)}
+  .q-task.dragging{opacity:.45;transform:scale(.99)}
+  .q-task.drop-target{border-color:var(--brand);border-style:dashed}
+  .q-time{min-width:86px;font-weight:800;font-size:13.5px;color:var(--brand-d);text-align:center;
+    background:#eef1ff;border-radius:8px;padding:8px 6px}
+  .q-time small{display:block;font-weight:600;font-size:10.5px;color:var(--muted)}
+  .q-main{flex:1;min-width:0}
+  .q-cap{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .q-meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .q-acts{display:flex;gap:6px;flex-shrink:0}
+
+  /* ---------- Buffer parity: tags ---------- */
+  .tag-chip{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:3px 10px;font-size:12px;
+    font-weight:700;color:#fff;cursor:pointer;border:none}
+  .tag-chip.sel{outline:2px solid var(--txt);outline-offset:1px}
+  .tag-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .tag-sugg{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .tag-sugg input{flex:1;min-width:140px;border:1px dashed var(--border2);border-radius:20px;padding:5px 12px;font-size:12.5px}
+
+  /* ---------- Buffer parity: link shortener ---------- */
+  .link-bar{display:flex;gap:8px;align-items:center;margin-top:10px}
+  .link-bar input{flex:1;border:1px solid var(--border2);border-radius:9px;padding:9px 12px;font-size:13px}
+  .link-out{display:flex;gap:8px;align-items:center;background:#eef7f2;border:1px solid #bfe3d2;border-radius:9px;
+    padding:7px 12px;font-size:13px;color:var(--green);font-weight:700}
+
+  /* ---------- Buffer parity: per-network customization ---------- */
+  .custom-toggle{display:flex;align-items:center;gap:9px;margin:10px 0;padding:9px 12px;background:#f6f8ff;border:1px solid #dde3ff;
+    border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;color:var(--brand-d)}
+  .pn-card{border:1px solid var(--border2);border-radius:11px;padding:10px 12px;margin-bottom:9px;background:#fff}
+  .pn-head{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+  .pn-card textarea{width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px 11px;font-size:13px;min-height:56px;resize:vertical}
+  .pn-card .pn-media{display:flex;gap:8px;margin-top:7px;align-items:center}
+  .pn-card input[type=text]{flex:1;border:1px solid var(--border2);border-radius:9px;padding:7px 10px;font-size:12.5px}
+
+  /* ---------- Buffer parity: posting schedule manager ---------- */
+  .slot-picker{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .slot-day{background:#fafbfe;border:1px solid var(--border);border-radius:11px;padding:10px;min-height:120px}
+  .slot-day h4{margin:0 0 8px;font-size:12.5px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.5px}
+  .slot-day.today-col{background:#f4f7ff;border-color:#c9d4ff}
+  .slot-chip{display:flex;align-items:center;justify-content:center;gap:5px;background:var(--brand);color:#fff;border-radius:7px;
+    padding:5px 4px;font-size:12px;font-weight:800;margin-bottom:5px;cursor:pointer}
+  .slot-chip:hover{background:var(--brand-d)}
+  .slot-add{border:1px dashed var(--border2);color:var(--muted);background:none;border-radius:7px;width:100%;padding:5px;
+    font-size:12px;font-weight:700}
+  .slot-add:hover{border-color:var(--brand);color:var(--brand)}
+  .goal-row{display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:700;font-size:13.5px}
+  .goal-row input{width:70px;border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-size:14px;text-align:center}
+
+  /* ---------- Buffer parity: analytics range pills + tags ---------- */
+  .range-pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .tag-stat{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+  .tag-stat .bar{flex:1}
+
+  /* ---------- Buffer parity: link modal ---------- */
+  .link-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .link-row code{font-weight:700;color:var(--brand-d)}
+
+  /* ---------- slot hint in composer ---------- */
+  .slot-hint{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);margin-top:9px;flex-wrap:wrap}
+  .slot-hint b{color:var(--brand-d)}
 </style>
 </head>
 <body>
@@ -363,6 +455,7 @@
 <!-- ================= SIDEBAR ================= -->
 <aside class="sidebar">
   <div class="logo"><div class="mk">⚡</div> SocialAuto</div>
+  <button class="btn" style="margin:2px 4px 12px;justify-content:center" onclick="openComposer()">✏️ + New Post</button>
   <button class="nav-item active" data-view="home">🏠 Home</button>
 
   <div class="nav-group-label">Create</div>
@@ -374,6 +467,7 @@
   <button class="nav-item" data-view="calendar">📅 Calendar</button>
   <button class="nav-item" data-view="posts">📋 Queue</button>
   <button class="nav-item" data-view="bulk">📦 Bulk / CSV</button>
+  <button class="nav-item" data-view="schedule">⏰ Publishing Schedule</button>
 
   <div class="nav-group-label">Analyze</div>
   <button class="nav-item" data-view="analytics">📊 Analytics</button>
@@ -392,6 +486,9 @@
     </button>
     <div id="avatarMenu" class="avatar-menu">
       <button class="av-menu-item" data-view="accounts">🔗 Channels</button>
+      <button class="av-menu-item" onclick="openTagManager()">🏷 Tags</button>
+      <button class="av-menu-item" onclick="openLinkManager()">🔗 Short links</button>
+      <button class="av-menu-item" onclick="openProfile()">🌍 Profile &amp; timezone</button>
       <button class="av-menu-item" data-view="deploy">⚙️ Settings</button>
       <button class="av-menu-item" onclick="openChangePassword()">🔑 Change password</button>
       <button class="av-menu-item" disabled>💳 Billing <span class="soon">soon</span></button>
@@ -493,26 +590,32 @@
   </div>
 
   <!-- CALENDAR -->
-  <section id="view-calendar">
+  <section id="view-calendar" style="display:none">
     <div class="cal-head">
-      <button class="btn ghost" onclick="moveMonth(-1)">‹</button>
+      <button class="btn ghost" onclick="moveCal(-1)">‹</button>
       <div class="title" id="calTitle"></div>
-      <button class="btn ghost" onclick="moveMonth(1)">›</button>
+      <button class="btn ghost" onclick="moveCal(1)">›</button>
       <button class="btn ghost sm" onclick="goToday()" style="margin-left:6px">Today</button>
+      <div class="view-toggle" style="margin-left:auto">
+        <button id="tgWeek" class="active" onclick="setCalMode('week')">Week</button>
+        <button id="tgMonth" onclick="setCalMode('month')">Month</button>
+      </div>
     </div>
-    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-grid" id="calGrid" style="display:none"></div>
+    <div class="week-grid" id="weekGrid"></div>
     <div class="legend">
       <span><i class="dot" style="background:var(--ig)"></i> Instagram</span>
       <span><i class="dot" style="background:var(--fb)"></i> Facebook</span>
       <span><i class="dot" style="background:#ff0000"></i> YouTube</span>
-      <span class="muted">· Click a day to create · Click a post to edit</span>
+      <span class="muted">· Click a day (or a time in Week view) to create · Click a post to edit</span>
     </div>
   </section>
 
-  <!-- POSTS -->
+  <!-- POSTS (Buffer-style Queue) -->
   <section id="view-posts" style="display:none">
     <div class="filters" id="postFilters"></div>
-    <div class="card" style="overflow:hidden">
+    <div class="queue-wrap" id="queueWrap"></div>
+    <div class="card" id="postsCard" style="overflow:hidden">
       <table><thead><tr><th></th><th>Content</th><th>Account</th><th>Scheduled</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="postsTbody"></tbody></table>
     </div>
@@ -529,10 +632,22 @@
         Each row is posted to every selected account.</p>
       <label class="f">Target accounts</label>
       <div class="acc-pick" id="bulkAccPick" style="margin-bottom:14px"></div>
+      <label class="f" style="margin-top:4px">Tags (optional — applied to every row)</label>
+      <div class="tag-sugg" id="bulkTags" style="margin-bottom:14px"></div>
       <div class="upload-drop" id="bulkDrop">📄 Drag &amp; drop <b>posts.csv</b> here, or click to browse</div>
       <input type="file" id="bulkFile" accept=".csv" style="display:none">
       <button class="btn ghost sm" onclick="downloadTemplate()">⬇️ Download CSV template</button>
       <div id="bulkResult" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- PUBLISHING SCHEDULE (Buffer-style per-channel slots) -->
+  <section id="view-schedule" style="display:none">
+    <div class="card" style="padding:20px;max-width:980px">
+      <h2 class="section-title">⏰ Publishing Schedule</h2>
+      <p class="muted" style="margin-bottom:14px">Buffer-style: pick the days &amp; times each channel should post.
+        “Add to Queue” and “Share Next” land on these slots automatically — skipped if another post already took it.</p>
+      <div id="schedChannels"></div>
     </div>
   </section>
 
@@ -581,6 +696,13 @@
 
   <!-- ANALYTICS -->
   <section id="view-analytics" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div class="range-pills" id="rangePills"></div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn ghost sm" onclick="syncAnalytics()">🔄 Refresh from platforms</button>
+        <button class="btn ghost sm" onclick="exportAnalytics()">⬇️ Export CSV</button>
+      </div>
+    </div>
     <div class="grid stats" id="statCards"></div>
     <div class="grid two-col" style="margin-top:16px">
       <div class="card" style="padding:18px">
@@ -591,6 +713,10 @@
         <h2 class="section-title">Auto-comment engine</h2>
         <div id="commentStats" style="line-height:2"></div>
       </div>
+    </div>
+    <div class="card" style="margin-top:16px;padding:18px">
+      <h2 class="section-title">🏷 Performance by tag</h2>
+      <div id="byTag" style="margin-top:10px"></div>
     </div>
     <div class="card" style="margin-top:16px;overflow:hidden">
       <div style="padding:18px 18px 0"><h2 class="section-title">Published posts performance</h2></div>
@@ -710,6 +836,25 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
           <span class="hint" id="mediaHint"></span>
         </div>
 
+        <!-- Buffer: customize for each network -->
+        <label class="custom-toggle">
+          <input type="checkbox" id="customEach" onchange="renderCustomize()"> 🔀 Customize for each network
+          <span class="muted" style="font-weight:500;font-size:12px">— different caption/media per account</span>
+        </label>
+        <div id="customizeList"></div>
+
+        <!-- Buffer: tags -->
+        <label class="f">🏷 Tags</label>
+        <div class="tag-sugg" id="compTags"></div>
+
+        <!-- Buffer: link shortener -->
+        <label class="f" style="margin-top:10px">🔗 Add a link (auto-shortened)</label>
+        <div class="link-bar">
+          <input id="linkUrl" placeholder="https://example.com/your-page" onkeydown="if(event.key==='Enter')shortenLink()">
+          <button class="tool-btn" onclick="shortenLink()">Shorten + add</button>
+        </div>
+        <div id="linkOut" style="margin-top:8px"></div>
+
         <!-- AI assistant panel -->
         <div id="aiPanel" style="display:none;margin-top:12px;border:1px solid #d9cbfb;background:#faf8ff;border-radius:12px;padding:14px">
           <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:var(--purple);margin-bottom:8px">
@@ -754,10 +899,11 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
             </select>
           </div>
           <div class="fld" id="whenFld" style="display:none">
-            <label class="f">Date &amp; time (UTC)</label>
+            <label class="f">Date &amp; time</label>
             <input type="datetime-local" id="schedWhen">
           </div>
         </div>
+        <div class="slot-hint" id="slotHint"></div>
       </div>
 
       <div class="preview-pane">
@@ -769,6 +915,76 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
       <button class="btn ghost" onclick="closeComposer()">Cancel</button>
       <button class="btn ghost" id="draftBtn" onclick="savePost(true)">💾 Save Draft</button>
       <button class="btn green" id="saveBtn" onclick="savePost(false)">📥 Add to Queue</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULE SLOT EDITOR MODAL (Buffer-style per channel) -->
+<div class="overlay" id="schedModalOverlay">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head"><h3>⏰ Posting schedule — <span id="schedModalName"></span></h3>
+      <button class="x" onclick="closeSchedModal()">✕</button></div>
+    <div style="padding:18px 22px">
+      <p class="muted" style="font-size:13px;margin-bottom:12px">Tap a time to remove it · Tap <b>+ Add</b> to add a slot. Queue posts fill these slots in order.</p>
+      <div class="slot-picker" id="schedModalGrid"></div>
+      <div class="goal-row">
+        🎯 Weekly posting goal <input type="number" id="schedGoal" min="1" max="70"> posts/week
+        <span class="muted" style="font-weight:500;font-size:12.5px">(shown on Home dashboard)</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeSchedModal()">Cancel</button>
+      <button class="btn green" onclick="saveSchedModal()">💾 Save schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAG MANAGER MODAL -->
+<div class="overlay" id="tagManagerOverlay">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head"><h3>🏷 Tags</h3>
+      <button class="x" onclick="closeTagManager()">✕</button></div>
+    <div style="padding:18px 22px">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input id="newTagName" placeholder="New tag name…" style="flex:1;border:1px solid var(--border2);border-radius:9px;padding:9px 12px"
+          onkeydown="if(event.key==='Enter')createTag()">
+        <button class="btn" onclick="createTag()">+ Create</button>
+      </div>
+      <div id="tagManagerList"></div>
+      <p class="muted" style="font-size:12.5px;margin-top:10px">Tags group posts for filtering + tag performance analytics.</p>
+    </div>
+  </div>
+</div>
+
+<!-- LINK MANAGER MODAL -->
+<div class="overlay" id="linkManagerOverlay">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-head"><h3>🔗 Short links</h3>
+      <button class="x" onclick="closeLinkManager()">✕</button></div>
+    <div style="padding:18px 22px">
+      <div class="link-bar" style="margin:0 0 14px">
+        <input id="lmUrl" placeholder="https://example.com/long-link" onkeydown="if(event.key==='Enter')shortenFromManager()">
+        <button class="btn sm" onclick="shortenFromManager()">Shorten</button>
+      </div>
+      <div id="linkManagerList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE / TIMEZONE MODAL -->
+<div class="overlay" id="profileOverlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head"><h3>🌍 Profile &amp; timezone</h3>
+      <button class="x" onclick="closeProfile()">✕</button></div>
+    <div style="padding:18px 22px">
+      <label class="f">Display name</label>
+      <input id="profName" style="width:100%;margin-bottom:12px;border:1px solid var(--border2);border-radius:9px;padding:10px">
+      <label class="f">Timezone — posting schedule &amp; queue slots use this</label>
+      <select id="profTz" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:10px"></select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeProfile()">Cancel</button>
+      <button class="btn green" onclick="saveProfile()">💾 Save</button>
     </div>
   </div>
 </div>
@@ -858,9 +1074,9 @@ function maybeAutoAI(){
 }
 
 /* ================= state ================= */
-let ACCOUNTS = [], POSTS = [], MEDIA = [];
+let ACCOUNTS = [], POSTS = [], MEDIA = [], TAGS = [];
 let calYear, calMonth;                      // calendar cursor
-let comp = { sel: new Set(), mediaUrl: "", editingId: null };
+let comp = { sel: new Set(), mediaUrl: "", editingId: null, tags: new Set(), perAcct: {}, custom: false };
 const PLAT_META = {
   instagram:{ic:'📸',cls:'ig',limit:2200,label:'Instagram', ratio:'4/5', ratioNote:'4:5 portrait (best feed)'},
   facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook', ratio:'1.91/1', ratioNote:'1.91:1 link / 4:5 photo'},
@@ -1010,6 +1226,7 @@ function enterApp(){
   const initial = (ME.name || ME.email || 'S').trim()[0].toUpperCase();
   const circle = document.getElementById('avatarCircle');
   if (circle) circle.textContent = initial;
+  switchView('home');
   refreshData();
 }
 
@@ -1069,6 +1286,7 @@ async function loadCommunity(){
         <div style="text-align:right">
           <div style="font-weight:800;font-size:15px">${t.replied} replied / ${t.total} total</div>
           <div class="bar" style="width:150px;margin-top:6px"><div style="width:${pct}%"></div></div>
+          ${t.unresolved?`<div style="margin-top:6px"><span class="pill failed">⏳ ${t.unresolved} unanswered</span></div>`:''}
         </div>
       </div>
       <div style="margin-top:14px">
@@ -1216,15 +1434,15 @@ async function loadHome(){
   // week streak: days with scheduled/published posts in last 7 days
   const weekAgo = Date.now()-7*864e5;
   const days = new Set((await api('/api/posts'))
-    .filter(p=> new Date(p.published_at||p.scheduled_at).getTime() > weekAgo)
+    .filter(p=>p.status!=='draft' && new Date(p.published_at||p.scheduled_at).getTime() > weekAgo)
     .map(p=>new Date(p.published_at||p.scheduled_at).toDateString()));
   const streak = days.size;
   document.getElementById('streakRing').textContent = streak;
   document.getElementById('streakPct').textContent = streak>=5?'Top 15%':streak>=3?'On track':'Warm up';
   document.getElementById('streakSub').textContent = streak>=5?'Streak hit, keep going!':`${7-streak} more day(s) this week for Top 15%`;
-  const goal = 7, done = streak;
+  const goal = Math.max(7, ACCOUNTS.reduce((s,a)=>s+(a.posting_goal||7),0)), done = streak;
   document.getElementById('goalsRing').textContent = `${done}/${goal}`;
-  document.getElementById('goalsSub').textContent = done>=goal?'Weekly goal smashed 🎉':'Goal: post once daily (7/week)';
+  document.getElementById('goalsSub').textContent = done>=goal?'Weekly goal smashed 🎉':`Goal: ${goal} posts/week across your channels (set in Publishing Schedule)`;
   const coverage = d.comments_total ? Math.round(d.auto_replied/d.comments_total*100) : 55;
   document.getElementById('scoreRing').textContent = Math.max(55, coverage);
   document.getElementById('homeStats').innerHTML = `
@@ -1406,8 +1624,9 @@ const TITLES = {
   home:['Home','Your growth dashboard'],
   ideas:['Ideas','Plan content before you post — Kanban board'],
   calendar:['Calendar','Plan, schedule and auto-publish across all your social accounts'],
-  posts:['Queue','Every scheduled and published post in one place'],
+  posts:['Queue','Drag to reorder — posts publish in this order at your schedule slots'],
   bulk:['Bulk / CSV','Upload hundreds of posts at once'],
+  schedule:['Publishing Schedule','Set per-channel posting times — queue posts fill these slots'],
   community:['Community','Comments from all channels — auto + manual replies'],
   templates:['Templates','Ready-made captions, one click into the composer'],
   analytics:['Analytics','Performance across all platforms'],
@@ -1421,6 +1640,7 @@ function switchView(view){
   if (navBtn) navBtn.classList.add('active');
   document.querySelectorAll('.main > section').forEach(s=>s.style.display='none');
   document.getElementById('view-'+view).style.display='block';
+  document.querySelector('.topbar').style.display = view==='home' ? 'none' : 'flex';
   document.getElementById('viewTitle').textContent = TITLES[view][0];
   document.getElementById('viewSub').textContent = TITLES[view][1];
   if (view==='home') loadHome();
@@ -1433,6 +1653,7 @@ function switchView(view){
   if (view==='media') loadMedia();
   if (view==='accounts') loadAccounts();
   if (view==='bulk') renderBulkAccs();
+  if (view==='schedule') loadSchedule();
   if (view==='deploy'){} // static section, no fetch needed
   document.getElementById('avatarMenu').classList.remove('open');
 }
@@ -1473,9 +1694,176 @@ function accPill(a, selected, onclick){
     <span class="av ${a.platform}">${PLAT_META[a.platform].ic}</span>${esc(a.display_name)}</button>`;
 }
 
+/* ================= publishing schedule (Buffer-style slots) ================= */
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const slotLabel = s => { const [h,m]=s.time.split(':').map(Number); const ap=h>=12?'PM':'AM';
+  return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`; };
+
+async function loadSchedule(){
+  const wrap = document.getElementById('schedChannels');
+  if(!ACCOUNTS.length){
+    wrap.innerHTML = '<p class="muted">No channels connected yet — open Accounts to connect one.</p>';
+    return;
+  }
+  wrap.innerHTML = ACCOUNTS.map(a=>{
+    const slots = (a.posting_slots&&a.posting_slots.length) ? a.posting_slots
+      : window._DEFAULT_SLOTS || [];
+    const m = PLAT_META[a.platform];
+    return `<div class="card" style="padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <span class="av ${a.platform}" style="width:40px;height:40px;font-size:17px">${m?m.ic:''}</span>
+      <div style="flex:1;min-width:200px">
+        <b>${esc(a.display_name)}</b>
+        <div class="muted" style="font-size:12.5px">${slots.length ? slots.map(slotLabel).join(' · ') : 'No slots — tap Edit to add times'}</div>
+      </div>
+      <div style="text-align:center;min-width:90px">
+        <div style="font-size:20px;font-weight:800;color:var(--brand)">${a.posting_goal||7}</div>
+        <div class="muted" style="font-size:11px">posts/week goal</div>
+      </div>
+      <button class="btn ghost sm" onclick="openSchedModal(${a.id})">⏰ Edit schedule</button>
+    </div>`;
+  }).join('');
+}
+
+let schedModalAcc = null;
+let schedModalSlots = [];
+function openSchedModal(accId){
+  schedModalAcc = ACCOUNTS.find(a=>a.id===accId);
+  if(!schedModalAcc) return;
+  schedModalSlots = JSON.parse(JSON.stringify(
+    (schedModalAcc.posting_slots&&schedModalAcc.posting_slots.length)
+      ? schedModalAcc.posting_slots : (window._DEFAULT_SLOTS||[])));
+  document.getElementById('schedModalName').textContent = schedModalAcc.display_name;
+  document.getElementById('schedGoal').value = schedModalAcc.posting_goal||7;
+  renderSchedModalGrid();
+  document.getElementById('schedModalOverlay').classList.add('open');
+}
+function closeSchedModal(){ document.getElementById('schedModalOverlay').classList.remove('open'); }
+function renderSchedModalGrid(){
+  const grid = document.getElementById('schedModalGrid');
+  const todayDow = new Date().getDay();
+  grid.innerHTML = DAY_NAMES.map((dn,i)=>{
+    const daySlots = schedModalSlots.filter(s=>s.day===i).sort((a,b)=>a.time.localeCompare(b.time));
+    return `<div class="slot-day ${i===todayDow?'today-col':''}">
+      <h4>${dn}</h4>
+      ${daySlots.map(s=>`<div class="slot-chip" onclick="removeSlot(${i},'${s.time}')">${slotLabel(s)} ✕</div>`).join('')}
+      <button class="slot-add" onclick="addSlot(${i})">+ Add</button>
+    </div>`;
+  }).join('');
+}
+function addSlot(day){
+  const t = prompt(`Add a time for ${DAY_NAMES[day]} (24h format, e.g. 18:30):`, '10:00');
+  if(!t) return;
+  if(!/^([01]?\d|2[0-3]):[0-5]\d$/.test(t.trim())) return toast('Use HH:MM 24h format', false);
+  const norm = t.trim().split(':').map(x=>x.padStart(2,'0')).join(':');
+  if(!schedModalSlots.some(s=>s.day===day&&s.time===norm)){
+    schedModalSlots.push({day, time:norm});
+    renderSchedModalGrid();
+  } else toast('That slot already exists', false);
+}
+function removeSlot(day, time){
+  schedModalSlots = schedModalSlots.filter(s=>!(s.day===day&&s.time===time));
+  renderSchedModalGrid();
+}
+async function saveSchedModal(){
+  const goal = parseInt(document.getElementById('schedGoal').value)||7;
+  await api(`/api/accounts/${schedModalAcc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({posting_slots:schedModalSlots, posting_goal:goal})});
+  closeSchedModal();
+  await refreshData();
+  loadSchedule();
+  toast('Posting schedule saved ⏰');
+}
+
+/* ================= tag manager ================= */
+async function openTagManager(){
+  await loadTags();
+  document.getElementById('newTagName').value='';
+  renderTagManager();
+  document.getElementById('tagManagerOverlay').classList.add('open');
+}
+function closeTagManager(){ document.getElementById('tagManagerOverlay').classList.remove('open'); }
+function renderTagManager(){
+  document.getElementById('tagManagerList').innerHTML = TAGS.length ? TAGS.map(t=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <span class="tag-chip" style="background:${esc(t.color)}">${esc(t.name)}</span>
+      <span class="muted" style="font-size:12.5px;flex:1">${t.posts} post${t.posts===1?'':'s'}</span>
+      <button class="btn ghost sm" style="padding:3px 10px" onclick="renameTag(${t.id},'${esc(t.name).replace(/'/g,"\\'")}')">✏️</button>
+      <button class="btn red sm" style="padding:3px 10px" onclick="delTag(${t.id})">🗑</button>
+    </div>`).join('') : '<p class="muted">No tags yet — create one above.</p>';
+}
+async function createTag(){
+  const name = document.getElementById('newTagName').value.trim();
+  if(!name) return;
+  try{
+    await api('/api/tags',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    document.getElementById('newTagName').value='';
+    await loadTags(); renderTagManager();
+    toast('Tag created 🏷');
+  }catch(e){ toast(e.message,false); }
+}
+async function renameTag(id, oldName){
+  const name = prompt('Rename tag:', oldName);
+  if(!name||name===oldName) return;
+  await api(`/api/tags/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  await loadTags(); renderTagManager(); toast('Renamed ✏️');
+}
+async function delTag(id){
+  if(!confirm('Delete this tag? Posts keep working — the tag is just removed from them.')) return;
+  await api('/api/tags/'+id,{method:'DELETE'});
+  await loadTags(); renderTagManager(); toast('Tag deleted');
+}
+
+/* ================= link manager ================= */
+async function openLinkManager(){
+  try{
+    const links = await api('/api/links/stats');
+    document.getElementById('lmUrl').value='';
+    document.getElementById('linkManagerList').innerHTML = links.length ? links.map(l=>`
+      <div class="link-row">
+        <code>${location.origin}/l/${esc(l.code)}</code>
+        <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.long_url)}</span>
+        <span class="pill published">👆 ${l.clicks}</span>
+        <button class="btn ghost sm" style="padding:3px 10px" onclick="navigator.clipboard.writeText('${location.origin}/l/${esc(l.code)}');toast('copied')">Copy</button>
+      </div>`).join('') : '<p class="muted">No short links yet.</p>';
+    document.getElementById('linkManagerOverlay').classList.add('open');
+  }catch(e){ toast(e.message,false); }
+}
+function closeLinkManager(){ document.getElementById('linkManagerOverlay').classList.remove('open'); }
+async function shortenFromManager(){
+  const url = document.getElementById('lmUrl').value.trim();
+  if(!url) return;
+  try{
+    await api('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    toast('Shortened 🔗'); openLinkManager();
+  }catch(e){ toast(e.message,false); }
+}
+
+/* ================= profile & timezone ================= */
+const TZ_OPTIONS = ['Asia/Kolkata','Asia/Dubai','Europe/London','Europe/Berlin','America/New_York','America/Los_Angeles','America/Chicago','Australia/Sydney','Asia/Singapore','Asia/Tokyo','UTC'];
+async function openProfile(){
+  if(!ME) return;
+  document.getElementById('profName').value = ME.name||'';
+  const tz = ME.timezone || 'Asia/Kolkata';
+  const sel = document.getElementById('profTz');
+  const opts = [...new Set([...TZ_OPTIONS, tz, Intl.DateTimeFormat().resolvedOptions().timeZone])].sort();
+  sel.innerHTML = opts.map(z=>`<option ${z===tz?'selected':''}>${z}</option>`).join('');
+  document.getElementById('profileOverlay').classList.add('open');
+}
+function closeProfile(){ document.getElementById('profileOverlay').classList.remove('open'); }
+async function saveProfile(){
+  try{
+    ME = await api('/api/auth/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:document.getElementById('profName').value.trim(),
+        timezone:document.getElementById('profTz').value})});
+    document.getElementById('userBox').textContent = ME.name||ME.email;
+    closeProfile();
+    toast('Profile saved 🌍');
+  }catch(e){ toast(e.message,false); }
+}
+
 /* ================= composer ================= */
 function openComposer(presetDateISO=null, editPost=null){
-  comp = { sel:new Set(), mediaUrl:'', editingId:null };
+  comp = { sel:new Set(), mediaUrl:'', editingId:null, tags:new Set(), perAcct:{}, custom:false };
   const ptRadio = document.querySelector('input[name=ptype][value="feed"]');
   if(ptRadio) ptRadio.checked = true;
   if(editPost && editPost.post_type){
@@ -1498,16 +1886,23 @@ function openComposer(presetDateISO=null, editPost=null){
     comp.sel.add(editPost.account_id);
     if(editPost.status==='published'){ /* shouldn't happen */ }
     document.getElementById('schedWhen').value = toLocalInput(new Date(editPost.scheduled_at));
+    (editPost.tags||[]).forEach(t=>comp.tags.add(t.id));
   }
+  document.getElementById('customEach').checked = false;
+  document.getElementById('linkUrl').value = '';
+  document.getElementById('linkOut').innerHTML = '';
   document.getElementById('mediaPickerFile').onchange = e => {
     const f = e.target.files[0]; if(!f) return;
     const fd = new FormData(); fd.append('file', f);
-    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); loadMedia(); });
+    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); });
   };
   renderCompAccs();
+  renderCompTags();
+  renderCustomize();
   onPostType();
   showSelMedia();
   renderPreviews();
+  updateSlotHint();
   document.getElementById('composerOverlay').classList.add('open');
 }
 function closeComposer(){ document.getElementById('composerOverlay').classList.remove('open'); }
@@ -1522,7 +1917,105 @@ function renderCompAccs(){
     accPill(a, comp.sel.has(a.id), `toggleAcc(${a.id})`)).join('')
     || '<span class="muted">No accounts — connect one in the Accounts tab.</span>';
 }
-function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); onPostType(); renderPreviews(); }
+function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); onPostType(); renderPreviews(); renderCustomize(); updateSlotHint(); }
+
+/* ---- Buffer: customize for each network ---- */
+function renderCustomize(){
+  const box = document.getElementById('customizeList');
+  const sel = ACCOUNTS.filter(a=>comp.sel.has(a.id));
+  if(!comp.custom || !sel.length){ box.innerHTML=''; return; }
+  box.innerHTML = sel.map(a=>{
+    const v = comp.perAcct[a.id] || {};
+    const m = PLAT_META[a.platform];
+    return `<div class="pn-card">
+      <div class="pn-head"><span class="av ${a.platform}">${m?m.ic:''}</span><b>${esc(a.display_name)}</b>
+        <span class="muted" style="font-size:11px;margin-left:auto">${m?m.limit:''} chars</span></div>
+      <textarea placeholder="Caption for ${esc(a.display_name)}… (blank = use shared caption)"
+        oninput="comp.perAcct[${a.id}]=comp.perAcct[${a.id}]||{};comp.perAcct[${a.id}].caption=this.value">${esc(v.caption||'')}</textarea>
+      <div class="pn-media">
+        <input type="text" placeholder="Media URL for this account (blank = shared media)"
+          oninput="comp.perAcct[${a.id}]=comp.perAcct[${a.id}]||{};comp.perAcct[${a.id}].media_url=this.value" value="${esc(v.media_url||'')}">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---- Buffer: tags in composer ---- */
+async function loadTags(){
+  try{ TAGS = await api('/api/tags'); }catch(e){ TAGS=[]; }
+}
+function renderCompTags(){
+  const box = document.getElementById('compTags');
+  box.innerHTML = TAGS.length ? TAGS.map(t=>`
+    <button class="tag-chip ${comp.tags.has(t.id)?'sel':''}" style="background:${esc(t.color)}"
+      onclick="toggleCompTag(${t.id})">${esc(t.name)}</button>`).join('') +
+    `<button class="tag-chip" style="background:var(--muted)" onclick="quickNewTag()">+ new</button>`
+    : '<span class="muted" style="font-size:12.5px">No tags yet — <a onclick="quickNewTag()">create one</a></span>';
+}
+function toggleCompTag(id){ comp.tags.has(id) ? comp.tags.delete(id) : comp.tags.add(id); renderCompTags(); }
+async function quickNewTag(){
+  const name = prompt('New tag name:');
+  if(!name) return;
+  const t = await api('/api/tags',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name})});
+  await loadTags();
+  comp.tags.add(t.id);
+  renderCompTags();
+  toast('Tag created 🏷');
+}
+
+/* ---- Buffer: link shortener in composer ---- */
+async function shortenLink(){
+  const inp = document.getElementById('linkUrl');
+  const url = inp.value.trim();
+  if(!url) return toast('Paste a link first', false);
+  try{
+    const r = await api('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url})});
+    const short = location.origin + r.short_url;
+    const ta = document.getElementById('capText');
+    ta.value = ta.value.trim() ? ta.value.trimEnd() + '\n\n' + short : short;
+    inp.value = '';
+    document.getElementById('linkOut').innerHTML =
+      `<div class="link-out">🔗 <span>${esc(short)}</span>
+       <button class="btn ghost sm" style="padding:2px 9px" onclick="navigator.clipboard.writeText('${short}');toast('copied')">Copy</button></div>`;
+    renderPreviews();
+    toast('Short link added 🔗');
+  }catch(e){ toast(e.message, false); }
+}
+
+/* ---- Buffer: next-slot hint under the schedule dropdown ---- */
+function updateSlotHint(){
+  const el = document.getElementById('slotHint');
+  const mode = document.getElementById('schedMode').value;
+  const sel = ACCOUNTS.filter(a=>comp.sel.has(a.id));
+  if(!sel.length || (mode!=='queue' && mode!=='next')){ el.innerHTML=''; return; }
+  el.innerHTML = sel.map(a=>{
+    const d = nextSlotFor(a);
+    return `<span>${PLAT_META[a.platform].ic} <b>${esc(a.display_name)}</b> → ${d.toLocaleString('en-IN',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</span>`;
+  }).join(' · ');
+}
+function nextSlotFor(a){
+  const slots = (a.posting_slots&&a.posting_slots.length) ? a.posting_slots
+    : window._DEFAULT_SLOTS || (window._DEFAULT_SLOTS = [
+      {day:0,time:'09:00'},{day:0,time:'18:30'},{day:1,time:'09:00'},{day:1,time:'18:30'},
+      {day:2,time:'09:00'},{day:2,time:'18:30'},{day:3,time:'09:00'},{day:3,time:'18:30'},
+      {day:4,time:'09:00'},{day:4,time:'18:30'},{day:5,time:'11:00'},{day:5,time:'17:00'},
+      {day:6,time:'11:00'},{day:6,time:'17:00'}]);
+  const now = new Date();
+  let best = null;
+  slots.forEach(s=>{
+    for(let off=0; off<8; off++){
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()+off);
+      if(d.getDay() !== s.day) continue;
+      const [hh,mm] = s.time.split(':').map(Number);
+      d.setHours(hh,mm,0,0);
+      if(d > now && (!best || d < best)) best = d;
+      break;
+    }
+  });
+  return best || new Date(Date.now()+3600e3);
+}
 
 /* ---- post type (feed photo/text | video | short | YouTube community) ---- */
 function curPostType(){ return (document.querySelector('input[name=ptype]:checked')||{}).value || 'feed'; }
@@ -1588,6 +2081,7 @@ document.getElementById('schedMode').onchange = e => {
   document.getElementById('whenFld').style.display = e.target.value==='schedule' ? 'block' : 'none';
   document.getElementById('saveBtn').textContent =
     comp.editingId ? '💾 Save changes' : SCHED_LABELS[e.target.value];
+  updateSlotHint();
 };
 
 // NOTE: "Add to Queue" / "Share Next" approximate Buffer's per-channel posting-schedule
@@ -1608,44 +2102,49 @@ async function savePost(asDraft){
     if(!confirm('No image attached — post a TEXT community post? (image posts get more reach)')) return;
   }
   const mode = document.getElementById('schedMode').value;
+  // Buffer-style per-network variants
+  const per_account = comp.custom ? account_ids.filter(id=>comp.perAcct[id]&&(comp.perAcct[id].caption||comp.perAcct[id].media_url))
+    .map(id=>({account_id:id,
+      caption:(comp.perAcct[id].caption||'').trim()||caption,
+      media_url:comp.perAcct[id].media_url||comp.mediaUrl||'',
+      post_type})).filter(v=>v.caption||v.media_url) : [];
+  const tag_ids = [...comp.tags];
+  const base = {account_ids, caption, media_url:comp.mediaUrl, post_type, tag_ids, per_account};
   try{
     if(comp.editingId){
       const applyAll = document.getElementById('applyAll').checked ? 1 : 0;
       await api(`/api/posts/${comp.editingId}?apply_all=${applyAll}`,
         {method:'PATCH',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({caption, media_url:comp.mediaUrl, post_type,
+        body:JSON.stringify({caption, media_url:comp.mediaUrl, post_type, tag_ids,
           scheduled_at: (mode==='schedule' ? new Date(document.getElementById('schedWhen').value) : new Date()).toISOString()})});
       toast(applyAll ? 'Updated on ALL linked accounts ✅' : 'Post updated ✅');
     } else if(asDraft){
       const when = mode==='schedule' && document.getElementById('schedWhen').value
         ? new Date(document.getElementById('schedWhen').value) : new Date();
       await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type,
-          scheduled_at: when.toISOString(), status:'draft'})});
+        body:JSON.stringify({...base, scheduled_at: when.toISOString(),
+          status:'draft', source:'draft'})});
       toast('Saved as draft 💾');
     } else if(mode==='now'){
       const created = await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type,
-          scheduled_at:new Date().toISOString()})});
+        body:JSON.stringify({...base, scheduled_at:new Date().toISOString(), source:'now'})});
       toast(`Publishing to ${created.length} account${created.length>1?'s':''} — same post, same time…`);
       const res = await Promise.all(created.map(p => api(`/api/posts/${p.id}/publish-now`,{method:'POST'})));
       const manual = res.filter(p=>p.status==='failed' && (p.error||'').startsWith('MANUAL:'));
       if(manual.length) toast(`⚠️ ${manual.length} post(s) need a manual finish (YouTube Community has no API) — see Posts tab`, false);
       else toast(`Published to ${created.length} accounts 🚀`);
     } else if(mode==='next'){
-      const when = new Date(Date.now() + 60*1000); // jumps ahead of anything already queued
-      await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type, scheduled_at:when.toISOString()})});
-      toast('Moved to the front of the queue ⏭');
+      const created = await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({...base, scheduled_at:new Date().toISOString(), source:'next'})});
+      toast(`Moved to the front of the queue ⏭ — next slot ${fmtDT(created[0].scheduled_at)}`);
     } else if(mode==='queue'){
-      const when = new Date(Date.now() + 15*60*1000); // stand-in "next available slot"
-      await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type, scheduled_at:when.toISOString()})});
-      toast('Added to queue 📥');
+      const created = await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({...base, scheduled_at:new Date().toISOString(), source:'queue'})});
+      toast(`Added to queue 📥 — next slot ${fmtDT(created[0].scheduled_at)}`);
     } else {
       const when = new Date(document.getElementById('schedWhen').value).toISOString();
       await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type, scheduled_at:when})});
+        body:JSON.stringify({...base, scheduled_at:when, source:'scheduled'})});
       toast('Post scheduled 🗓');
     }
     closeComposer();
@@ -1653,11 +2152,82 @@ async function savePost(asDraft){
   }catch(e){ toast(e.message, false); }
 }
 
-/* ================= calendar ================= */
+/* ================= calendar (Buffer-style Week + Month) ================= */
+let calMode = 'week';   // 'week' | 'month'
+let calAnchor = new Date();   // week view: anchor date (we show its week)
+
+function setCalMode(mode){
+  calMode = mode;
+  document.getElementById('tgWeek').classList.toggle('active', mode==='week');
+  document.getElementById('tgMonth').classList.toggle('active', mode==='month');
+  renderCalendar();
+}
 function moveMonth(d){ calMonth += d; if(calMonth>11){calMonth=0;calYear++;} if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
-function goToday(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); renderCalendar(); }
+function moveWeek(d){ calAnchor.setDate(calAnchor.getDate() + 7*d); renderCalendar(); }
+function moveCal(d){ if(calMode==='week') moveWeek(d); else moveMonth(d); }
+function goToday(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); calAnchor=n; renderCalendar(); }
+
+function _postsByLocalDate(){
+  const byDate = {};
+  POSTS.filter(p=>p.status!=='draft').forEach(p=>{
+    const d = new Date(p.status==='published' && p.published_at ? p.published_at : p.scheduled_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    (byDate[key] = byDate[key]||[]).push(p);
+  });
+  return byDate;
+}
+
+function _chipHTML(p, sibs){
+  const multi = sibs>1 ? ` <span style="opacity:.85">·${sibs}⧉</span>` : '';
+  const m = PLAT_META[p.account.platform];
+  return `<button class="chip ${p.account.platform} ${p.status}" title="${esc(p.caption)}${sibs>1?` (${sibs} accounts)`:''}"
+    onclick="event.stopPropagation();editPost(${p.id})">${m?m.ic:''} ${esc(p.caption.slice(0,18))}${p.caption.length>18?'…':''}${multi}</button>`;
+}
 
 function renderCalendar(){
+  document.getElementById('calGrid').style.display = calMode==='month' ? 'grid' : 'none';
+  document.getElementById('weekGrid').style.display = calMode==='week' ? 'grid' : 'none';
+  if (calMode==='month') renderMonth(); else renderWeek();
+}
+
+function renderWeek(){
+  const byDate = _postsByLocalDate();
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+  const anchor = new Date(calAnchor);
+  // monday-start week
+  const dow = (anchor.getDay()+6)%7;
+  const monday = new Date(anchor); monday.setDate(anchor.getDate()-dow);
+  const days = [...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
+  const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('calTitle').textContent =
+    `${monthNames[days[0].getMonth()]} ${days[0].getDate()} – ${monthNames[days[6].getMonth()]} ${days[6].getDate()}, ${days[6].getFullYear()}`;
+  const HOURS = 14, START = 7;  // 7 AM – 8 PM
+  let html = `<div class="week-gutter">${[...Array(HOURS)].map((_,i)=>
+    `<div class="week-hour">${((START+i)%12)||12}${START+i<12?' AM':' PM'}</div>`).join('')}</div>`;
+  const today = new Date();
+  days.forEach((d,i)=>{
+    const isToday = d.toDateString()===today.toDateString();
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const posts = (byDate[key]||[]).slice().sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+    html += `<div class="week-col ${d.getMonth()!==anchor.getMonth()?'out':''}" onclick="openComposer('${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T10:00')">
+      <div class="week-dayhead ${isToday?'today':''}">${dayNames[i]}<span class="dn">${d.getDate()} ${monthNames[d.getMonth()].slice(0,3)}</span></div>
+      ${posts.map(p=>{
+        const dt = new Date(p.status==='published' && p.published_at ? p.published_at : p.scheduled_at);
+        const mins = (dt.getHours()*60+dt.getMinutes()) - START*60;
+        if (mins<0 || mins>HOURS*60) return '';
+        const topPct = Math.max(1, mins/(HOURS*60)*100);
+        const sibs = posts.filter(q=>q.group_id && q.group_id===p.group_id).length;
+        return `<div class="week-post ${p.account.platform}" style="top:${topPct.toFixed(1)}%" title="${esc(p.caption)}"
+          onclick="event.stopPropagation();editPost(${p.id})">${dt.getHours()%12||12}:${String(dt.getMinutes()).padStart(2,'0')}${dt.getHours()<12?'a':'p'}
+          <small>${p.account.platform==='instagram'?'IG':p.account.platform==='facebook'?'FB':p.account.platform==='youtube'?'YT':p.account.platform} · ${esc(p.caption.slice(0,16))}${p.caption.length>16?'…':''}${sibs>1?' ·'+sibs+'⧉':''}</small></div>`;
+      }).join('')}
+    </div>`;
+  });
+  document.getElementById('weekGrid').innerHTML = html;
+}
+
+function renderMonth(){
   const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('calTitle').textContent = `${monthNames[calMonth]} ${calYear}`;
   const first = new Date(calYear, calMonth, 1);
@@ -1668,12 +2238,7 @@ function renderCalendar(){
   let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
 
   // index posts by local date key
-  const byDate = {};
-  POSTS.forEach(p=>{
-    const d = new Date(p.status==='published' && p.published_at ? p.published_at : p.scheduled_at);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    (byDate[key] = byDate[key]||[]).push(p);
-  });
+  const byDate = _postsByLocalDate();
 
   const prevDays = new Date(calYear, calMonth, 0).getDate();
   for(let i=0;i<startDow;i++){
@@ -1688,9 +2253,7 @@ function renderCalendar(){
       <div class="dnum">${day}</div>
       ${shown.map(p=>{
         const sibs = posts.filter(q=>q.group_id && q.group_id===p.group_id).length;
-        const multi = sibs>1 ? ` <span style="opacity:.85">·${sibs}⧉</span>` : '';
-        return `<button class="chip ${p.account.platform} ${p.status}" title="${esc(p.caption)}${sibs>1?` (${sibs} accounts)`:''}"
-          onclick="event.stopPropagation();editPost(${p.id})">${PLAT_META[p.account.platform].ic} ${esc(p.caption.slice(0,18))}${p.caption.length>18?'…':''}${multi}</button>`;
+        return _chipHTML(p, sibs);
       }).join('')}
       ${posts.length>3?`<span class="chip more">+${posts.length-3} more</span>`:''}
     </div>`;
@@ -1710,23 +2273,42 @@ async function editPost(id){
   openComposer(null, p);
 }
 
-/* ================= posts list ================= */
-let postFilter = 'all';
+/* ================= queue + posts list (Buffer-style) ================= */
+let postFilter = 'queue';
+const isQueuePost = p => p.status==='scheduled' && !['published','draft'].includes(p.status)
+  && ['queue','next'].includes(p.source||'scheduled');
+const isDraft = p => p.status==='draft';
 function renderPostFilters(){
-  const counts = {all:POSTS.length, scheduled:0, published:0, failed:0};
-  POSTS.forEach(p=>counts[p.status]!==undefined && counts[p.status]++);
-  const tabs = [['all','All'],['scheduled','Scheduled'],['published','Published'],['failed','Failed']];
+  const counts = {queue:0, all:POSTS.length, scheduled:0, published:0, failed:0, draft:0};
+  POSTS.forEach(p=>{
+    if (isQueuePost(p)) counts.queue++;
+    if (p.status==='draft') counts.draft++;
+    else if (counts[p.status]!==undefined) counts[p.status]++;
+  });
+  const tabs = [['queue','📥 Queue'],['scheduled','Scheduled'],['draft','💾 Drafts'],['published','Published'],['failed','Failed'],['all','All']];
   document.getElementById('postFilters').innerHTML = tabs.map(([k,l])=>
     `<button class="ftab ${postFilter===k?'active':''}" onclick="postFilter='${k}';renderPosts()">${l} (${counts[k]||0})</button>`).join('');
 }
 function renderPosts(){
   renderPostFilters();
-  const list = POSTS.filter(p=>postFilter==='all'||p.status===postFilter)
-    .sort((a,b)=> new Date(b.scheduled_at)-new Date(a.scheduled_at));
+  const wrap = document.getElementById('queueWrap');
+  const card = document.getElementById('postsCard');
+  if (postFilter==='queue'){
+    wrap.style.display='block'; card.style.display='none';
+    renderQueue();
+    return;
+  }
+  wrap.style.display='none'; card.style.display='block';
+  let list = POSTS.filter(p=>{
+    if (postFilter==='all') return p.status!=='draft';
+    if (postFilter==='draft') return isDraft(p);
+    return p.status===postFilter && !isDraft(p);
+  }).sort((a,b)=> new Date(b.scheduled_at)-new Date(a.scheduled_at));
   document.getElementById('postsTbody').innerHTML = list.length ? list.map(p=>`
     <tr>
       <td>${p.media_url?`<img class="thumb" src="${p.media_url}">`:'<div class="thumb" style="display:flex;align-items:center;justify-content:center;font-size:18px">📝</div>'}</td>
       <td style="max-width:340px"><div style="font-weight:600">${esc(p.caption.slice(0,90))}${p.caption.length>90?'…':''}</div>
+        ${(p.tags||[]).map(t=>`<span class="tag-chip" style="background:${esc(t.color)};margin-top:4px">${esc(t.name)}</span>`).join(' ')}
         ${p.error?(p.error.startsWith('MANUAL:')
           ? `<div style="background:#fff7e6;border:1px solid #ffd591;border-radius:8px;padding:6px 9px;font-size:12px;margin-top:4px;color:#ad6800">✋ <b>Manual step needed</b> — ${esc(p.error.replace('MANUAL:',''))}
              <div style="margin-top:5px;display:flex;gap:6px">
@@ -1742,10 +2324,90 @@ function renderPosts(){
         ${p.status==='scheduled'?`<button class="btn green sm" onclick="publishNow(${p.id})">🚀 Publish</button>
           <button class="btn ghost sm" onclick="editPost(${p.id})">✏️</button>
           <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
+        ${p.status==='draft'?`<button class="btn green sm" onclick="useDraft(${p.id})">✏️ Open</button>
+          <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
         ${(p.error||'').startsWith('MANUAL:')?`<button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
       </td>
     </tr>`).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">No posts here. Click “Create Post” →</td></tr>';
+}
+
+/* ---- queue: day-grouped, drag to reorder ---- */
+let dragId = null;
+function renderQueue(){
+  const queue = POSTS.filter(isQueuePost).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+  const wrap = document.getElementById('queueWrap');
+  if(!queue.length){
+    wrap.innerHTML = `<div class="card" style="padding:30px;text-align:center;color:var(--muted)">
+      Queue khali undi 📭<br>Create Post → “📥 Add to Queue” — posts land on your channel's next free schedule slot.<br>
+      <button class="btn sm" style="margin-top:12px" onclick="openComposer()">✏️ Create Post</button>
+      <button class="btn ghost sm" style="margin-top:12px" onclick="switchView('schedule')">⏰ Open Publishing Schedule</button></div>`;
+    return;
+  }
+  const byDay = {};
+  queue.forEach(p=>{
+    const d = new Date(p.scheduled_at);
+    const key = d.toDateString();
+    (byDay[key]=byDay[key]||[]).push(p);
+  });
+  const order = queue.map(p=>p.id);
+  const now = new Date();
+  const today = now.toDateString();
+  const tomorrow = new Date(now.getTime()+864e5).toDateString();
+  const label = key => key===today ? 'Today' : key===tomorrow ? 'Tomorrow' : new Date(key).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
+  wrap.innerHTML = `<div class="queue-header">
+      <div class="range-pills">
+        <button class="ftab active" onclick="sortQueue('slot')">⏰ Slot order</button>
+      </div>
+      <span class="hint muted">Drag posts to reorder — times auto-shift to your schedule slots ↕</span>
+    </div>
+    ${Object.keys(byDay).sort((a,b)=>new Date(a)-new Date(b)).map(key=>`
+    <div class="q-day">
+      <div class="q-day-title">${label(key)} <span class="cnt">${byDay[key].length} post${byDay[key].length>1?'s':''}</span></div>
+      ${byDay[key].map(p=>{
+        const dt = new Date(p.scheduled_at);
+        const m = PLAT_META[p.account.platform];
+        return `<div class="q-task" draggable="true" data-id="${p.id}"
+          ondragstart="dragId=${p.id};this.classList.add('dragging')"
+          ondragend="this.classList.remove('dragging')"
+          ondragover="event.preventDefault();this.classList.add('drop-target')"
+          ondragleave="this.classList.remove('drop-target')"
+          ondrop="event.preventDefault();dropOnQueue(${p.id})">
+          <div class="q-time">${dt.getHours()%12||12}:${String(dt.getMinutes()).padStart(2,'0')}${dt.getHours()<12?' AM':' PM'}<small>${m?m.label:''}</small></div>
+          <div class="q-main">
+            <div class="q-cap">${esc(p.caption.slice(0,70))}${p.caption.length>70?'…':''}</div>
+            <div class="q-meta">
+              <span><span class="av ${p.account.platform}" style="width:20px;height:20px;font-size:11px">${m?m.ic:''}</span> ${esc(p.account.display_name)}</span>
+              ${p.post_type&&p.post_type!=='feed'?`<span>· ${p.post_type}</span>`:''}
+              ${(p.tags||[]).map(t=>`<span class="tag-chip" style="background:${esc(t.color)};padding:1px 8px">${esc(t.name)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="q-acts">
+            <button class="btn green sm" onclick="publishNow(${p.id})">🚀</button>
+            <button class="btn ghost sm" onclick="editPost(${p.id})">✏️</button>
+            <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('')}`;
+  window._qOrder = order;
+}
+function sortQueue(){ renderQueue(); }
+async function dropOnQueue(targetId){
+  const ids = [...window._qOrder];
+  const from = ids.indexOf(dragId), to = ids.indexOf(targetId);
+  if(from<0 || to<0 || from===to){ dragId=null; renderQueue(); return; }
+  ids.splice(from,1); ids.splice(to,0,dragId);
+  dragId=null;
+  await api('/api/posts/reorder',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ordered_ids:ids})});
+  toast('Queue reordered — new slot times assigned ⏰');
+  await refreshData();
+}
+function useDraft(id){
+  const p = POSTS.find(x=>x.id===id);
+  if(!p) return;
+  openComposer(null, p);
 }
 async function publishNow(id){
   await api(`/api/posts/${id}/publish-now`,{method:'POST'});
@@ -1761,10 +2423,17 @@ async function delPost(id){
 }
 
 /* ================= bulk ================= */
+let bulkTagSel = new Set();
 function renderBulkAccs(){
   document.getElementById('bulkAccPick').innerHTML = ACCOUNTS.map(a=>
     accPill(a, comp.sel.has('b'+a.id), `toggleBulkAcc(${a.id})`)).join('')
     || '<span class="muted">No accounts connected yet.</span>';
+  const box = document.getElementById('bulkTags');
+  if(!box) return;
+  box.innerHTML = TAGS.length ? TAGS.map(t=>`
+    <button class="tag-chip ${bulkTagSel.has(t.id)?'sel':''}" style="background:${esc(t.color)}"
+      onclick="bulkTagSel.has(${t.id})?bulkTagSel.delete(${t.id}):bulkTagSel.add(${t.id});renderBulkAccs()">${esc(t.name)}</button>`).join('')
+    : '<span class="muted" style="font-size:12.5px">No tags — create them in the composer or avatar menu 🏷</span>';
 }
 function toggleBulkAcc(id){
   const k='b'+id;
@@ -1781,8 +2450,9 @@ async function uploadBulk(file){
   const ids = ACCOUNTS.filter(a=>comp.sel.has('b'+a.id)).map(a=>a.id);
   if(!ids.length) return toast('Select target accounts first', false);
   const fd = new FormData(); fd.append('file',file);
+  const tids = [...bulkTagSel].join(',');
   try{
-    const res = await api(`/api/posts/bulk/csv?account_ids=${ids.join(',')}`,{method:'POST',body:fd});
+    const res = await api(`/api/posts/bulk/csv?account_ids=${ids.join(',')}&tag_ids=${tids}`,{method:'POST',body:fd});
     document.getElementById('bulkResult').innerHTML =
       `<span class="pill published">✅ ${res.length} posts scheduled across ${ids.length} accounts</span>`;
     toast(`${res.length} posts scheduled ✅`);
@@ -1795,33 +2465,32 @@ function downloadTemplate(){
   a.download='posts_template.csv'; a.click();
 }
 
-/* ================= inbox ================= */
-async function loadInbox(){
-  const posts = await api('/api/posts?status=published');
-  document.getElementById('simPost').innerHTML = posts.map(p=>
-    `<option value="${p.id}">${PLAT_META[p.account.platform].ic} ${esc(p.caption.slice(0,40))}</option>`).join('')
-    || '<option value="">No published posts</option>';
-  const cs = await api('/api/comments');
-  document.getElementById('inboxBadge').style.display = cs.filter(c=>!c.replied).length ? 'inline-block' : 'none';
-  document.getElementById('inboxBadge').textContent = cs.filter(c=>!c.replied).length;
-  document.getElementById('commentsList').innerHTML = cs.length ? cs.map(c=>`
-    <div class="cmt">
-      <div class="meta">👤 <b>${esc(c.author)}</b> · post #${c.post_id} · ${fmtDT(c.created_at)}</div>
-      <div>${esc(c.text)}</div>
-      ${c.replied ? `<div class="reply">${esc(c.our_reply)}</div>` : '<div class="wait">⏳ awaiting reply</div>'}
-    </div>`).join('') : '<p class="muted">No comments yet — simulate one ☝️</p>';
+/* ================= analytics (Buffer-style widgets) ================= */
+let analyticsDays = 30;
+const RANGES = [[7,'Last 7 days'],[30,'Last 30 days'],[90,'Last 90 days'],[365,'Last 12 months'],[null,'All time']];
+function renderRangePills(){
+  document.getElementById('rangePills').innerHTML = RANGES.map(([d,l])=>
+    `<button class="ftab ${analyticsDays===d?'active':''}" onclick="setAnalyticsRange(${d===null?'null':d})">${l}</button>`).join('');
 }
-async function simulateComment(){
-  const post_id = +simPost.value;
-  if(!post_id) return toast('Publish a post first', false);
-  await api('/api/comments/simulate',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({post_id, author:simAuthor.value, text:simText.value})});
-  toast('Comment posted — bot replied 🤖'); loadInbox();
+function setAnalyticsRange(v){
+  analyticsDays = (v===null || v==='null') ? null : v;
+  renderRangePills(); loadAnalytics();
 }
-
-/* ================= analytics ================= */
+function exportAnalytics(){
+  const url = `/api/analytics/export.csv${analyticsDays?`?days=${analyticsDays}`:''}`;
+  const a = document.createElement('a');
+  a.href = url; a.download = 'socialauto_analytics.csv'; a.click();
+  toast('CSV download started ⬇️');
+}
+async function syncAnalytics(){
+  toast('Refreshing metrics from platforms…');
+  await api('/api/analytics/sync',{method:'POST'});
+  toast('Analytics refreshed ✅');
+  loadAnalytics();
+}
 async function loadAnalytics(){
-  const d = await api('/api/analytics');
+  renderRangePills();
+  const d = await api(`/api/analytics${analyticsDays?`?days=${analyticsDays}`:''}`);
   const t = d.totals;
   const cards = [
     ['📝','Posts published',d.posts_published,'var(--brand)'],
@@ -1853,6 +2522,14 @@ async function loadAnalytics(){
     <td>${p.likes}</td><td>${p.comments}</td><td>${p.shares}</td>
     <td>${p.impressions.toLocaleString('en-IN')}</td><td>${p.reach.toLocaleString('en-IN')}</td></tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:26px">Publish posts to see analytics.</td></tr>';
+  const tags = Object.entries(d.by_tag||{}).sort((a,b)=>b[1].likes-a[1].likes);
+  const maxT = Math.max(1, ...tags.map(([,v])=>v.likes));
+  document.getElementById('byTag').innerHTML = tags.length ? tags.map(([name,v])=>`
+    <div class="tag-stat">
+      <span class="tag-chip" style="background:${esc(v.color)}">${esc(name)}</span>
+      <span class="muted" style="font-size:12.5px">${v.posts} posts · ${v.likes.toLocaleString('en-IN')} likes · ${v.comments} comments · ${v.shares} shares</span>
+      <div class="bar"><div style="width:${Math.round(v.likes/maxT*100)}%"></div></div>
+    </div>`).join('') : '<p class="muted">Tag your posts (composer → 🏷 Tags) to see tag-level performance here.</p>';
 }
 
 /* ================= media library ================= */
@@ -1898,15 +2575,18 @@ mediaDrop.addEventListener('drop',async e=>{
 async function syncNow(){
   toast('Syncing with platforms…');
   try{
-    await api('/api/cron/tick',{method:'POST',headers:{'X-Cron-Secret':'dev-cron-secret-change-me'}});
-    toast('Sync complete ✅'); refreshData();
+    const c = await api('/api/comments/sync',{method:'POST'});
+    await api('/api/analytics/sync',{method:'POST'});
+    toast(`Sync complete ✅ — ${c.new_comments} new comments, ${c.auto_replies} auto-replies`);
+    refreshData();
   }catch(e){ toast(e.message,false); }
 }
 
 /* ================= data refresh ================= */
 async function refreshData(){
   ACCOUNTS = await api('/api/accounts');
-  POSTS = await api('/api/posts');
+  POSTS = await api('/api/posts?include_drafts=1');
+  try{ TAGS = await api('/api/tags'); }catch(e){ TAGS=[]; }
   // embed account object on posts for convenience
   const accMap = Object.fromEntries(ACCOUNTS.map(a=>[a.id,a]));
   POSTS.forEach(p=>p.account = accMap[p.account_id] || {platform:'instagram',display_name:'?'});
@@ -1946,7 +2626,7 @@ async function refreshData(){
   }
 
   const now = new Date();
-  calYear = now.getFullYear(); calMonth = now.getMonth();
+  calYear = now.getFullYear(); calMonth = now.getMonth(); calAnchor = now;
 
   if(TOKEN){
     try{

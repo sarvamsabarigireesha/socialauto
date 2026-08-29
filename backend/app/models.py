@@ -3,7 +3,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, Boolean, Enum, JSON, ForeignKey
+    Column, Integer, String, Text, DateTime, Boolean, Enum, JSON, ForeignKey, Table
 )
 from sqlalchemy.orm import relationship
 
@@ -22,6 +22,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(200), default="")
     password_hash = Column(String(255), nullable=False)
+    timezone = Column(String(64), default="Asia/Kolkata")  # Buffer-style: user's local timezone
     reset_token = Column(String(120), default="", index=True)
     reset_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
@@ -77,6 +78,8 @@ class Account(Base):
     refresh_token = Column(String(500), default="")            # offline refresh token (Google/Meta)
     auto_comment = Column(Boolean, default=True)               # reply to comments automatically
     comment_template = Column(Text, default="")                # optional fixed reply; "" = AI pool
+    posting_slots = Column(JSON, default=list)                 # Buffer-style weekly time slots [{day,time}]
+    posting_goal = Column(Integer, default=7)                  # posts per week goal for this channel
     created_at = Column(DateTime, default=utcnow)
 
     user = relationship("User", back_populates="accounts")
@@ -94,6 +97,7 @@ class Post(Base):
     caption = Column(Text, nullable=False)
     media_url = Column(String(500), default="")               # image/video URL (or local path)
     post_type = Column(String(12), default="feed", nullable=False)  # feed | video | short | community
+    source = Column(String(12), default="scheduled", nullable=False)  # scheduled | queue | next | draft | now
     scheduled_at = Column(DateTime, nullable=False)
     status = Column(Enum(PostStatus), default=PostStatus.scheduled, nullable=False)
     error = Column(Text, default="")
@@ -103,6 +107,40 @@ class Post(Base):
     account = relationship("Account", back_populates="posts")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
     metrics = relationship("Metric", back_populates="post", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary="post_tags", back_populates="posts")
+
+
+# many-to-many: posts <-> tags
+post_tags = Table(
+    "post_tags", Base.metadata,
+    Column("post_id", Integer, ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Tag(Base):
+    """User-defined label for posts (Buffer-style tags)."""
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(60), nullable=False)
+    color = Column(String(9), default="#5b6cff")
+    created_at = Column(DateTime, default=utcnow)
+
+    posts = relationship("Post", secondary="post_tags", back_populates="tags")
+
+
+class ShortLink(Base):
+    """Self-hosted link shortener (Buffer-style link shortening in composer)."""
+    __tablename__ = "short_links"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    code = Column(String(12), unique=True, nullable=False, index=True)
+    long_url = Column(Text, nullable=False)
+    clicks = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utcnow)
 
 
 class Comment(Base):

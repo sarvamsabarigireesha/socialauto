@@ -10,6 +10,7 @@ from ..models import User
 from ..schemas import (
     RegisterIn, LoginIn, TokenOut, UserOut,
     ForgotPasswordIn, ForgotPasswordOut, ResetPasswordIn, ChangePasswordIn,
+    ProfileUpdate,
 )
 from ..security import (
     hash_password, verify_password, create_token, get_current_user,
@@ -47,6 +48,24 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
+    return user
+
+
+@router.patch("/profile", response_model=UserOut)
+def update_profile(data: ProfileUpdate, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    """Update timezone / display name (Buffer settings)."""
+    if data.timezone:
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(data.timezone)
+        except Exception:
+            raise HTTPException(400, "invalid IANA timezone")
+        user.timezone = data.timezone
+    if data.name is not None and data.name.strip():
+        user.name = data.name.strip()
+    db.commit()
+    db.refresh(user)
     return user
 
 

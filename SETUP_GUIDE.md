@@ -91,7 +91,7 @@ Everything below is **FREE**. Total time: ~25 minutes. After setup, set env vars
 | `MOCK_MODE` | `false` |
 | `APP_PUBLIC_URL` | `https://socialauto-k5ou.onrender.com` |
 | `JWT_SECRET` | any long random string (e.g. 40+ chars) |
-| `CRON_SECRET` | `prod_4d27fff398afac3883d154ecf9e917e6` (already in GitHub secrets) |
+| `CRON_SECRET` | a long random string (the SAME one you put in GitHub secrets) |
 | `DATABASE_URL` | Neon Postgres string (already set) |
 | `META_APP_ID` | from Part 1-C |
 | `META_APP_SECRET` | from Part 1-C |

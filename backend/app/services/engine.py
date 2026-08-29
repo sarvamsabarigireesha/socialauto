@@ -1,15 +1,136 @@
 """Core background jobs: publish due posts, sync comments + auto-reply, sync analytics."""
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from ..models import Post, PostStatus, Comment, Metric, Account
+from ..models import Post, PostStatus, Comment, Metric, Account, User
 from ..config import settings
 from . import platforms, autocomment
 
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+# Buffer-style default weekly posting slots (used until user sets their own).
+DEFAULT_SLOTS = [
+    {"day": 0, "time": "09:00"}, {"day": 0, "time": "18:30"},
+    {"day": 1, "time": "09:00"}, {"day": 1, "time": "18:30"},
+    {"day": 2, "time": "09:00"}, {"day": 2, "time": "18:30"},
+    {"day": 3, "time": "09:00"}, {"day": 3, "time": "18:30"},
+    {"day": 4, "time": "09:00"}, {"day": 4, "time": "18:30"},
+    {"day": 5, "time": "11:00"}, {"day": 5, "time": "17:00"},
+    {"day": 6, "time": "11:00"}, {"day": 6, "time": "17:00"},
+]
+
+
+def _tz_for(db: Session, user_id: int) -> ZoneInfo:
+    u = db.get(User, user_id)
+    name = (u.timezone if u and u.timezone else "Asia/Kolkata")
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return ZoneInfo("Asia/Kolkata")
+
+
+def _slots_of(account: Account) -> list[dict]:
+    slots = account.posting_slots if isinstance(account.posting_slots, list) else []
+    return slots or DEFAULT_SLOTS
+
+
+def _next_occurrence(slot: dict, tz: ZoneInfo, after_local: datetime) -> datetime | None:
+    """Next local datetime matching {day:0-6, time:'HH:MM'} strictly after after_local."""
+    try:
+        hh, mm = (int(x) for x in str(slot["time"]).split(":")[:2])
+        day = int(slot["day"])
+    except Exception:
+        return None
+    base = after_local.date()
+    for offset in range(8):  # up to a week ahead
+        d = base + timedelta(days=offset)
+        if d.weekday() != day:
+            continue
+        cand = datetime(d.year, d.month, d.day, hh, mm, tzinfo=tz)
+        if cand > after_local:
+            return cand
+    return None
+
+
+def next_slot_for(db: Session, account: Account, after_utc: datetime | None = None,
+                  exclude_post_id: int | None = None) -> datetime:
+    """Buffer-style: next FREE posting slot for this channel (skips taken ones)."""
+    now = datetime.now(timezone.utc)
+    after = _aware(after_utc) if after_utc else now
+    tz = _tz_for(db, account.user_id)
+    taken = {
+        p.scheduled_at.replace(tzinfo=timezone.utc) if p.scheduled_at and p.scheduled_at.tzinfo is None else p.scheduled_at
+        for p in (db.query(Post)
+                  .filter(Post.account_id == account.id,
+                          Post.status == PostStatus.scheduled,
+                          Post.source.in_(["queue", "next"]),
+                          Post.id != (exclude_post_id or -1))
+                  .all())
+    }
+    candidate = after
+    for _ in range(300):
+        cand_local = candidate.astimezone(tz)
+        options = [_next_occurrence(s, tz, cand_local) for s in _slots_of(account)]
+        options = [o for o in options if o]
+        if not options:
+            # no valid slots -> fall back to 1 hour from now
+            return candidate + timedelta(hours=1)
+        nxt = min(options)
+        if nxt.astimezone(timezone.utc) not in taken:
+            return nxt.astimezone(timezone.utc)
+        candidate = nxt.astimezone(timezone.utc) + timedelta(minutes=1)
+    return candidate + timedelta(minutes=30)
+
+
+def reorder_queue(db: Session, user_id: int, ordered_ids: list[int]) -> list[Post]:
+    """Drag-reorder: reassign slot times so queued posts follow the new order,
+    per channel, keeping the earliest scheduled date as the anchor."""
+    posts = (db.query(Post)
+             .filter(Post.user_id == user_id, Post.id.in_(ordered_ids),
+                     Post.status == PostStatus.scheduled,
+                     Post.source.in_(["queue", "next"]))
+             .all())
+    by_id = {p.id: p for p in posts}
+    ordered = [by_id[i] for i in ordered_ids if i in by_id]
+    by_account: dict[int, list[Post]] = {}
+    for p in ordered:
+        by_account.setdefault(p.account_id, []).append(p)
+    now = datetime.now(timezone.utc)
+    for acc_id, group in by_account.items():
+        acc = db.get(Account, acc_id)
+        if not acc:
+            continue
+        tz = _tz_for(db, user_id)
+        existing = [p for p in group if p.scheduled_at]
+        anchor = min(p.scheduled_at for p in existing)
+        if anchor.tzinfo is None:
+            anchor = anchor.replace(tzinfo=timezone.utc)
+        anchor = max(anchor - timedelta(minutes=1), now - timedelta(days=1))
+        t = anchor
+        for p in group:
+            cand = t
+            for _ in range(300):
+                cand_local = cand.astimezone(tz)
+                options = [_next_occurrence(s, tz, cand_local) for s in _slots_of(acc)]
+                options = [o for o in options if o]
+                if not options:
+                    nxt = cand + timedelta(hours=1)
+                else:
+                    nxt = min(options).astimezone(timezone.utc)
+                if nxt > t:
+                    break
+                cand = cand + timedelta(minutes=1)
+            t = nxt
+            p.scheduled_at = t
+    db.commit()
+    for p in ordered:
+        db.refresh(p)
+    return ordered
 
 
 # ------------------------------------------------------------------ publishing
@@ -239,14 +360,18 @@ async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
             "per_account": results, "errors": errors}
 
 
-def analytics_summary(db: Session, user_id: int | None = None) -> dict:
-    """Aggregate dashboard numbers for one user."""
+def analytics_summary(db: Session, user_id: int | None = None, days: int | None = None) -> dict:
+    """Aggregate dashboard numbers for one user (optional last-N-days filter)."""
     q = db.query(Post).filter(Post.status == PostStatus.published)
     if user_id is not None:
         q = q.filter(Post.user_id == user_id)
+    if days:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        q = q.filter(Post.published_at >= cutoff)
     posts = q.all()
     totals = {"likes": 0, "comments": 0, "shares": 0, "impressions": 0, "reach": 0}
     by_platform: dict[str, dict] = {}
+    by_tag: dict[str, dict] = {}
     per_post = []
     for p in posts:
         latest = (db.query(Metric).filter(Metric.post_id == p.id)
@@ -255,6 +380,7 @@ def analytics_summary(db: Session, user_id: int | None = None) -> dict:
             "post_id": p.id, "platform": p.account.platform.value,
             "account": p.account.display_name,
             "caption": p.caption[:60],
+            "published_at": p.published_at.isoformat() if p.published_at else None,
             "likes": latest.likes if latest else 0,
             "comments": latest.comments_count if latest else 0,
             "shares": latest.shares if latest else 0,
@@ -270,6 +396,13 @@ def analytics_summary(db: Session, user_id: int | None = None) -> dict:
                                     {"likes": 0, "comments": 0, "shares": 0, "posts": 0})
         bp["likes"] += row["likes"]; bp["comments"] += row["comments"]
         bp["shares"] += row["shares"]; bp["posts"] += 1
+        for t in p.tags:
+            bt = by_tag.setdefault(t.name, {"posts": 0, "likes": 0, "comments": 0,
+                                            "shares": 0, "color": t.color})
+            bt["posts"] += 1
+            bt["likes"] += row["likes"]
+            bt["comments"] += row["comments"]
+            bt["shares"] += row["shares"]
 
     post_ids = [p.id for p in posts]
     cq = db.query(Comment)
@@ -285,6 +418,7 @@ def analytics_summary(db: Session, user_id: int | None = None) -> dict:
     return {
         "totals": totals,
         "by_platform": by_platform,
+        "by_tag": by_tag,
         "per_post": per_post,
         "comments_total": total_comments,
         "auto_replied": auto_replied,

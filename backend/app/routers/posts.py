@@ -1,17 +1,18 @@
 import csv
 import io
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Post, PostStatus, Account, User
+from ..models import Post, PostStatus, Account, User, Tag
 from ..schemas import PostIn, BulkPostIn, PostOut, PostUpdate
 from ..security import get_current_user
 from ..services import engine
-from ..services.engine import _aware
+from ..services.engine import _aware, next_slot_for
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
@@ -22,8 +23,10 @@ def _to_out(p: Post) -> dict:
         "platform": p.account.platform.value if p.account else None,
         "account_name": p.account.display_name if p.account else None,
         "caption": p.caption, "media_url": p.media_url, "post_type": getattr(p, "post_type", "feed") or "feed",
+        "source": getattr(p, "source", "scheduled") or "scheduled",
         "scheduled_at": p.scheduled_at, "status": p.status,
         "error": p.error, "published_at": p.published_at, "group_id": p.group_id or "",
+        "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in p.tags],
     }
 
 
@@ -36,28 +39,79 @@ def _owned_accounts(db: Session, user: User, ids: list[int]) -> list[Account]:
 
 
 @router.get("", response_model=list[PostOut])
-def list_posts(status: PostStatus | None = None, db: Session = Depends(get_db),
-               user: User = Depends(get_current_user)):
+def list_posts(status: PostStatus | None = None, include_drafts: int = 0,
+               db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     q = db.query(Post).filter(Post.user_id == user.id)
     if status:
         q = q.filter(Post.status == status)
+    elif not include_drafts:
+        q = q.filter(Post.status != PostStatus.draft)
     return [_to_out(p) for p in q.order_by(Post.scheduled_at).all()]
+
+
+class ReorderIn(BaseModel):
+    ordered_ids: list[int]
+
+
+@router.post("/reorder")
+def reorder(data: ReorderIn, db: Session = Depends(get_db),
+            user: User = Depends(get_current_user)):
+    """Buffer-style queue: drag to reorder — queued posts get new slot times."""
+    posts = engine.reorder_queue(db, user.id, data.ordered_ids)
+    return {"reordered": len(posts), "posts": [_to_out(p) for p in posts]}
+
+
+def _owned_tags(db: Session, user: User, tag_ids: list[int]) -> list[Tag]:
+    if not tag_ids:
+        return []
+    tags = db.query(Tag).filter(Tag.user_id == user.id, Tag.id.in_(tag_ids)).all()
+    if len(tags) != len(set(tag_ids)):
+        raise HTTPException(404, "one or more tags not found")
+    return tags
 
 
 @router.post("", response_model=list[PostOut], status_code=201)
 def create_post(data: PostIn, db: Session = Depends(get_db),
                 user: User = Depends(get_current_user)):
-    _owned_accounts(db, user, data.account_ids)
+    accs = _owned_accounts(db, user, data.account_ids)
+    tags = _owned_tags(db, user, data.tag_ids or [])
     created = []
     group = uuid.uuid4().hex[:16]
     post_status = PostStatus.draft if data.status == "draft" else PostStatus.scheduled
+    source = (data.source or "scheduled").lower()
+    if data.status == "draft":
+        source = "draft"
+    elif source not in ("scheduled", "queue", "next", "now"):
+        source = "scheduled"
+    now_utc = datetime.now(timezone.utc)
+    when = _aware(data.scheduled_at)
+    if source == "now":
+        when = now_utc
+    # per-account custom variants (Buffer "Customize for each network")
+    variants = {v.account_id: v for v in (data.per_account or [])}
+    by_aid = {a.id: a for a in accs}
     for aid in data.account_ids:
-        p = Post(user_id=user.id, account_id=aid, caption=data.caption,
-                 media_url=data.media_url, post_type=(data.post_type or "feed"),
-                 scheduled_at=_aware(data.scheduled_at),
-                 status=post_status, group_id=group)
+        acc = by_aid[aid]
+        v = variants.get(aid)
+        p = Post(user_id=user.id, account_id=aid,
+                 caption=v.caption if v else data.caption,
+                 media_url=v.media_url if v else data.media_url,
+                 post_type=(v.post_type if v else data.post_type) or "feed",
+                 scheduled_at=when, status=post_status, group_id=group,
+                 source=source)
+        p.tags = tags
         db.add(p)
         created.append(p)
+    # Buffer-style slot assignment for queue/next sources
+    if source in ("next", "queue"):
+        now_utc = datetime.now(timezone.utc)
+        anchor = max(now_utc, when)
+        for i, p in enumerate(sorted(created, key=lambda x: x.account_id)):
+            t = engine.next_slot_for(db, by_aid[p.account_id], anchor,
+                                     exclude_post_id=p.id)
+            p.scheduled_at = t
+            if source == "queue" and i == 0:
+                anchor = max(anchor, t - timedelta(minutes=1))
     db.commit()
     for p in created:
         db.refresh(p)
@@ -75,7 +129,8 @@ def bulk_create(data: BulkPostIn, db: Session = Depends(get_db),
             p = Post(user_id=user.id, account_id=aid, caption=row.caption,
                      media_url=row.media_url, post_type=(row.post_type or "feed"),
                      scheduled_at=_aware(row.scheduled_at),
-                     status=PostStatus.scheduled, group_id=group)
+                     status=PostStatus.scheduled, group_id=group,
+                     source="scheduled")
             db.add(p)
             created.append(p)
     db.commit()
@@ -86,10 +141,13 @@ def bulk_create(data: BulkPostIn, db: Session = Depends(get_db),
 
 @router.post("/bulk/csv", response_model=list[PostOut], status_code=201)
 async def bulk_csv(account_ids: str = Query(..., description="comma-separated account ids"),
+                   tag_ids: str = Query("", description="comma-separated tag ids"),
                    file: UploadFile = File(...), db: Session = Depends(get_db),
                    user: User = Depends(get_current_user)):
     aids = [int(x) for x in account_ids.split(",") if x.strip()]
+    tids = [int(x) for x in tag_ids.split(",") if x.strip()]
     _owned_accounts(db, user, aids)
+    tags = _owned_tags(db, user, tids)
 
     raw = (await file.read()).decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(raw))
@@ -101,6 +159,9 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
     for row in reader:
         caption = (row.get("caption") or "").strip()
         when = (row.get("scheduled_at") or "").strip()
+        ptype = (row.get("post_type") or "feed").strip() or "feed"
+        if ptype not in ("feed", "video", "short", "community"):
+            raise HTTPException(400, f"bad post_type: {ptype} (use feed|video|short|community)")
         if not caption or not when:
             continue
         try:
@@ -116,8 +177,10 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
         for aid in aids:
             p = Post(user_id=user.id, account_id=aid, caption=caption,
                      media_url=(row.get("media_url") or "").strip(),
-                     post_type=(row.get("post_type") or "feed").strip() or "feed",
-                     scheduled_at=dt, status=PostStatus.scheduled, group_id=group)
+                     post_type=ptype,
+                     scheduled_at=dt, status=PostStatus.scheduled,
+                     group_id=group, source="scheduled")
+            p.tags = tags
             db.add(p)
             created.append(p)
     db.commit()
@@ -140,13 +203,17 @@ def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db),
         targets = siblings or [p]
     payload = data.model_dump(exclude_none=True)
     new_account = payload.pop("account_id", None)
+    tag_ids = payload.pop("tag_ids", None)
     if "scheduled_at" in payload:
         payload["scheduled_at"] = _aware(payload["scheduled_at"])
+    tags = _owned_tags(db, user, tag_ids) if tag_ids is not None else None
     for tgt in targets:
         if tgt.status == PostStatus.published:
             continue
         for field, value in payload.items():
             setattr(tgt, field, value)
+        if tags is not None:
+            tgt.tags = tags
     if new_account is not None and not apply_all:
         _owned_accounts(db, user, [new_account])
         p.account_id = new_account

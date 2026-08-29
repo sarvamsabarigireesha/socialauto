@@ -14,10 +14,10 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import Base, engine, SessionLocal
-from .models import Account, Post, PostStatus, Platform, User
+from .models import Account, Post, PostStatus, Platform, ShortLink, Tag, User
 from .security import hash_password
 from .routers import auth as auth_router, oauth as oauth_router, webhooks as webhooks_router
-from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates
+from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links
 from .routers.media import MEDIA_DIR
 
 app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.0.0")
@@ -40,8 +40,26 @@ app.include_router(comments.router)
 app.include_router(analytics.router)
 app.include_router(cron.router)
 app.include_router(media.router)
+app.include_router(tags.router)
+app.include_router(links.router)
 
 app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+
+
+# ---- public short-link redirect (Buffer-style /l/abc123) ----
+@app.get("/l/{code}")
+def redirect_short_link(code: str):
+    from fastapi.responses import RedirectResponse
+    db = SessionLocal()
+    try:
+        row = db.query(ShortLink).filter(ShortLink.code == code).first()
+        if not row:
+            return RedirectResponse(url="/?shortlink=notfound")
+        row.clicks += 1
+        db.commit()
+        return RedirectResponse(url=row.long_url)
+    finally:
+        db.close()
 
 
 @app.on_event("startup")
@@ -95,6 +113,14 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE posts ADD COLUMN user_id INTEGER"))
         if "posts" in cols and "group_id" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN group_id VARCHAR(40) DEFAULT ''"))
+        if "posts" in cols and "source" not in cols["posts"]:
+            conn.execute(text("ALTER TABLE posts ADD COLUMN source VARCHAR(12) NOT NULL DEFAULT 'scheduled'"))
+        if "users" in cols and "timezone" not in cols["users"]:
+            conn.execute(text("ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Kolkata'"))
+        if "accounts" in cols and "posting_slots" not in cols["accounts"]:
+            conn.execute(text("ALTER TABLE accounts ADD COLUMN posting_slots JSON"))
+        if "accounts" in cols and "posting_goal" not in cols["accounts"]:
+            conn.execute(text("ALTER TABLE accounts ADD COLUMN posting_goal INTEGER NOT NULL DEFAULT 7"))
         pg = engine.dialect.name == "postgresql"
         if "comments" in cols and "resolved" not in cols["comments"]:
             conn.execute(text("ALTER TABLE comments ADD COLUMN resolved BOOLEAN NOT NULL DEFAULT false"))
@@ -180,6 +206,13 @@ async def _seed_demo_data(demo_user: User):
         if not created and db.query(Post).filter(Post.user_id == uid).count() > 0:
             return
 
+        # demo tags (Buffer-style) — idempotent per user
+        tag_names = {"Food": "#e1306c", "Festive": "#f5a524", "Behind the Scenes": "#22a06b"}
+        for tname, tcol in tag_names.items():
+            if not db.query(Tag).filter(Tag.user_id == uid, Tag.name == tname).first():
+                db.add(Tag(user_id=uid, name=tname, color=tcol))
+        db.commit()
+
         now = datetime.now(timezone.utc)
         pub_captions = [
             "Best biryani in Hyderabad? Drop your pick 🍗 #Hyderabad #Biryani",
@@ -187,7 +220,7 @@ async def _seed_demo_data(demo_user: User):
         ]
         for caption in pub_captions:
             p = Post(user_id=uid, account_id=accs[0].id, caption=caption,
-                     scheduled_at=now - timedelta(hours=2),
+                     scheduled_at=now - timedelta(hours=2), source="scheduled",
                      status=PostStatus.published, platform_post_id=f"mock_seed_{caption[:6]}",
                      published_at=now - timedelta(hours=2))
             db.add(p)
@@ -199,9 +232,18 @@ async def _seed_demo_data(demo_user: User):
         ]
         for caption, dt in sched:
             db.add(Post(user_id=uid, account_id=accs[0].id, caption=caption, scheduled_at=dt,
-                        status=PostStatus.scheduled))
+                        status=PostStatus.scheduled, source="scheduled"))
             db.add(Post(user_id=uid, account_id=accs[1].id, caption=caption, scheduled_at=dt,
-                        status=PostStatus.scheduled))
+                        status=PostStatus.scheduled, source="scheduled"))
+        # a few Buffer-style queue posts (drag-to-reorder works on these)
+        queue_caps = [
+            "Saturday foodie walk — guessing the street? 🚶",
+            "Secret menu item reveal 🍔",
+        ]
+        for i, caption in enumerate(queue_caps):
+            db.add(Post(user_id=uid, account_id=accs[0].id, caption=caption,
+                        scheduled_at=now + timedelta(hours=4 + i), status=PostStatus.scheduled,
+                        source="queue"))
         db.commit()
 
         await eng.sync_metrics(db, uid)
