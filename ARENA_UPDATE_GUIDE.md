@@ -3,7 +3,7 @@
 ## What was changed
 
 ### Version
-- Current local code version: `1.3.0`
+- Current local code version: `1.4.0`
 
 ### UI / UX
 - Mobile top header + hamburger sidebar drawer
@@ -14,6 +14,9 @@
 - Reset-password flow improved, including token auto-open from URL query params
 - Home dashboard polished with quick actions + status cards
 - Sticky topbar and better card hover polish
+- Calendar filters + in-range summary cards
+- Connected accounts dashboard cards + search + summary
+- Analytics highlights + published-post search
 
 ### Backend
 - Duplicate connected accounts are blocked with `409`
@@ -64,7 +67,7 @@ curl https://socialauto-k5ou.onrender.com/api/health
 ```
 Expected:
 ```json
-{"ok":true,"mock_mode":false,"version":"1.3.0"}
+{"ok":true,"mock_mode":false,"version":"1.4.0"}
 ```
 
 Then test manually:

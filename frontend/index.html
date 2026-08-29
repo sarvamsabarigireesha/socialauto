@@ -83,6 +83,17 @@
   .mini-pill.ok{background:#e8f7f0;color:#177d57}
   .mini-pill.warn{background:#fff7e6;color:#ad6800}
   .mini-pill.info{background:#eef2ff;color:#4454d8}
+  .mini-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .mini-stat-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px}
+  .mini-stat-card .k{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .mini-stat-card .v{font-size:24px;font-weight:800;margin-top:6px}
+  .mini-stat-card .s{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .account-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .account-card{border:1px solid var(--border);border-radius:16px;background:#fff;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .account-head{display:flex;align-items:flex-start;gap:12px}
+  .account-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .meta-box{border:1px solid var(--border);border-radius:12px;padding:10px;background:#fafbfe}
+  .meta-box b{font-size:15px}
 
   .btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:14px;background:var(--brand);color:#fff;
     display:inline-flex;align-items:center;gap:7px;transition:.15s}
@@ -294,7 +305,8 @@
     .topbar .right{margin-left:0;width:100%;justify-content:flex-start;flex-wrap:wrap}
     .cal-head{flex-wrap:wrap}
     .search-input,.select-input{width:100%;min-width:unset}
-    .quick-grid{grid-template-columns:1fr}
+    .quick-grid,.account-cards{grid-template-columns:1fr}
+    .account-meta{grid-template-columns:1fr}
   }
   .metric-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;
     display:flex;align-items:center;gap:16px;box-shadow:var(--shadow)}
@@ -666,6 +678,24 @@
         <button id="tgMonth" onclick="setCalMode('month')">Month</button>
       </div>
     </div>
+    <div class="toolbar-row">
+      <select id="calPlatformFilter" class="select-input" onchange="calendarPlatformFilter=this.value;renderCalendar()">
+        <option value="all">All platforms</option>
+        <option value="instagram">📸 Instagram</option>
+        <option value="facebook">👍 Facebook</option>
+        <option value="youtube">▶️ YouTube</option>
+        <option value="threads">🧵 Threads</option>
+        <option value="moj">🎬 Moj</option>
+        <option value="sharechat">💬 ShareChat</option>
+      </select>
+      <select id="calStatusFilter" class="select-input" onchange="calendarStatusFilter=this.value;renderCalendar()">
+        <option value="all">All statuses</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="published">Published</option>
+        <option value="failed">Failed</option>
+      </select>
+    </div>
+    <div class="mini-stats" id="calSummary" style="margin-bottom:14px"></div>
     <div class="cal-grid" id="calGrid" style="display:none"></div>
     <div class="week-grid" id="weekGrid"></div>
     <div class="legend">
@@ -777,12 +807,14 @@
   <section id="view-analytics" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <div class="range-pills" id="rangePills"></div>
+      <input id="analyticsSearch" class="search-input" style="max-width:320px" placeholder="Search published post captions…" oninput="analyticsSearch=this.value.toLowerCase();loadAnalytics()">
       <div style="margin-left:auto;display:flex;gap:8px">
         <button class="btn ghost sm" onclick="syncAnalytics()">🔄 Refresh from platforms</button>
         <button class="btn ghost sm" onclick="exportAnalytics()">⬇️ Export CSV</button>
       </div>
     </div>
     <div class="grid stats" id="statCards"></div>
+    <div class="mini-stats" id="analyticsHighlights" style="margin-top:16px"></div>
     <div class="grid two-col" style="margin-top:16px">
       <div class="card" style="padding:18px">
         <h2 class="section-title">Performance by platform</h2>
@@ -850,7 +882,13 @@
       </div>
       <div class="card" style="padding:20px">
         <h2 class="section-title">Connected accounts</h2>
-        <div id="accountsList"></div>
+        <div class="toolbar-row">
+          <input id="accountSearch" class="search-input" placeholder="Search channel name, platform, status…" oninput="accountSearch=this.value.toLowerCase();loadAccounts()">
+          <button class="btn ghost sm" onclick="switchView('schedule')">⏰ Schedule settings</button>
+          <button class="btn ghost sm" onclick="switchView('community')">💬 Community inbox</button>
+        </div>
+        <div class="mini-stats" id="accountSummary" style="margin-bottom:14px"></div>
+        <div id="accountsList" class="account-cards"></div>
       </div>
     </div>
   </section>
@@ -1170,6 +1208,10 @@ let queueSearch = '';
 let queuePlatformFilter = 'all';
 let communitySearch = '';
 let communityOpenOnly = false;
+let calendarPlatformFilter = 'all';
+let calendarStatusFilter = 'all';
+let accountSearch = '';
+let analyticsSearch = '';
 function togglePassword(id, btn){
   const inp = document.getElementById(id);
   if(!inp) return;
@@ -1832,13 +1874,46 @@ document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeNav(); do
 /* ================= accounts ================= */
 async function loadAccounts(){
   ACCOUNTS = await api('/api/accounts');
-  document.getElementById('accountsList').innerHTML = ACCOUNTS.length ? ACCOUNTS.map(a=>`
-    <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)">
-      <div class="av ${a.platform}" style="width:38px;height:38px;font-size:16px">${PLAT_META[a.platform].ic}</div>
-      <div style="flex:1"><div style="font-weight:700">${esc(a.display_name)}</div>
-        <div class="muted" style="font-size:12px">${PLAT_META[a.platform].label} · auto-comments ${a.auto_comment?'ON':'OFF'}</div></div>
-      <button class="btn red sm" onclick="delAccount(${a.id})">Remove</button>
-    </div>`).join('') : '<p class="muted">No accounts yet — connect one →</p>';
+  const all = ACCOUNTS;
+  const needle = accountSearch.trim();
+  const list = !needle ? all : all.filter(a=>[
+    a.display_name, a.platform, a.external_id,
+    a.auto_comment ? 'auto on' : 'auto off',
+    (a.posting_slots||[]).length ? 'scheduled' : 'no schedule'
+  ].join(' ').toLowerCase().includes(needle));
+  const customReply = all.filter(a=>(a.comment_template||'').trim()).length;
+  const slotted = all.filter(a=>(a.posting_slots||[]).length).length;
+  document.getElementById('accountSummary').innerHTML = [
+    ['Connected', all.length, 'Active channels in workspace'],
+    ['Auto-comments ON', all.filter(a=>a.auto_comment).length, 'Channels using auto replies'],
+    ['Schedules set', slotted, 'Channels with posting slots'],
+    ['Custom replies', customReply, 'Accounts using a fixed template'],
+  ].map(([k,v,s])=>`<div class="mini-stat-card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  document.getElementById('accountsList').innerHTML = list.length ? list.map(a=>{
+    const m = PLAT_META[a.platform];
+    const slots = (a.posting_slots||[]).length;
+    return `<div class="account-card">
+      <div class="account-head">
+        <div class="av ${a.platform}" style="width:44px;height:44px;font-size:18px">${m.ic}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800">${esc(a.display_name)}</div>
+          <div class="muted" style="font-size:12.5px">${m.label}${a.external_id?` · ID: ${esc(a.external_id)}`:''}</div>
+        </div>
+        <span class="mini-pill ${a.auto_comment?'ok':'warn'}">${a.auto_comment?'🤖 Auto ON':'Auto OFF'}</span>
+      </div>
+      <div class="account-meta">
+        <div class="meta-box"><div class="k">Posting goal</div><b>${a.posting_goal||7}/week</b></div>
+        <div class="meta-box"><div class="k">Schedule slots</div><b>${slots}</b></div>
+      </div>
+      <div class="helper-note">${slots ? `${slots} posting slot(s) configured for this channel.` : 'No posting schedule set yet — add time slots so queue posts land automatically.'}</div>
+      ${a.comment_template?`<div class="helper-note" style="background:#fafbfe;border:1px solid var(--border);border-radius:12px;padding:10px">Fixed reply: ${esc(a.comment_template)}</div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost sm" onclick="openSchedModal(${a.id})">⏰ Edit schedule</button>
+        <button class="btn ghost sm" onclick="switchView('community')">💬 Inbox</button>
+        <button class="btn red sm" onclick="delAccount(${a.id})">Remove</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="card" style="padding:24px;text-align:center;color:var(--muted)">${all.length ? 'No accounts matched your search 🔎' : 'No accounts yet — connect one →'}</div>`;
 }
 async function createAccount(){
   const body = {platform:aPlatform.value, display_name:aName.value.trim(), external_id:aExt.value.trim(),
@@ -1846,9 +1921,11 @@ async function createAccount(){
   if(!body.display_name) return toast('Display name required', false);
   await api('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   aName.value=aExt.value=aToken.value=aTmpl.value='';
-  toast('Account connected ✅'); loadAccounts();
+  toast('Account connected ✅');
+  await refreshData();
+  loadAccounts();
 }
-async function delAccount(id){ await api('/api/accounts/'+id,{method:'DELETE'}); toast('Account removed'); loadAccounts(); }
+async function delAccount(id){ await api('/api/accounts/'+id,{method:'DELETE'}); toast('Account removed'); await refreshData(); loadAccounts(); }
 
 function accPill(a, selected, onclick){
   return `<button type="button" class="acc-pill ${selected?'sel':''}" onclick="${onclick}">
@@ -2328,9 +2405,42 @@ function moveWeek(d){ calAnchor.setDate(calAnchor.getDate() + 7*d); renderCalend
 function moveCal(d){ if(calMode==='week') moveWeek(d); else moveMonth(d); }
 function goToday(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); calAnchor=n; renderCalendar(); }
 
+function calendarVisiblePosts(){
+  return POSTS.filter(p=>p.status!=='draft')
+    .filter(p=>calendarPlatformFilter==='all' || p.account?.platform===calendarPlatformFilter)
+    .filter(p=>calendarStatusFilter==='all' || p.status===calendarStatusFilter);
+}
+function currentCalendarRange(){
+  if(calMode==='week'){
+    const anchor = new Date(calAnchor);
+    const dow = (anchor.getDay()+6)%7;
+    const start = new Date(anchor); start.setHours(0,0,0,0); start.setDate(anchor.getDate()-dow);
+    const end = new Date(start); end.setDate(start.getDate()+6); end.setHours(23,59,59,999);
+    return {start, end};
+  }
+  const start = new Date(calYear, calMonth, 1, 0, 0, 0, 0);
+  const end = new Date(calYear, calMonth+1, 0, 23, 59, 59, 999);
+  return {start, end};
+}
+function renderCalSummary(){
+  const {start,end} = currentCalendarRange();
+  const items = calendarVisiblePosts().filter(p=>{
+    const d = new Date(p.status==='published' && p.published_at ? p.published_at : p.scheduled_at);
+    return d >= start && d <= end;
+  });
+  const scheduled = items.filter(p=>p.status==='scheduled').length;
+  const published = items.filter(p=>p.status==='published').length;
+  const failed = items.filter(p=>p.status==='failed').length;
+  document.getElementById('calSummary').innerHTML = [
+    ['Posts in range', items.length, calMode==='week' ? 'This week view' : 'This month view'],
+    ['Scheduled', scheduled, 'Waiting to publish'],
+    ['Published', published, 'Already completed'],
+    ['Failed', failed, 'Need attention'],
+  ].map(([k,v,s])=>`<div class="mini-stat-card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+}
 function _postsByLocalDate(){
   const byDate = {};
-  POSTS.filter(p=>p.status!=='draft').forEach(p=>{
+  calendarVisiblePosts().forEach(p=>{
     const d = new Date(p.status==='published' && p.published_at ? p.published_at : p.scheduled_at);
     const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     (byDate[key] = byDate[key]||[]).push(p);
@@ -2348,6 +2458,7 @@ function _chipHTML(p, sibs){
 function renderCalendar(){
   document.getElementById('calGrid').style.display = calMode==='month' ? 'grid' : 'none';
   document.getElementById('weekGrid').style.display = calMode==='week' ? 'grid' : 'none';
+  renderCalSummary();
   if (calMode==='month') renderMonth(); else renderWeek();
 }
 
@@ -2654,6 +2765,7 @@ async function loadAnalytics(){
   renderRangePills();
   const d = await api(`/api/analytics${analyticsDays?`?days=${analyticsDays}`:''}`);
   const t = d.totals;
+  const needle = analyticsSearch.trim();
   const cards = [
     ['📝','Posts published',d.posts_published,'var(--brand)'],
     ['🗓','Scheduled',d.posts_scheduled,'var(--purple)'],
@@ -2666,6 +2778,16 @@ async function loadAnalytics(){
   ];
   document.getElementById('statCards').innerHTML = cards.map(([ic,l,n,c])=>
     `<div class="card stat"><div class="ic">${ic}</div><div class="num" style="color:${c}">${n.toLocaleString('en-IN')}</div><div class="lbl">${l}</div></div>`).join('');
+  const best = Object.entries(d.by_platform||{}).sort((a,b)=> (b[1].likes+b[1].comments+b[1].shares) - (a[1].likes+a[1].comments+a[1].shares))[0];
+  const engagement = (t.likes||0) + (t.comments||0) + (t.shares||0);
+  const avgReach = d.posts_published ? Math.round((t.reach||0) / d.posts_published) : 0;
+  const coveragePct = d.comments_total ? Math.round(d.auto_replied / d.comments_total * 100) : 0;
+  document.getElementById('analyticsHighlights').innerHTML = [
+    ['Best platform', best ? `${PLAT_META[best[0]].ic} ${PLAT_META[best[0]].label}` : '—', best ? `${best[1].likes} likes · ${best[1].comments} comments` : 'No published platform data yet'],
+    ['Engagement total', engagement.toLocaleString('en-IN'), 'Likes + comments + shares'],
+    ['Avg reach / post', avgReach.toLocaleString('en-IN'), 'Average reach across published posts'],
+    ['Reply coverage', `${coveragePct}%`, 'Auto replies over total comments'],
+  ].map(([k,v,s])=>`<div class="mini-stat-card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   const maxL = Math.max(1,...Object.values(d.by_platform).map(p=>p.likes));
   document.getElementById('byPlatform').innerHTML = Object.entries(d.by_platform).map(([pl,v])=>`
     <div style="margin-bottom:13px">
@@ -2678,12 +2800,13 @@ async function loadAnalytics(){
     🤖 Auto-replies sent: <b style="color:var(--green)">${d.auto_replied}</b><br>
     📈 Reply coverage: <b>${d.comments_total?Math.round(d.auto_replied/d.comments_total*100):0}%</b><br>
     <span class="muted">Intents: question · praise · purchase · support · generic</span>`;
-  document.getElementById('perPostTbody').innerHTML = d.per_post.length ? d.per_post.map(p=>`<tr>
+  const perPost = (d.per_post||[]).filter(p=>!needle || [p.caption, p.platform, p.account].join(' ').toLowerCase().includes(needle));
+  document.getElementById('perPostTbody').innerHTML = perPost.length ? perPost.map(p=>`<tr>
     <td style="max-width:280px">${esc(p.caption)}…</td>
     <td><span class="plat-tag">${PLAT_META[p.platform].ic} ${PLAT_META[p.platform].label}</span></td>
     <td>${p.likes}</td><td>${p.comments}</td><td>${p.shares}</td>
     <td>${p.impressions.toLocaleString('en-IN')}</td><td>${p.reach.toLocaleString('en-IN')}</td></tr>`).join('')
-    : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:26px">Publish posts to see analytics.</td></tr>';
+    : `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:26px">${d.per_post.length ? 'No published posts matched your search.' : 'Publish posts to see analytics.'}</td></tr>`;
   const tags = Object.entries(d.by_tag||{}).sort((a,b)=>b[1].likes-a[1].likes);
   const maxT = Math.max(1, ...tags.map(([,v])=>v.likes));
   document.getElementById('byTag').innerHTML = tags.length ? tags.map(([name,v])=>`
