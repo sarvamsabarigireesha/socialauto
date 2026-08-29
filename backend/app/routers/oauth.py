@@ -297,10 +297,17 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
             me = await c.get(
                 "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
                 headers={"Authorization": f"Bearer {token}"})
-            me.raise_for_status()
+            if me.status_code != 200:
+                try:
+                    gmsg = me.json()["error"]["message"]
+                except Exception:
+                    gmsg = me.text[:200]
+                raise HTTPException(400,
+                    f"YouTube API error ({me.status_code}): {gmsg}. "
+                    f"Enable YouTube Data API v3 in Google Cloud console.")
             items = me.json().get("items", [])
             if not items:
-                raise HTTPException(400, "No YouTube channel found on this Google account")
+                raise HTTPException(400, "No YouTube channel found on this Google account — create one at youtube.com")
             ch = items[0]
         acc = _upsert_account(db, user, Platform.youtube,
                               external_id=ch["id"], token=token,
