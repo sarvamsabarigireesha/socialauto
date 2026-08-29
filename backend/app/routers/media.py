@@ -14,7 +14,8 @@ MEDIA_DIR = DATA_DIR / "media"
 SAMPLES_DIR = MEDIA_DIR / "samples"
 SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 
-ALLOWED = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+ALLOWED = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+           ".mp4", ".mov", ".m4v", ".webm"}  # videos for YouTube/Shorts/Reels
 
 router = APIRouter(prefix="/api/media", tags=["media"])
 
@@ -66,15 +67,20 @@ async def upload_media(file: UploadFile = File(...),
                        user: User = Depends(get_current_user)):
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED:
-        raise HTTPException(400, "Only image files (jpg/png/gif/webp/svg) are allowed")
+        raise HTTPException(400, "Supported: images (jpg/png/gif/webp/svg) and videos (mp4/mov/webm)")
+    max_bytes = 100 * 1024 * 1024 if ext in (".mp4",".mov",".m4v",".webm") else 8 * 1024 * 1024
     user_dir = MEDIA_DIR / f"u{user.id}"
     user_dir.mkdir(parents=True, exist_ok=True)
     name = f"{uuid.uuid4().hex[:12]}{ext}"
     content = await file.read()
-    if len(content) > 8 * 1024 * 1024:
-        raise HTTPException(400, "File too large (max 8MB)")
+    if len(content) > max_bytes:
+        raise HTTPException(400, f"File too large (max {max_bytes//(1024*1024)}MB)")
     (user_dir / name).write_bytes(content)
-    return {"name": name, "url": f"/media/u{user.id}/{name}", "size": len(content)}
+    from ..config import settings
+    base = (settings.APP_PUBLIC_URL or "").rstrip("/")
+    rel = f"/media/u{user.id}/{name}"
+    return {"name": name, "url": f"{base}{rel}" if base else rel,
+            "size": len(content)}
 
 
 @router.delete("/{name}", status_code=204)

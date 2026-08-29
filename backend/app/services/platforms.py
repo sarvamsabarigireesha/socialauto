@@ -120,9 +120,13 @@ class _MetaClient:
         try:
             async with httpx.AsyncClient(timeout=30) as c:
                 if media_url:
+                    img = media_url
+                    if not img.startswith(("http://","https://")):
+                        img = (settings.APP_PUBLIC_URL or "").rstrip("/") + (
+                            img if img.startswith("/") else "/" + img)
                     # Instagram: 1) create media container  2) publish
                     r = await c.post(f"{self._v()}/{account.external_id}/media", data={
-                        "image_url": media_url, "caption": caption,
+                        "image_url": img, "caption": caption,
                         "access_token": account.access_token,
                     })
                     r.raise_for_status()
@@ -251,24 +255,40 @@ class _YouTubeClient(Client):
 
     async def publish(self, account: Account, caption: str, media_url: str,
                       post_type: str = "feed") -> PublishResult:
-        if post_type == "community":
+        # YouTube Community posts (image/text) have NO public API. A normal
+        # "feed" post with an image is really a Community post on YouTube.
+        if post_type == "community" or (post_type == "feed" and media_url and
+                                        not str(media_url).lower().endswith(
+                                            (".mp4",".mov",".m4v",".webm"))):
             return PublishResult(False, manual=True,
                 error=("MANUAL: YouTube Community posts can't be published via API. "
                        "Open studio.youtube.com -> Create -> Create post (or your "
                        "channel -> Posts tab), paste the caption, upload the image."))
         if not media_url:
             return PublishResult(False, error=(
-                f"YouTube needs a video file/URL for a {post_type}. "
-                "For text/image posts use a Community post (manual reminder)."))
+                "YouTube: pick a VIDEO file for a Short/Video upload. "
+                "Image or text posts go via a Community post (manual reminder)."))
         try:
             title, desc = caption[:100], caption
             if post_type == "short":
                 title = (caption[:90] + " #Shorts")[:100]
                 desc = caption if "#Shorts" in caption else caption + "\n\n#Shorts"
-            import json
+            import json, os
+            from ..config import DATA_DIR
+            # Read media: local uploaded file (DATA_DIR/media/...) or remote URL
+            if str(media_url).startswith(("http://", "https://")):
+                async with httpx.AsyncClient(timeout=180) as c0:
+                    v = await c0.get(media_url)
+                    v.raise_for_status()
+                    video_bytes, ctype = v.content, v.headers.get("content-type", "video/mp4")
+            else:
+                local = str(media_url).split("/media/", 1)[-1]
+                fpath = DATA_DIR / "media" / local
+                if not fpath.exists():
+                    return PublishResult(False, error=f"YouTube: media file missing ({fpath.name})")
+                video_bytes = fpath.read_bytes()
+                ctype = "video/mp4"
             async with httpx.AsyncClient(timeout=180) as c:
-                vid = await c.get(media_url)
-                vid.raise_for_status()
                 # resumable session init
                 init = await c.post(
                     f"{self.UPLOAD}/videos?uploadType=resumable&part=snippet,status",
@@ -295,8 +315,8 @@ class _YouTubeClient(Client):
                         error=f"YouTube upload init failed ({init.status_code}): {init.text[:300]}")
                 up_url = init.headers["location"]
                 done = await c.put(up_url,
-                                   content=vid.content,
-                                   headers={"Content-Type": "video/mp4",
+                                   content=video_bytes,
+                                   headers={"Content-Type": ctype,
                                             "Authorization": f"Bearer {account.access_token}"})
                 if done.status_code not in (200, 201):
                     return PublishResult(False,
