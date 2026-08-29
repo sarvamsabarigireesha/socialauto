@@ -1,10 +1,10 @@
 # ⚡ SocialAuto — Free-Tier Social Media Automation Webapp (Publer-style)
 
-**Calendar view · Rich composer with live per-platform previews · Media library · Bulk CSV scheduling · Auto-comments (intent-based smart replies) · Analytics** — across **Instagram, Facebook, X (Twitter), LinkedIn**. Runs 100% on free tiers. Works in **MOCK MODE** with zero credentials so you can demo it instantly.
+**Calendar view · Rich composer with live per-platform previews · Media library · Bulk CSV scheduling · Auto-comments (intent-based smart replies) · Analytics** — across **Instagram, Facebook, YouTube** (plus manual-helper support for Threads, Moj, ShareChat). Runs 100% on free tiers. Works in **MOCK MODE** with zero credentials so you can demo it instantly.
 
 ### Dashboard features (like Publer)
 - 📅 **Monthly calendar** — color-coded posts per platform; click a day to create, click a post to edit
-- ✏️ **Composer modal** — multi-account selector, live platform preview cards, per-platform character counters (X 280 / IG 2200 / LinkedIn 3000), attach media, schedule or *Publish now*
+- ✏️ **Composer modal** — multi-account selector, live platform preview cards, per-platform character counters (IG 2200 / FB 2200), attach media, schedule or *Publish now*
 - 🖼 **Media library** — upload images once (drag & drop), reuse in any post; demo images pre-seeded
 - ✏️ **Edit / delete / publish-now** any scheduled post (`PATCH /api/posts/:id`)
 - 📦 **Bulk CSV** upload — hundreds of posts × multiple accounts in one request
@@ -43,9 +43,9 @@
               ┌────────────────────┐   ┌─────────────────────────┐
               │  SQLite / Turso /  │   │  Platform APIs (free):  │
               │  Neon Postgres     │   │  Meta Graph (IG/FB)     │
-              │  (posts, comments, │   │  X API v2, LinkedIn API │
-              │   metrics)         │   └─────────────────────────┘
-              └────────────────────┘
+              │  (posts, comments, │   │  Meta Graph (IG/FB)     │
+              │   metrics)         │   │  YouTube Data API v3    │
+              └────────────────────┘   └─────────────────────────┘
 ```
 
 ### Cron tick = one call does everything
@@ -93,7 +93,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 | Edge cron | Cloudflare Worker (`cloudflare/worker.js`) | 100k requests/day |
 | No-code | n8n self-hosted (`n8n/socialauto-workflow.json`) | open source, free |
 | Database | Turso (libSQL) / Neon Postgres | 9GB / 0.5GB free |
-| APIs | Meta Developer, X, LinkedIn | free (Meta needs app review for advanced perms) |
+| APIs | Meta Developer, Google Cloud (YouTube) | free (Meta needs app review for advanced perms) |
 
 **Go live:**
 ```bash
@@ -117,7 +117,7 @@ socialauto/
 │   │   ├── schemas.py         # pydantic I/O
 │   │   ├── routers/           # accounts, posts, comments, analytics, cron
 │   │   └── services/
-│   │       ├── platforms.py   # mock client + real Meta/X/LinkedIn clients
+│   │       ├── platforms.py   # mock client + real Meta/YouTube clients
 │   │       ├── autocomment.py # intent detection + smart replies
 │   │       └── engine.py      # publish / sync comments / sync analytics jobs
 │   └── requirements.txt

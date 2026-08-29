@@ -27,7 +27,7 @@ gcloud run deploy socialauto \
 ```
 
 > Add real platform tokens later with `--set-env-vars` or in Console → Service → Edit & deploy → Variables:
-> `META_APP_ID`, `META_APP_SECRET`, `X_BEARER_TOKEN`, `LINKEDIN_ACCESS_TOKEN` (see `.env.example`).
+> `META_APP_ID`, `META_APP_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (see `.env.example`).
 >
 > **Database — Neon Postgres (free, recommended):**
 > 1. Sign up at https://neon.tech → create project (region: Mumbai/Singapore) → Connect → copy the

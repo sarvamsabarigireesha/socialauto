@@ -5,15 +5,11 @@ full OAuth round trip; a connected account is created immediately.
 
 Real mode: standard OAuth2 code flow per platform.
   Meta:      https://www.facebook.com/v21.0/dialog/oauth (IG/FB share)
-  LinkedIn:  https://www.linkedin.com/oauth/v2/authorization
-  X (Twt v2): PKCE flow, https://twitter.com/i/oauth2/authorize
+  Google:    https://accounts.google.com/o/oauth2/v2/auth (YouTube)
 
 After /callback we store the access token + external id as an Account row.
 """
-import base64
-import hashlib
 import os
-import secrets
 from urllib.parse import urlencode, quote as _ue
 
 import httpx
@@ -78,38 +74,6 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
         url = f"https://www.facebook.com/{settings.META_GRAPH_VERSION}/dialog/oauth?{qs}"
         return {"mode": "real", "authorize_url": url}
 
-    if plat == Platform.linkedin:
-        if not settings.LINKEDIN_CLIENT_ID:
-            raise HTTPException(400, "LINKEDIN_CLIENT_ID not set — real LinkedIn OAuth not configured")
-        qs = urlencode({
-            "response_type": "code", "client_id": settings.LINKEDIN_CLIENT_ID,
-            "redirect_uri": redirect_uri, "state": state,
-            "scope": "openid profile w_member_social",
-        })
-        return {"mode": "real",
-                "authorize_url": f"https://www.linkedin.com/oauth/v2/authorization?{qs}"}
-
-    if plat == Platform.x:
-        if not settings.X_CLIENT_ID:
-            raise HTTPException(400, "X_CLIENT_ID not set — real X OAuth not configured")
-        verifier = secrets.token_urlsafe(64)
-        challenge = base64.urlsafe_b64encode(
-            hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
-        # short-lived: stashed via signed state-less token; embed verifier in JWT? keep simple:
-        # store in a second jwt-ish token is overkill — use a server-side note via settings? Use token.
-        qs = urlencode({
-            "response_type": "code", "client_id": settings.X_CLIENT_ID,
-            "redirect_uri": redirect_uri, "state": state,
-            "scope": "tweet.read tweet.write users.read offline.access",
-            "code_challenge": challenge, "code_challenge_method": "S256",
-        })
-        # verifier needed at callback; pass to frontend via a cookie-ish header is complex,
-        # so X uses a simpler fallback: store verifier keyed by state hash in memory.
-        _X_PKCE[hashlib.sha256(state.encode()).hexdigest()[:16]] = verifier
-        _X_PKCE[state] = verifier  # also keyed by full state (survives)
-        return {"mode": "real",
-                "authorize_url": f"https://twitter.com/i/oauth2/authorize?{qs}"}
-
     if plat == Platform.youtube:
         if not settings.GOOGLE_CLIENT_ID:
             raise HTTPException(400, "GOOGLE_CLIENT_ID not set — Google/YouTube OAuth not configured")
@@ -141,9 +105,6 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
                 "authorize_url": f"https://threads.net/oauth/authorize?{qs}"}
 
 
-_X_PKCE: dict[str, str] = {}
-
-
 # ------------------------------------------------------------------ callback
 @router.get("/callback", response_model=AccountOut)
 async def callback(request: Request, code: str | None = None, state: str | None = None,
@@ -166,7 +127,6 @@ async def callback(request: Request, code: str | None = None, state: str | None 
     if mock == "1":
         plat = _require_platform(platform or plat_str)
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
-                 "x": "@your_x_handle", "linkedin": "Your LinkedIn",
                  "youtube": "Your YouTube Channel", "threads": "@your.threads",
                  "moj": "Your Moj account", "sharechat": "Your ShareChat"}
         acc = _upsert_account(db, user, plat, external_id=f"mock_{plat.value}_{user.id}",
@@ -227,45 +187,6 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
                         display_name=f"{pg.get('name','IG')} (Instagram)")
         # browser redirect -> back to app; AJAX (mock-like test) returns an account
         return await _finish(first_acc, ajax, db)
-
-    if plat == Platform.linkedin:
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.post("https://www.linkedin.com/oauth/v2/accessToken", data={
-                "grant_type": "authorization_code", "code": code,
-                "client_id": settings.LINKEDIN_CLIENT_ID,
-                "client_secret": settings.LINKEDIN_CLIENT_SECRET,
-                "redirect_uri": redirect_uri})
-            r.raise_for_status()
-            token = r.json()["access_token"]
-            me = await c.get("https://api.linkedin.com/v2/userinfo",
-                            headers={"Authorization": f"Bearer {token}"})
-            me.raise_for_status()
-            d = me.json()
-        acc = _upsert_account(db, user, Platform.linkedin,
-                              external_id=d.get("sub", ""), token=token,
-                              display_name=d.get("name", "LinkedIn User"))
-        return await _finish(acc, ajax, db)
-
-    if plat == Platform.x:
-        sig = hashlib.sha256(state.encode()).hexdigest()[:16]
-        verifier = _X_PKCE.pop(state, None) or _X_PKCE.pop(sig, None)
-        if not verifier:
-            raise HTTPException(400, "PKCE verifier lost — restart connect")
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.post("https://api.twitter.com/2/oauth/token", data={
-                "grant_type": "authorization_code", "code": code,
-                "redirect_uri": redirect_uri, "code_verifier": verifier,
-                "client_id": settings.X_CLIENT_ID},
-                auth=(settings.X_CLIENT_ID, settings.X_CLIENT_SECRET))
-            r.raise_for_status()
-            token = r.json()["access_token"]
-            me = await c.get("https://api.twitter.com/2/users/me",
-                            headers={"Authorization": f"Bearer {token}"})
-            me.raise_for_status()
-            d = me.json()["data"]
-        acc = _upsert_account(db, user, Platform.x, external_id=d["id"], token=token,
-                              display_name="@" + d["username"])
-        return await _finish(acc, ajax, db)
 
     if plat == Platform.threads:
         async with httpx.AsyncClient(timeout=30) as c:
