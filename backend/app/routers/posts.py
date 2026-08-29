@@ -11,6 +11,7 @@ from ..models import Post, PostStatus, Account, User
 from ..schemas import PostIn, BulkPostIn, PostOut, PostUpdate
 from ..security import get_current_user
 from ..services import engine
+from ..services.engine import _aware
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
@@ -51,7 +52,8 @@ def create_post(data: PostIn, db: Session = Depends(get_db),
     group = uuid.uuid4().hex[:16]
     for aid in data.account_ids:
         p = Post(user_id=user.id, account_id=aid, caption=data.caption,
-                 media_url=data.media_url, post_type=(data.post_type or "feed"), scheduled_at=data.scheduled_at,
+                 media_url=data.media_url, post_type=(data.post_type or "feed"),
+                 scheduled_at=_aware(data.scheduled_at),
                  status=PostStatus.scheduled, group_id=group)
         db.add(p)
         created.append(p)
@@ -70,7 +72,8 @@ def bulk_create(data: BulkPostIn, db: Session = Depends(get_db),
         group = uuid.uuid4().hex[:16]
         for aid in data.account_ids:
             p = Post(user_id=user.id, account_id=aid, caption=row.caption,
-                     media_url=row.media_url, post_type=(row.post_type or "feed"), scheduled_at=row.scheduled_at,
+                     media_url=row.media_url, post_type=(row.post_type or "feed"),
+                     scheduled_at=_aware(row.scheduled_at),
                      status=PostStatus.scheduled, group_id=group)
             db.add(p)
             created.append(p)
@@ -103,6 +106,11 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
             dt = datetime.fromisoformat(when.replace("Z", "+00:00"))
         except ValueError:
             raise HTTPException(400, f"bad scheduled_at: {when}")
+        # CSV rows often omit the UTC offset (e.g. "2026-09-01T09:00:00"), which
+        # fromisoformat parses as a naive datetime. Normalize to UTC-aware so it
+        # compares correctly against `now` in the publish-due-posts cron job —
+        # otherwise CSV-scheduled posts silently never get picked up.
+        dt = _aware(dt)
         group = uuid.uuid4().hex[:16]
         for aid in aids:
             p = Post(user_id=user.id, account_id=aid, caption=caption,
@@ -131,6 +139,8 @@ def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db),
         targets = siblings or [p]
     payload = data.model_dump(exclude_none=True)
     new_account = payload.pop("account_id", None)
+    if "scheduled_at" in payload:
+        payload["scheduled_at"] = _aware(payload["scheduled_at"])
     for tgt in targets:
         if tgt.status == PostStatus.published:
             continue
