@@ -14,7 +14,7 @@ import base64
 import hashlib
 import os
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote as _ue
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -24,7 +24,20 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..models import Account, Platform, User
-from ..security import get_current_user, create_token, decode_token
+from ..security import get_current_user, create_token, decode_token, JWT_ALG, JWT_SECRET
+import jwt as _pyjwt
+
+
+def _make_state(user_id: int, platform: str) -> str:
+    import time
+    payload = {"sub": str(user_id), "plat": platform,
+               "iat": int(time.time()), "exp": int(time.time()) + 3600}
+    return _pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+
+def _parse_state(state: str) -> tuple[int, str]:
+    data = _pyjwt.decode(state, JWT_SECRET, algorithms=[JWT_ALG])
+    return int(data["sub"]), data.get("plat", "")
 from ..schemas import AccountOut
 
 router = APIRouter(prefix="/api/oauth", tags=["oauth"])
@@ -42,10 +55,8 @@ def _base_url(request: Request) -> str:
 async def connect(platform: str, request: Request, user: User = Depends(get_current_user)):
     """Begin OAuth. Returns {authorize_url} (real) or {mock_callback} (demo)."""
     plat = _require_platform(platform)
-    state = create_token(user.id)          # signed JWT carrying user id
+    state = _make_state(user.id, platform)
     redirect_uri = _base_url(request) + REDIRECT_PATH
-    sig = hashlib.sha256(state.encode()).hexdigest()[:16]
-    _REDIRECT_PLATFORM[sig] = plat
 
     if settings.MOCK_MODE:
         cb = f"{redirect_uri}?mock=1&platform={platform}&state={state}"
@@ -95,6 +106,7 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
         # verifier needed at callback; pass to frontend via a cookie-ish header is complex,
         # so X uses a simpler fallback: store verifier keyed by state hash in memory.
         _X_PKCE[hashlib.sha256(state.encode()).hexdigest()[:16]] = verifier
+        _X_PKCE[state] = verifier  # also keyed by full state (survives)
         return {"mode": "real",
                 "authorize_url": f"https://twitter.com/i/oauth2/authorize?{qs}"}
 
@@ -140,7 +152,10 @@ async def callback(request: Request, code: str | None = None, state: str | None 
                    db: Session = Depends(get_db)):
     if not state:
         raise HTTPException(400, "Missing state")
-    user_id = decode_token(state)
+    try:
+        user_id, plat_str = _parse_state(state)
+    except Exception:
+        return RedirectResponse(url="/?oauth_error=" + _ue("Expired or invalid session. Please try connecting again."))
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(401, "Unknown user")
@@ -149,7 +164,7 @@ async def callback(request: Request, code: str | None = None, state: str | None 
 
     # ---- MOCK round trip ----
     if mock == "1":
-        plat = _require_platform(platform)
+        plat = _require_platform(platform or plat_str)
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
                  "x": "@your_x_handle", "linkedin": "Your LinkedIn",
                  "youtube": "Your YouTube Channel", "threads": "@your.threads",
@@ -158,18 +173,24 @@ async def callback(request: Request, code: str | None = None, state: str | None 
                               token="MOCK_OAUTH_TOKEN", display_name=names[plat.value])
         return _finish(acc, ajax)
 
-    plat_hint = _detect_platform_from_code(code or "")   # real: caller passes ?platform too via state? no.
-    # Platform in real flow: Meta/LinkedIn/X all hit same callback; distinguish via state? We set
-    # state per connect; embed platform in JWT? decode_token only gives uid. Accept platform via query.
-    # Frontend appends nothing (provider does) — so store platform at /connect time keyed by state hash.
-    sig = hashlib.sha256(state.encode()).hexdigest()[:16]
-    plat = _REDIRECT_PLATFORM.pop(sig, None)
-    if not plat:
-        raise HTTPException(400, "Unknown OAuth session — restart connect")
-    if not code:
-        raise HTTPException(400, "Missing authorization code")
+    if not code and mock != "1":
+        return RedirectResponse(url="/?oauth_error=" + _ue("Missing authorization code from provider."))
+    if mock == "1":
+        pass
 
-    # ---- REAL exchanges ----
+    try:
+        plat = _require_platform(plat_str)
+        return await _real_exchange(plat, code, redirect_uri, db, user, ajax, state)
+    except Exception as e:
+        import traceback
+        print("OAUTH CALLBACK ERROR:", plat, "\n", traceback.format_exc(), flush=True)
+        if ajax == "1":
+            raise HTTPException(502, f"{plat.value} connect failed: {e}")
+        return RedirectResponse(url="/?oauth_error=" + _ue(
+            f"{plat.value.capitalize()} connect failed: {str(e)[:180]}"))
+
+
+async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
     if plat in (Platform.instagram, Platform.facebook):
         async with httpx.AsyncClient(timeout=30) as c:
             v = settings.META_GRAPH_VERSION
@@ -226,7 +247,8 @@ async def callback(request: Request, code: str | None = None, state: str | None 
         return _finish(acc, ajax)
 
     if plat == Platform.x:
-        verifier = _X_PKCE.pop(sig, None)
+        sig = hashlib.sha256(state.encode()).hexdigest()[:16]
+        verifier = _X_PKCE.pop(state, None) or _X_PKCE.pop(sig, None)
         if not verifier:
             raise HTTPException(400, "PKCE verifier lost — restart connect")
         async with httpx.AsyncClient(timeout=30) as c:

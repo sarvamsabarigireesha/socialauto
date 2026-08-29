@@ -1623,8 +1623,15 @@ async function refreshData(){
   }catch(e){}
 
   // returning from a real OAuth redirect?
-  if(new URLSearchParams(location.search).get('oauth') === 'connected'){
+  const qp = new URLSearchParams(location.search);
+  if(qp.get('oauth') === 'connected'){
     setTimeout(()=>flashConnected('instagram'), 400);
+    history.replaceState({}, '', '/');
+    setTimeout(async()=>{ await refreshData(); toast('✅ Channel connected! Check Accounts tab.'); }, 800);
+  }
+  const oerr = qp.get('oauth_error');
+  if(oerr){
+    setTimeout(()=>toast('Connect failed: '+oerr, false), 500);
     history.replaceState({}, '', '/');
   }
 
