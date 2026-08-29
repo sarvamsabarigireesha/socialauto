@@ -80,6 +80,13 @@ async def import_all(db: Session = Depends(get_db), user: User = Depends(get_cur
     return await engine.auto_import_all(db, user.id)
 
 
+@router.post("/bootstrap-sync")
+async def bootstrap_sync(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Run the full first-login sync: import existing channel content,
+    fetch existing comments, run auto-replies, and refresh metrics."""
+    return await engine.auto_import_all(db, user.id, run_sync=True, force_all_sync=True)
+
+
 @router.post("/comments/{comment_id}/reply")
 async def manual_reply(comment_id: int, data: ReplyIn,
                        db: Session = Depends(get_db), user: User = Depends(get_current_user)):

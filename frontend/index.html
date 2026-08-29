@@ -89,7 +89,7 @@
   .idea-toolbar{display:flex;gap:12px;align-items:center;padding:16px 18px;margin-bottom:16px}.idea-toolbar input{flex:1;border:1px solid #ddd7ce;border-radius:14px;padding:14px 15px}
   .publish-filterbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.publish-tools{display:flex;gap:10px;flex-wrap:wrap}
   .soft-toggle{border:1px solid #e5dfd6;background:#fff;padding:10px 14px;border-radius:14px;font-weight:700;color:#374151}.soft-toggle.active{background:#e8f4e8;border-color:#cae5ca;color:#246a34}
-  .community-tabs-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid #ebe6df;padding-bottom:10px;margin-bottom:12px}.community-syncbar{padding:12px 16px;margin-bottom:14px;background:#faf7f0;color:#6b7280}
+  .community-tabs-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid #ebe6df;padding-bottom:10px;margin-bottom:12px}.community-syncbar{padding:12px 16px;margin-bottom:14px;background:#faf7f0;color:#6b7280}.sync-feedback{display:none;padding:12px 14px;margin-bottom:14px;border-radius:14px;font-size:13px;line-height:1.6}.sync-feedback.ok{display:block;background:#eefbf3;border:1px solid #bfe5c9;color:#1f5130}.sync-feedback.warn{display:block;background:#fff8e8;border:1px solid #f4d6a0;color:#7a4b00}
   .insights-summary{padding:18px;background:#fcfaf5}
   .settings-layout{display:grid;grid-template-columns:250px 1fr;gap:20px}.settings-side{padding:18px;align-self:start;position:sticky;top:24px}.settings-side-title{font-size:16px;font-weight:800;margin-bottom:14px}.settings-group-label{font-size:12px;color:#9ca3af;text-transform:uppercase;font-weight:800;margin:18px 0 8px}.settings-link{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 14px;border:none;background:transparent;border-radius:12px;font-weight:700;color:#374151;text-align:left}.settings-link.active,.settings-link:hover{background:#efebe4}
   .small-select{min-width:170px}
@@ -1103,6 +1103,7 @@
       </div>
     </div>
     <div class="community-syncbar page-card">⟳ Checking for new comments. Almost there...</div>
+    <div id="syncFeedback" class="sync-feedback"></div>
     <div class="toolbar-row">
       <input id="commSearch" class="search-input" placeholder="Search comment, author, reply, caption…" oninput="communitySearch=this.value.toLowerCase();loadCommunity()">
       <button class="btn ghost sm" onclick="syncCommunity()">🔄 Fetch latest comments</button>
@@ -1295,7 +1296,7 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
         <div id="ptypeHint" class="hint" style="margin-bottom:8px"></div>
 
         <div class="cap-wrap">
-          <textarea class="cap" id="capText" placeholder="What do you want to share?" oninput="renderPreviews()"></textarea>
+          <textarea class="cap" id="capText" placeholder="What do you want to share?" oninput="renderPreviews();maybeAutoAI()"></textarea>
           <div class="char-count" id="charCount"></div>
         </div>
 
@@ -1311,7 +1312,7 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
 
         <!-- Buffer: customize for each network -->
         <label class="custom-toggle">
-          <input type="checkbox" id="customEach" onchange="renderCustomize()"> 🔀 Customize for each network
+          <input type="checkbox" id="customEach" onchange="comp.custom=this.checked;renderCustomize();maybeAutoAI()"> 🔀 Customize for each network
           <span class="muted" style="font-weight:500;font-size:12px">— different caption/media per account</span>
         </label>
         <div id="customizeList"></div>
@@ -1484,10 +1485,13 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
 <script>
 /* ---------- AI assistant ---------- */
 let lastAI = null;
-async function runAI(){
+let aiDebounce = null;
+async function runAI(auto=false){
   const cap = document.getElementById('capText').value;
-  if(!cap && !comp.mediaUrl) return toast('Type a caption or attach an image first', false);
   const platforms = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
+  if(!auto && !cap && !comp.mediaUrl) return toast('Type a caption or attach an image first', false);
+  if(!auto && !platforms.length) return toast('Select at least one account for better suggestions', false);
+  if(auto && (!platforms.length || (!cap.trim() && !comp.mediaUrl))) return;
   const panel = document.getElementById('aiPanel');
   panel.style.display = 'block';
   document.getElementById('aiLoading').style.display = 'block';
@@ -1512,7 +1516,10 @@ async function runAI(){
       </div>`).join('');
     document.getElementById('aiTimes').innerHTML = Object.entries(r.best_times||{})
       .filter(([k])=>platforms.includes(k)).map(([k,v])=>`• <b>${PLAT_META[k].label}</b>: ${esc(v)}`).join('<br>');
-  }catch(e){ toast('AI error: '+e.message, false); panel.style.display='none'; }
+  }catch(e){
+    if(!auto) toast('AI error: '+e.message, false);
+    if(auto) panel.style.display='none';
+  }
   document.getElementById('aiLoading').style.display = 'none';
   document.getElementById('aiBody').style.display = 'block';
 }
@@ -1532,24 +1539,25 @@ function appendText(t){
   ta.value = ta.value.trimEnd() + '\n\n' + t;
   renderPreviews(); toast('Disclaimer added');
 }
-// auto-suggest after selecting accounts + caption (debounced), and right after media attach
-let aiDebounce = null;
-function maybeAutoAI(){
+function maybeAutoAI(force=false){
   clearTimeout(aiDebounce);
   aiDebounce = setTimeout(()=>{
     const cap = document.getElementById('capText').value.trim();
-    const platforms = ACCOUNTS.filter(a=>comp.sel.has(a.id)).length;
-    if((cap.length > 25 || comp.mediaUrl) && platforms && !document.getElementById('aiPanel').style.display.includes('block') === false){
-      // only auto-open if user hasn't seen it yet this session
-      if(!sessionStorage.getItem('ai_shown')){ runAI(); sessionStorage.setItem('ai_shown','1'); }
-    }
-  }, 2500);
+    const platforms = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
+    if(!platforms.length || (!cap && !comp.mediaUrl)) return;
+    if(comp.aiAutoStamp && !force) return;
+    if(!force && cap.length < 20 && !comp.mediaUrl) return;
+    const stamp = JSON.stringify({p:[...platforms].sort().join(','), m:comp.mediaUrl || '', c:cap.slice(0,140)});
+    if(comp.aiAutoStamp === stamp) return;
+    comp.aiAutoStamp = stamp;
+    runAI(true);
+  }, force ? 250 : 1200);
 }
 
 /* ================= state ================= */
 let ACCOUNTS = [], POSTS = [], MEDIA = [], TAGS = [];
 let calYear, calMonth;                      // calendar cursor
-let comp = { sel: new Set(), mediaUrl: "", editingId: null, tags: new Set(), perAcct: {}, custom: false };
+let comp = { sel: new Set(), mediaUrl: "", editingId: null, tags: new Set(), perAcct: {}, custom: false, aiAutoStamp: '' };
 const PLAT_META = {
   instagram:{ic:'📸',cls:'ig',limit:2200,label:'Instagram', ratio:'4/5', ratioNote:'4:5 portrait (best feed)'},
   facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook', ratio:'1.91/1', ratioNote:'1.91:1 link / 4:5 photo'},
@@ -1777,16 +1785,19 @@ async function submitChangePassword(){
     toast('Password updated ✅');
   }catch(e){ toast(e.message, false); }
 }
-function enterApp(){
+async function enterApp(){
   document.getElementById('authOverlay').style.display = 'none';
+  closeAuthPanel();
   const menuEmail = document.getElementById('menuEmail');
   if(menuEmail) menuEmail.textContent = ME.email || '';
   document.getElementById('userBox').textContent = 'My Organization';
   const initial = (ME.name || ME.email || 'S').trim()[0].toUpperCase();
   const circle = document.getElementById('avatarCircle');
   if (circle) circle.textContent = initial;
+  await refreshData();
   switchView('home');
-  refreshData();
+  await autoSyncWorkspace(Boolean(window._forceNextAutoSync));
+  window._forceNextAutoSync = false;
 }
 
 /* ---------- OAuth connect ---------- */
@@ -1920,18 +1931,10 @@ async function importAllChannels(){
   if(!real.length) return toast('Connect YouTube / Instagram / Facebook first (Moj, ShareChat, Threads have no data API)', false);
   toast(`📥 Syncing existing posts/videos + comments from ${real.length} account(s)…`);
   try{
-    const r = await api('/api/community/import-all',{method:'POST'});
-    let msg = r.imported
-      ? `✅ Synced ${r.imported} existing posts/videos with real comments`
-      : '✅ Sync complete';
-    const ok = (r.per_account||[]).map(a=>{
-      let line = `${a.label||a.name||a.platform}: ${a.scanned||0} found, ${a.imported} new`;
-      if(a.note) line += '\n   ' + a.note;
-      return line;
-    });
-    if(ok.length) msg += '\n\n' + ok.join('\n\n');
-    if(r.errors && r.errors.length) msg += '\n\n⚠️ ' + r.errors.slice(0,3).join('\n');
-    setTimeout(()=>alert(msg), 400);
+    const r = await api('/api/community/bootstrap-sync',{method:'POST'});
+    showSyncFeedback(r, 'Workspace sync complete ✅');
+    const c = r.comments_sync || {new_comments:0, auto_replies:0};
+    toast(`Sync complete ✅ — ${r.imported||0} imported, ${c.new_comments||0} comments, ${c.auto_replies||0} auto-replies`);
     await refreshData();
     loadCommunity();
   }catch(e){ toast(e.message,false); }
@@ -1971,12 +1974,12 @@ async function pickTemplate(){
   const i = parseInt(use)-1;
   if(i>=0 && list[i]){
     document.getElementById('capText').value = list[i].content;
-    renderPreviews(); toast('Template loaded 📄');
+    renderPreviews(); maybeAutoAI(true); toast('Template loaded 📄');
   }
 }
 function useTemplate(content){
   openComposer();
-  setTimeout(()=>{ document.getElementById('capText').value = content; renderPreviews(); }, 150);
+  setTimeout(()=>{ document.getElementById('capText').value = content; renderPreviews(); maybeAutoAI(true); }, 150);
 }
 
 /* ================= home (greeting + metrics) ================= */
@@ -2139,7 +2142,7 @@ async function delIdea(id){
 function ideaToPost(text){
   openComposer();
   document.getElementById('capText').value = text;
-  renderPreviews();
+  renderPreviews(); maybeAutoAI(true);
 }
 async function runIdeaAI(){
   const topic = prompt('What is your niche/topic? (e.g. Hyderabad food, fitness tips)');
@@ -2550,7 +2553,7 @@ async function saveProfile(){
 
 /* ================= composer ================= */
 function openComposer(presetDateISO=null, editPost=null){
-  comp = { sel:new Set(), mediaUrl:'', editingId:null, tags:new Set(), perAcct:{}, custom:false };
+  comp = { sel:new Set(), mediaUrl:'', editingId:null, tags:new Set(), perAcct:{}, custom:false, aiAutoStamp:'' };
   const ptRadio = document.querySelector('input[name=ptype][value="feed"]');
   if(ptRadio) ptRadio.checked = true;
   if(editPost && editPost.post_type){
@@ -2576,12 +2579,14 @@ function openComposer(presetDateISO=null, editPost=null){
     (editPost.tags||[]).forEach(t=>comp.tags.add(t.id));
   }
   document.getElementById('customEach').checked = false;
+  comp.custom = false;
+  comp.aiAutoStamp = '';
   document.getElementById('linkUrl').value = '';
   document.getElementById('linkOut').innerHTML = '';
   document.getElementById('mediaPickerFile').onchange = e => {
     const f = e.target.files[0]; if(!f) return;
     const fd = new FormData(); fd.append('file', f);
-    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); });
+    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); maybeAutoAI(true); });
   };
   renderCompAccs();
   renderCompTags();
@@ -2591,6 +2596,7 @@ function openComposer(presetDateISO=null, editPost=null){
   renderPreviews();
   updateSlotHint();
   document.getElementById('composerOverlay').classList.add('open');
+  if(editPost) maybeAutoAI(true);
 }
 function closeComposer(){ document.getElementById('composerOverlay').classList.remove('open'); }
 document.getElementById('composerOverlay').onclick = e => { if(e.target.id==='composerOverlay') closeComposer(); };
@@ -2604,11 +2610,12 @@ function renderCompAccs(){
     accPill(a, comp.sel.has(a.id), `toggleAcc(${a.id})`)).join('')
     || '<span class="muted">No accounts — connect one in the Accounts tab.</span>';
 }
-function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); onPostType(); renderPreviews(); renderCustomize(); updateSlotHint(); }
+function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); onPostType(); renderPreviews(); renderCustomize(); updateSlotHint(); maybeAutoAI(true); }
 
 /* ---- Buffer: customize for each network ---- */
 function renderCustomize(){
   const box = document.getElementById('customizeList');
+  comp.custom = document.getElementById('customEach')?.checked || false;
   const sel = ACCOUNTS.filter(a=>comp.sel.has(a.id));
   if(!comp.custom || !sel.length){ box.innerHTML=''; return; }
   box.innerHTML = sel.map(a=>{
@@ -3377,14 +3384,63 @@ mediaDrop.addEventListener('drop',async e=>{
 });
 
 /* ================= sync ================= */
+function renderSyncFeedback(result, prefix='Sync complete ✅'){
+  const comments = result.comments_sync || result.comments || {new_comments:0, auto_replies:0, posts_scanned:0};
+  const metrics = result.metrics_sync || result.metrics || {snapshots:0};
+  const lines = [`<b>${prefix}</b>`];
+  lines.push(`Imported <b>${result.imported||0}</b> existing post(s), fetched <b>${comments.new_comments||0}</b> new comment(s), and sent <b>${comments.auto_replies||0}</b> auto-repl${(comments.auto_replies||0)===1?'y':'ies'}.`);
+  if((result.per_account||[]).length){
+    lines.push((result.per_account||[]).map(a=>`${esc(a.name||a.platform)}: ${a.scanned||0} found · ${a.imported||0} new${a.note?` · ${esc(a.note)}`:''}`).join('<br>'));
+  }
+  if((result.errors||[]).length){
+    lines.push(`<span style="color:#b45309">⚠️ ${(result.errors||[]).slice(0,3).map(esc).join('<br>')}</span>`);
+  }
+  if(metrics.snapshots){
+    lines.push(`Analytics refreshed for <b>${metrics.snapshots}</b> published post(s).`);
+  }
+  return lines.join('<br><br>');
+}
+function showSyncFeedback(result, prefix='Sync complete ✅'){
+  const box = document.getElementById('syncFeedback');
+  if(!box || !result) return;
+  box.className = 'sync-feedback ' + ((result.errors||[]).length ? 'warn' : 'ok');
+  box.innerHTML = renderSyncFeedback(result, prefix);
+  box.style.display = 'block';
+}
 async function syncNow(){
   toast('Syncing with platforms…');
   try{
     const c = await api('/api/comments/sync',{method:'POST'});
-    await api('/api/analytics/sync',{method:'POST'});
+    const m = await api('/api/analytics/sync',{method:'POST'});
+    const result = {comments_sync:c, metrics_sync:m, imported:0, per_account:[], errors:[]};
+    showSyncFeedback(result, 'Latest sync complete ✅');
     toast(`Sync complete ✅ — ${c.new_comments} new comments, ${c.auto_replies} auto-replies`);
     refreshData();
   }catch(e){ toast(e.message,false); }
+}
+async function autoSyncWorkspace(force=false){
+  if(autoSyncWorkspace._running) return;
+  const hasSyncable = (ACCOUNTS||[]).length || (POSTS||[]).some(p=>p.status==='published');
+  if(!hasSyncable) return;
+  const key = 'sa_autosync_' + (ME?.email || 'current');
+  if(!force && sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, '1');
+  autoSyncWorkspace._running = true;
+  try{
+    toast('🔄 Syncing existing posts, comments, and analytics…');
+    const result = await api('/api/community/bootstrap-sync',{method:'POST'});
+    showSyncFeedback(result, 'Workspace sync complete ✅');
+    const c = result.comments_sync || {new_comments:0, auto_replies:0};
+    toast(`Workspace synced ✅ — ${result.imported||0} imported, ${c.new_comments||0} comments, ${c.auto_replies||0} auto-replies`);
+    await refreshData();
+    if(document.getElementById('view-community')?.style.display !== 'none') await loadCommunity();
+    if(document.getElementById('view-home')?.style.display !== 'none') await loadHome();
+  }catch(e){
+    sessionStorage.removeItem(key);
+    toast('Auto sync failed: ' + e.message, false);
+  }finally{
+    autoSyncWorkspace._running = false;
+  }
 }
 
 /* ================= data refresh ================= */
@@ -3416,15 +3472,9 @@ async function refreshData(){
   const qp = new URLSearchParams(location.search);
   applyResetTokenFromUrl();
   if(qp.get('oauth') === 'connected'){
+    window._forceNextAutoSync = true;
     history.replaceState({}, '', '/');
-    setTimeout(async()=>{
-      await refreshData();
-      toast('✅ Channel connected! Auto-syncing your existing videos & comments…');
-      try{
-        const r = await api('/api/community/import-all', {method:'POST'});
-        if(r.imported) toast(`✅ Synced ${r.imported} existing videos/posts with real comments — check Community tab`);
-      }catch(e){/* user can press Sync button later */}
-    }, 900);
+    setTimeout(()=>toast('✅ Channel connected! Syncing your existing posts, comments, and analytics…'), 500);
   }
   const oerr = qp.get('oauth_error');
   if(oerr){

@@ -275,9 +275,11 @@ async def sync_metrics(db: Session, user_id: int | None = None) -> dict:
     return {"posts_scanned": len(posts), "snapshots": updated}
 
 
-async def import_channel_content(db: Session, user_id: int, account_id: int) -> dict:
+async def import_channel_content(db: Session, user_id: int, account_id: int,
+                                 *, sync_after: bool = True,
+                                 force_all_sync: bool = True) -> dict:
     """Import an account's existing videos/posts as 'published' posts so their
-    comments show up in the Community inbox. Then sync comments + metrics."""
+    comments show up in the Community inbox. Optionally sync comments + metrics."""
     acc = db.query(Account).filter(Account.id == account_id,
                                    Account.user_id == user_id).first()
     if not acc:
@@ -312,8 +314,11 @@ async def import_channel_content(db: Session, user_id: int, account_id: int) -> 
         db.add(p)
         imported += 1
     db.commit()
-    await sync_comments(db, user_id, force_all=True)
-    await sync_metrics(db, user_id)
+    comments_sync = {"posts_scanned": 0, "new_comments": 0, "auto_replies": 0}
+    metrics_sync = {"posts_scanned": 0, "snapshots": 0}
+    if sync_after:
+        comments_sync = await sync_comments(db, user_id, force_all=force_all_sync)
+        metrics_sync = await sync_metrics(db, user_id)
     note = ""
     if not videos:
         if acc.platform.value == "youtube":
@@ -325,10 +330,13 @@ async def import_channel_content(db: Session, user_id: int, account_id: int) -> 
             note = "No recent posts found on this account (or the API returned none)."
     elif imported == 0:
         note = f"{len(videos)} posts already synced — comments refreshed."
-    return {"imported": imported, "scanned": len(videos), "note": note}
+    return {"imported": imported, "scanned": len(videos), "note": note,
+            "comments_sync": comments_sync, "metrics_sync": metrics_sync}
 
 
-async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
+async def auto_import_all(db: Session, user_id: int | None = None,
+                          *, run_sync: bool = True,
+                          force_all_sync: bool = True) -> dict:
     """Background safety net: for every connected account that supports it,
     make sure existing channel content is imported (idempotent). Called after
     OAuth connect and periodically by cron — that's what makes the app feel
@@ -339,12 +347,14 @@ async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
     accs = q.all()
     total = 0
     results, errors = [], []
+    supported = 0
     for acc in accs:
         client = platforms.get_client(acc.platform)
         if not hasattr(client, "list_recent_videos"):
             continue  # Moj/ShareChat/Threads/manual helpers — no data API
+        supported += 1
         try:
-            res = await import_channel_content(db, acc.user_id, acc.id)
+            res = await import_channel_content(db, acc.user_id, acc.id, sync_after=False)
             total += res.get("imported", 0)
             if res.get("error"):
                 errors.append(f"{acc.display_name}: {res['error']}")
@@ -356,8 +366,14 @@ async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
                                 "note": res.get("note", "")})
         except Exception as e:
             errors.append(f"{acc.display_name}: {e}")
-    return {"imported": total, "accounts": len(accs),
-            "per_account": results, "errors": errors}
+    comments_sync = {"posts_scanned": 0, "new_comments": 0, "auto_replies": 0}
+    metrics_sync = {"posts_scanned": 0, "snapshots": 0}
+    if run_sync:
+        comments_sync = await sync_comments(db, user_id, force_all=force_all_sync)
+        metrics_sync = await sync_metrics(db, user_id)
+    return {"imported": total, "accounts": len(accs), "supported_accounts": supported,
+            "per_account": results, "errors": errors,
+            "comments_sync": comments_sync, "metrics_sync": metrics_sync}
 
 
 def analytics_summary(db: Session, user_id: int | None = None, days: int | None = None) -> dict:
