@@ -1,0 +1,184 @@
+"""Core background jobs: publish due posts, sync comments + auto-reply, sync analytics."""
+from datetime import datetime, timezone, timedelta
+
+from sqlalchemy.orm import Session
+
+from ..models import Post, PostStatus, Comment, Metric, Account
+from ..config import settings
+from . import platforms, autocomment
+
+
+def _aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+# ------------------------------------------------------------------ publishing
+async def publish_due_posts(db: Session) -> dict:
+    """Publish every scheduled post whose time has come."""
+    now = datetime.now(timezone.utc)
+    due = (db.query(Post)
+           .filter(Post.status == PostStatus.scheduled)
+           .filter(Post.scheduled_at <= now)
+           .all())
+    published, failed = 0, 0
+    for post in due:
+        post.status = PostStatus.publishing
+        db.commit()
+        result = await platforms.publish_post(post.account, post.caption, post.media_url)
+        if result.ok:
+            post.status = PostStatus.published
+            post.platform_post_id = result.platform_post_id
+            post.published_at = now
+            published += 1
+        else:
+            post.status = PostStatus.failed
+            post.error = result.error
+            failed += 1
+        db.commit()
+    return {"checked": len(due), "published": published, "failed": failed}
+
+
+async def publish_one(db: Session, post_id: int) -> Post:
+    post = db.get(Post, post_id)
+    if not post or post.status != PostStatus.scheduled:
+        return post
+    result = await platforms.publish_post(post.account, post.caption, post.media_url)
+    if result.ok:
+        post.status = PostStatus.published
+        post.platform_post_id = result.platform_post_id
+        post.published_at = datetime.now(timezone.utc)
+    else:
+        post.status = PostStatus.failed
+        post.error = result.error
+    db.commit()
+    return post
+
+
+# ------------------------------------------------------- comments + auto-reply
+async def sync_comments(db: Session) -> dict:
+    """Fetch new comments on published posts and auto-reply to each once."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.COMMENT_WATCH_WINDOW_HOURS)
+    posts = (db.query(Post)
+             .filter(Post.status == PostStatus.published)
+             .filter(Post.platform_post_id != "")
+             .filter(Post.published_at >= cutoff)
+             .all())
+    ingested, replied = 0, 0
+    for post in posts:
+        result = await platforms.fetch_post(post.account, post.platform_post_id)
+        for c in result.comments:
+            exists = (db.query(Comment)
+                      .filter(Comment.post_id == post.id)
+                      .filter(Comment.external_comment_id == c["external_id"])
+                      .first())
+            if exists:
+                continue
+            comment = Comment(
+                post_id=post.id,
+                external_comment_id=c["external_id"],
+                author=c["author"],
+                text=c["text"],
+            )
+            db.add(comment)
+            db.commit()
+            ingested += 1
+
+            # auto-reply?
+            if settings.AUTO_COMMENT_ENABLED and post.account.auto_comment:
+                reply = autocomment.generate_reply(c["text"], post.account)
+                ok = autocomment.post_reply(post.account, post.platform_post_id,
+                                            c["external_id"], reply)
+                if ok:
+                    comment.our_reply = reply
+                    comment.replied = True
+                    replied += 1
+                    db.commit()
+    return {"posts_scanned": len(posts), "new_comments": ingested, "auto_replies": replied}
+
+
+def simulate_incoming_comment(db: Session, post_id: int, author: str, text: str) -> Comment | None:
+    """Demo helper: inject a comment as if the platform sent it, then auto-reply."""
+    post = db.get(Post, post_id)
+    if not post:
+        return None
+    comment = Comment(post_id=post_id, external_comment_id=f"sim_{post_id}_{datetime.now(timezone.utc).timestamp()}",
+                      author=author, text=text)
+    db.add(comment)
+    db.commit()
+    if settings.AUTO_COMMENT_ENABLED and post.account.auto_comment:
+        reply = autocomment.generate_reply(text, post.account)
+        if autocomment.post_reply(post.account, post.platform_post_id, comment.external_comment_id, reply):
+            comment.our_reply = reply
+            comment.replied = True
+            db.commit()
+    return comment
+
+
+# ------------------------------------------------------------------ analytics
+async def sync_metrics(db: Session) -> dict:
+    """Pull latest metrics for published posts and store a snapshot row."""
+    posts = (db.query(Post)
+             .filter(Post.status == PostStatus.published)
+             .filter(Post.platform_post_id != "")
+             .all())
+    updated = 0
+    for post in posts:
+        result = await platforms.fetch_post(post.account, post.platform_post_id)
+        m = result.metrics
+        if "error" in m:
+            continue
+        snap = Metric(
+            post_id=post.id,
+            likes=m.get("likes", 0),
+            comments_count=m.get("comments_count", 0),
+            shares=m.get("shares", 0),
+            impressions=m.get("impressions", 0),
+            reach=m.get("reach", 0),
+            raw=m,
+        )
+        db.add(snap)
+        updated += 1
+    db.commit()
+    return {"posts_scanned": len(posts), "snapshots": updated}
+
+
+def analytics_summary(db: Session) -> dict:
+    """Aggregate dashboard numbers."""
+    posts = db.query(Post).filter(Post.status == PostStatus.published).all()
+    totals = {"likes": 0, "comments": 0, "shares": 0, "impressions": 0, "reach": 0}
+    by_platform: dict[str, dict] = {}
+    per_post = []
+    for p in posts:
+        latest = (db.query(Metric).filter(Metric.post_id == p.id)
+                  .order_by(Metric.fetched_at.desc()).first())
+        row = {
+            "post_id": p.id, "platform": p.account.platform.value,
+            "account": p.account.display_name,
+            "caption": p.caption[:60],
+            "likes": latest.likes if latest else 0,
+            "comments": latest.comments_count if latest else 0,
+            "shares": latest.shares if latest else 0,
+            "impressions": latest.impressions if latest else 0,
+            "reach": latest.reach if latest else 0,
+        }
+        per_post.append(row)
+        for k in totals:
+            totals[k] += row[{"likes": "likes", "comments": "comments",
+                              "shares": "shares", "impressions": "impressions",
+                              "reach": "reach"}[k]]
+        bp = by_platform.setdefault(p.account.platform.value,
+                                    {"likes": 0, "comments": 0, "shares": 0, "posts": 0})
+        bp["likes"] += row["likes"]; bp["comments"] += row["comments"]
+        bp["shares"] += row["shares"]; bp["posts"] += 1
+
+    auto_replied = db.query(Comment).filter(Comment.replied == True).count()
+    total_comments = db.query(Comment).count()
+    return {
+        "totals": totals,
+        "by_platform": by_platform,
+        "per_post": per_post,
+        "comments_total": total_comments,
+        "auto_replied": auto_replied,
+        "posts_published": len(posts),
+        "posts_scheduled": db.query(Post).filter(Post.status == PostStatus.scheduled).count(),
+    }

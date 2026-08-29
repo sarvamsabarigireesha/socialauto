@@ -1,0 +1,24 @@
+# Free scheduler: GitHub Actions cron — calls the app's /api/cron/tick every 15 minutes.
+# GitHub free tier: 2,000 Actions minutes/month (private repo); unlimited for public.
+#
+# Repo settings -> Secrets and variables -> Actions, add:
+#   APP_URL      e.g. https://socialauto-xxxx.el.r.appspot.com  (no trailing slash)
+#   CRON_SECRET  must match the app's CRON_SECRET env var
+name: socialauto-cron
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes — publish posts, auto-reply, refresh analytics
+  workflow_dispatch: {}      # manual trigger button
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping SocialAuto cron endpoint
+        run: |
+          echo "Calling ${{ secrets.APP_URL }}/api/cron/tick"
+          curl -fsS -X POST "${{ secrets.APP_URL }}/api/cron/tick" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 60

@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SocialAuto — Social Media Scheduler</title>
+<style>
+  :root{
+    --bg:#f3f5f9; --panel:#ffffff; --border:#e3e7ee; --border2:#d5dae3;
+    --txt:#1c2430; --muted:#7b8494; --brand:#5b6cff; --brand-d:#4856e0;
+    --green:#22a06b; --red:#e5484d; --amber:#f5a524; --purple:#8b5cf6;
+    --ig:#e1306c; --fb:#1877f2; --x:#0f1419; --li:#0a66c2;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:14px/1.55 -apple-system,'Segoe UI',Roboto,sans-serif}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px}
+
+  /* ---------- layout ---------- */
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:218px;background:#fff;border-right:1px solid var(--border);
+    padding:18px 12px;display:flex;flex-direction:column;z-index:40}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;padding:0 10px 18px}
+  .logo .mk{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--purple));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:#545d6e;
+    font-weight:600;font-size:14px;border:none;background:none;width:100%;text-align:left;margin-bottom:2px}
+  .nav-item:hover{background:#f2f4f9}
+  .nav-item.active{background:var(--brand);color:#fff}
+  .nav-item .badge{margin-left:auto;background:var(--red);color:#fff;font-size:11px;border-radius:20px;padding:1px 8px;font-weight:700}
+  .nav-item.active .badge{background:rgba(255,255,255,.25)}
+  .side-foot{margin-top:auto;padding:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .mock-pill{display:inline-block;background:#fff4e0;color:#b45309;border:1px solid #f3d59a;border-radius:20px;
+    padding:2px 10px;font-size:11px;font-weight:700;margin-top:6px}
+
+  .main{margin-left:218px;padding:22px 28px 60px;min-height:100vh}
+  .topbar{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .topbar h1{font-size:22px;font-weight:800}
+  .topbar .sub{color:var(--muted);font-size:13px}
+  .topbar .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+  .btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:14px;background:var(--brand);color:#fff;
+    display:inline-flex;align-items:center;gap:7px;transition:.15s}
+  .btn:hover{background:var(--brand-d)}
+  .btn.ghost{background:#fff;color:var(--txt);border:1px solid var(--border2)}
+  .btn.ghost:hover{background:#f5f7fb}
+  .btn.green{background:var(--green)} .btn.green:hover{filter:brightness(.94)}
+  .btn.red{background:var(--red)} .btn.sm{padding:6px 12px;font-size:12.5px;border-radius:8px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .grid{display:grid;gap:16px}
+
+  /* ---------- calendar ---------- */
+  .cal-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .cal-head .title{font-size:18px;font-weight:800;min-width:190px}
+  .cal-head .btn{padding:8px 13px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:var(--radius);
+    overflow:hidden;background:#fff;box-shadow:var(--shadow)}
+  .cal-dow{background:#f7f9fc;font-weight:700;color:var(--muted);font-size:12px;text-transform:uppercase;
+    text-align:center;padding:9px 0;border-bottom:1px solid var(--border);letter-spacing:.5px}
+  .cal-cell{min-height:118px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+    padding:6px;position:relative;cursor:pointer;transition:background .12s}
+  .cal-cell:nth-child(7n){border-right:none}
+  .cal-cell:hover{background:#f6f8ff}
+  .cal-cell.out{background:#fafbfe;color:#b6bcc9}
+  .cal-cell.today .dnum{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;
+    display:inline-flex;align-items:center;justify-content:center}
+  .dnum{font-size:12.5px;font-weight:700;color:var(--muted)}
+  .chip{display:block;text-align:left;width:100%;border:none;border-radius:7px;padding:3px 7px;margin-top:4px;
+    font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip.ig{background:var(--ig)} .chip.fb{background:var(--fb)}
+  .chip.x{background:var(--x)} .chip.li{background:var(--li)}
+  .chip.published{opacity:.72}
+  .chip.scheduled{box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+  .chip.failed{background:var(--red)}
+  .chip.more{background:transparent;color:var(--brand);font-size:11px;padding:1px 7px}
+  .legend{display:flex;gap:16px;margin-top:12px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  /* ---------- stat cards ---------- */
+  .stats{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  .stat{padding:17px 18px}
+  .stat .ic{font-size:19px}
+  .stat .num{font-size:27px;font-weight:800;margin-top:2px}
+  .stat .lbl{color:var(--muted);font-size:12.5px;font-weight:600}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+    padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700}
+  td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafbfe}
+  .pill{font-size:11px;padding:2px 10px;border-radius:20px;font-weight:700;white-space:nowrap}
+  .pill.scheduled{background:#e8edff;color:var(--brand-d)}
+  .pill.published{background:#e3f6ee;color:var(--green)}
+  .pill.failed{background:#fdeaea;color:var(--red)}
+  .pill.publishing{background:#f0eafe;color:var(--purple)}
+  .pill.draft{background:#eef0f5;color:var(--muted)}
+  .plat-tag{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12.5px}
+
+  /* ---------- tabs/filters ---------- */
+  .filters{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .ftab{border:1px solid var(--border2);background:#fff;border-radius:9px;padding:7px 15px;font-weight:600;
+    color:#545d6e;font-size:13.5px}
+  .ftab.active{background:var(--brand);border-color:var(--brand);color:#fff}
+
+  /* ---------- modal composer ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(15,20,35,.5);backdrop-filter:blur(2px);display:none;
+    align-items:flex-start;justify-content:center;z-index:100;padding:34px 16px;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{background:#fff;border-radius:18px;width:100%;max-width:960px;box-shadow:0 24px 70px rgba(0,0,0,.25);
+    overflow:hidden;animation:pop .18s ease}
+  @keyframes pop{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+  .modal-head{display:flex;align-items:center;padding:16px 22px;border-bottom:1px solid var(--border)}
+  .modal-head h3{font-size:17px;font-weight:800}
+  .modal-head .x{margin-left:auto;border:none;background:#f2f4f8;width:34px;height:34px;border-radius:9px;font-size:17px;color:#545d6e}
+  .modal-body{display:grid;grid-template-columns:1.15fr .85fr;min-height:430px}
+  @media(max-width:860px){.modal-body{grid-template-columns:1fr}}
+  .composer{padding:20px 22px;border-right:1px solid var(--border)}
+  .preview-pane{padding:20px 22px;background:#fafbfe;overflow:auto;max-height:68vh}
+  .acc-pick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .acc-pill{display:flex;align-items:center;gap:8px;border:1.5px solid var(--border2);background:#fff;border-radius:30px;
+    padding:6px 14px 6px 8px;font-weight:600;font-size:13px;color:#545d6e}
+  .acc-pill.sel{border-color:var(--brand);background:#f0f3ff;color:var(--brand-d)}
+  .acc-pill .av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:13px;font-weight:800}
+  .av.ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366)}
+  .av.fb{background:var(--fb)} .av.x{background:var(--x)} .av.li{background:var(--li)}
+  .cap-wrap{position:relative}
+  textarea.cap{width:100%;min-height:130px;border:1px solid var(--border2);border-radius:12px;padding:13px 14px;
+    resize:vertical;font-size:14.5px;line-height:1.5;outline:none}
+  textarea.cap:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(91,108,255,.12)}
+  .char-count{text-align:right;font-size:12px;color:var(--muted);margin-top:4px}
+  .char-count.over{color:var(--red);font-weight:700}
+  .comp-actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .tool-btn{border:1px solid var(--border2);background:#fff;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600;color:#545d6e}
+  .tool-btn:hover{background:#f5f7fb}
+  .sel-media{margin-top:14px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);display:none}
+  .sel-media img{width:100%;max-height:220px;object-fit:cover;display:block}
+  .sel-media .rm{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;border:none;
+    border-radius:50%;width:28px;height:28px;font-size:14px}
+  .sched-row{display:flex;gap:10px;align-items:flex-end;margin-top:14px;flex-wrap:wrap}
+  .sched-row .fld{flex:1;min-width:170px}
+  label.f{display:block;font-size:12px;font-weight:700;color:#545d6e;margin-bottom:5px}
+  .fld input,.fld select{width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px 11px;outline:none}
+  .fld input:focus{border-color:var(--brand)}
+  .modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:15px 22px;border-top:1px solid var(--border);background:#fff}
+
+  /* preview cards (Publer-style) */
+  .pv{background:#fff;border:1px solid var(--border);border-radius:13px;margin-bottom:16px;overflow:hidden}
+  .pv .pv-head{display:flex;align-items:center;gap:10px;padding:12px 14px}
+  .pv .pv-head .nm{font-weight:700;font-size:13.5px;line-height:1.2}
+  .pv .pv-head .hd{font-size:11.5px;color:var(--muted)}
+  .pv .pv-cap{padding:0 14px 10px;font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+  .pv .pv-img{width:100%;max-height:230px;object-fit:cover;display:block;border-top:1px solid var(--border)}
+  .pv .pv-acts{padding:9px 14px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);display:flex;gap:16px}
+  .pv .pv-plat{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+  .pv-plat.ig{background:#fdeef4;color:var(--ig)} .pv-plat.fb{background:#e9f2fe;color:var(--fb)}
+  .pv-plat.x{background:#eef0f2;color:var(--x)} .pv-plat.li{background:#e9f2fb;color:var(--li)}
+
+  /* media library grid */
+  .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+  .media-item{position:relative;border-radius:12px;overflow:hidden;border:2px solid var(--border);cursor:pointer;
+    aspect-ratio:1;background:#f0f2f7}
+  .media-item img{width:100%;height:100%;object-fit:cover}
+  .media-item:hover{border-color:var(--brand)}
+  .media-item.sel{border-color:var(--brand);box-shadow:0 0 0 3px rgba(91,108,255,.2)}
+  .media-item .tag{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.7));
+    color:#fff;font-size:11px;padding:16px 8px 6px;opacity:0;transition:.15s}
+  .media-item:hover .tag{opacity:1}
+  .upload-drop{border:2px dashed var(--border2);border-radius:14px;padding:34px;text-align:center;color:var(--muted);
+    cursor:pointer;transition:.15s;margin-bottom:18px;background:#fff}
+  .upload-drop:hover,.upload-drop.over{border-color:var(--brand);color:var(--brand);background:#f6f8ff}
+
+  /* comments inbox */
+  .cmt{border-left:3px solid var(--brand);background:#fff;border-radius:0 12px 12px 0;padding:12px 16px;margin-bottom:12px;
+    box-shadow:var(--shadow)}
+  .cmt .meta{font-size:12px;color:var(--muted);margin-bottom:3px}
+  .cmt .reply{margin-top:9px;padding:9px 13px;background:#e8f7f0;border:1px solid #bfe8d6;border-radius:10px;font-size:13px}
+  .cmt .reply::before{content:"🤖 Auto-reply — ";font-weight:800;color:var(--green)}
+  .cmt .wait{color:var(--amber);font-size:12px;margin-top:7px;font-weight:600}
+
+  .bar{height:9px;background:#eef1f6;border-radius:6px;overflow:hidden;margin-top:6px}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--brand),var(--purple));border-radius:6px}
+  .two-col{grid-template-columns:1fr 1fr}
+  @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+  .toast{position:fixed;bottom:26px;right:26px;background:#1c2430;color:#fff;padding:13px 20px;border-radius:11px;
+    box-shadow:0 10px 34px rgba(0,0,0,.3);display:none;z-index:200;font-weight:600;font-size:13.5px}
+  .toast.ok{border-left:4px solid var(--green)} .toast.err{border-left:4px solid var(--red)}
+  .muted{color:var(--muted)}
+  .section-title{font-size:16px;font-weight:800;margin:0 0 14px}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+  code{background:#f0f2f7;padding:2px 6px;border-radius:5px;font-size:12px}
+  .thumb{width:44px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--border)}
+  .acc-sel-wrap{border:1px solid var(--border);border-radius:10px;padding:10px}
+</style>
+</head>
+<body>
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar">
+  <div class="logo"><div class="mk">⚡</div> SocialAuto</div>
+  <button class="nav-item active" data-view="calendar">📅 Calendar</button>
+  <button class="nav-item" data-view="posts">📋 Posts</button>
+  <button class="nav-item" data-view="bulk">📦 Bulk / CSV</button>
+  <button class="nav-item" data-view="inbox">💬 Inbox <span class="badge" id="inboxBadge" style="display:none">0</span></button>
+  <button class="nav-item" data-view="analytics">📊 Analytics</button>
+  <button class="nav-item" data-view="media">🖼 Media Library</button>
+  <button class="nav-item" data-view="accounts">🔗 Accounts</button>
+  <button class="nav-item" data-view="deploy">☁️ Deploy</button>
+  <div class="side-foot">
+    Free-tier stack · Cloud Run + GitHub Actions
+    <div><span class="mock-pill" id="modePill">MOCK MODE</span></div>
+  </div>
+</aside>
+
+<!-- ================= MAIN ================= -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1 id="viewTitle">Calendar</h1>
+      <div class="sub" id="viewSub">Plan, schedule and auto-publish across all your social accounts</div>
+    </div>
+    <div class="right">
+      <button class="btn ghost" onclick="syncNow()">🔄 Sync now</button>
+      <button class="btn" onclick="openComposer()">✏️ Create Post</button>
+    </div>
+  </div>
+
+  <!-- CALENDAR -->
+  <section id="view-calendar">
+    <div class="cal-head">
+      <button class="btn ghost" onclick="moveMonth(-1)">‹</button>
+      <div class="title" id="calTitle"></div>
+      <button class="btn ghost" onclick="moveMonth(1)">›</button>
+      <button class="btn ghost sm" onclick="goToday()" style="margin-left:6px">Today</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--ig)"></i> Instagram</span>
+      <span><i class="dot" style="background:var(--fb)"></i> Facebook</span>
+      <span><i class="dot" style="background:var(--x)"></i> X (Twitter)</span>
+      <span><i class="dot" style="background:var(--li)"></i> LinkedIn</span>
+      <span class="muted">· Click a day to create · Click a post to edit</span>
+    </div>
+  </section>
+
+  <!-- POSTS -->
+  <section id="view-posts" style="display:none">
+    <div class="filters" id="postFilters"></div>
+    <div class="card" style="overflow:hidden">
+      <table><thead><tr><th></th><th>Content</th><th>Account</th><th>Scheduled</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="postsTbody"></tbody></table>
+    </div>
+  </section>
+
+  <!-- BULK -->
+  <section id="view-bulk" style="display:none">
+    <div class="card" style="padding:22px;max-width:760px">
+      <h2 class="section-title">📦 Bulk schedule via CSV</h2>
+      <p class="muted" style="margin-bottom:14px">Upload <code>caption,media_url,scheduled_at</code> — each row is
+        posted to every selected account. Hundreds of posts at once.</p>
+      <label class="f">Target accounts</label>
+      <div class="acc-pick" id="bulkAccPick" style="margin-bottom:14px"></div>
+      <div class="upload-drop" id="bulkDrop">📄 Drag &amp; drop <b>posts.csv</b> here, or click to browse</div>
+      <input type="file" id="bulkFile" accept=".csv" style="display:none">
+      <button class="btn ghost sm" onclick="downloadTemplate()">⬇️ Download CSV template</button>
+      <div id="bulkResult" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- INBOX -->
+  <section id="view-inbox" style="display:none">
+    <div class="two-col grid">
+      <div>
+        <div class="card" style="padding:18px;margin-bottom:16px">
+          <h2 class="section-title">🧪 Test the auto-comment bot</h2>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+            <div><label class="f">On published post</label><select id="simPost" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></select></div>
+            <div><label class="f">Follower name</label><input id="simAuthor" value="priya_99" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
+          </div>
+          <label class="f" style="margin-top:10px">Comment text</label>
+          <input id="simText" value="How much is this? I want to order 😍" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px">
+          <button class="btn green" style="margin-top:12px" onclick="simulateComment()">💬 Post comment</button>
+        </div>
+      </div>
+      <div class="card" style="padding:18px">
+        <h2 class="section-title">How it works</h2>
+        <div class="muted" style="line-height:2">
+          Every comment is scanned for intent and auto-replied:<br>
+          ❓ <b>Question</b> → "Great question! DMing you…"<br>
+          ❤️ <b>Praise</b> → "Thanks for the love! 🙏"<br>
+          🛍 <b>Purchase intent</b> → "Link sent in DM!"<br>
+          🆘 <b>Support</b> → "Let's fix it — DM sent 🙏"<br>
+          Runs every 15 min via cron, or instantly on webhooks.
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:18px">
+      <h2 class="section-title">Latest comments</h2>
+      <div id="commentsList"></div>
+    </div>
+  </section>
+
+  <!-- ANALYTICS -->
+  <section id="view-analytics" style="display:none">
+    <div class="grid stats" id="statCards"></div>
+    <div class="grid two-col" style="margin-top:16px">
+      <div class="card" style="padding:18px">
+        <h2 class="section-title">Performance by platform</h2>
+        <div id="byPlatform"></div>
+      </div>
+      <div class="card" style="padding:18px">
+        <h2 class="section-title">Auto-comment engine</h2>
+        <div id="commentStats" style="line-height:2"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;overflow:hidden">
+      <div style="padding:18px 18px 0"><h2 class="section-title">Published posts performance</h2></div>
+      <table><thead><tr><th>Post</th><th>Platform</th><th>❤️ Likes</th><th>💬 Comments</th><th>🔁 Shares</th><th>👁 Impressions</th><th>📡 Reach</th></tr></thead>
+      <tbody id="perPostTbody"></tbody></table>
+    </div>
+  </section>
+
+  <!-- MEDIA -->
+  <section id="view-media" style="display:none">
+    <div class="upload-drop" id="mediaDrop">🖼 Upload images to your media library — click or drag &amp; drop (JPG/PNG/GIF, max 8MB)</div>
+    <input type="file" id="mediaFile" accept="image/*" multiple style="display:none">
+    <div class="media-grid" id="mediaGrid"></div>
+  </section>
+
+  <!-- ACCOUNTS -->
+  <section id="view-accounts" style="display:none">
+    <div class="grid two-col">
+      <div class="card" style="padding:20px">
+        <h2 class="section-title">➕ Connect a social account</h2>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <div><label class="f">Platform</label>
+            <select id="aPlatform" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px">
+              <option value="instagram">📸 Instagram</option>
+              <option value="facebook">👍 Facebook Page</option>
+              <option value="x">🐦 X (Twitter)</option>
+              <option value="linkedin">💼 LinkedIn</option>
+            </select></div>
+          <div><label class="f">Display name</label><input id="aName" placeholder="@yourbrand" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
+          <div><label class="f">Account / Page ID</label><input id="aExt" placeholder="IG user id / page id" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
+          <div><label class="f">Access token</label><input id="aToken" placeholder="mock mode: leave blank" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:600;font-size:13.5px;cursor:pointer">
+          <input type="checkbox" id="aAuto" checked> 🤖 Enable auto-comments for this account</label>
+        <label class="f" style="margin-top:10px">Fixed reply template (optional — blank = smart intent replies)</label>
+        <input id="aTmpl" placeholder="e.g. Thanks! Check our bio 🙌" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px">
+        <button class="btn" style="margin-top:14px" onclick="createAccount()">Connect account</button>
+      </div>
+      <div class="card" style="padding:20px">
+        <h2 class="section-title">Connected accounts</h2>
+        <div id="accountsList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEPLOY -->
+  <section id="view-deploy" style="display:none">
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(270px,1fr))">
+      <div class="card" style="padding:18px"><h2 class="section-title">🖥 App hosting</h2><p class="muted">Google Cloud Run free tier (2M req/mo), Fly.io or Render. Dockerfile included.</p></div>
+      <div class="card" style="padding:18px"><h2 class="section-title">⏰ Scheduler</h2><p class="muted">GitHub Actions cron every 15 min (2,000 free min/mo) calls <code>/api/cron/tick</code>.</p></div>
+      <div class="card" style="padding:18px"><h2 class="section-title">⚡ Edge worker</h2><p class="muted">Cloudflare Worker (100k req/day free) — <code>cloudflare/worker.js</code>.</p></div>
+      <div class="card" style="padding:18px"><h2 class="section-title">🔄 No-code</h2><p class="muted">Self-hosted n8n workflow JSON included for visual automation.</p></div>
+      <div class="card" style="padding:18px"><h2 class="section-title">🔑 APIs</h2><p class="muted">Meta Developer, X, LinkedIn — free; Meta needs app review for advanced perms.</p></div>
+      <div class="card" style="padding:18px"><h2 class="section-title">🗄 Database</h2><p class="muted">SQLite for demo; Turso (9GB free) or Neon Postgres via <code>DATABASE_URL</code>.</p></div>
+    </div>
+    <div class="card" style="margin-top:16px;padding:18px">
+      <h2 class="section-title">🚀 Deploy commands</h2>
+      <pre style="background:#f4f6fa;padding:14px;border-radius:10px;overflow:auto;font-size:12.5px;line-height:1.8">
+cd backend && pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000      # local (mock mode)
+
+gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthenticated \
+  --set-env-vars MOCK_MODE=false,CRON_SECRET=your_long_secret
+# then add GitHub secrets: APP_URL + CRON_SECRET  → posts auto-publish every 15 min</pre>
+    </div>
+  </section>
+</div>
+
+<!-- ================= COMPOSER MODAL ================= -->
+<div class="overlay" id="composerOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="composerTitle">✏️ Create Post</h3>
+      <button class="x" onclick="closeComposer()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="composer">
+        <label class="f">Select accounts</label>
+        <div class="acc-pick" id="compAccPick"></div>
+
+        <div class="cap-wrap">
+          <textarea class="cap" id="capText" placeholder="What do you want to share?" oninput="renderPreviews()"></textarea>
+          <div class="char-count" id="charCount"></div>
+        </div>
+
+        <div class="comp-actions">
+          <button class="tool-btn" onclick="document.getElementById('mediaPickerFile').click()">🖼 Media library</button>
+          <input type="file" id="mediaPickerFile" accept="image/*" style="display:none">
+          <button class="tool-btn" id="clearMediaBtn" style="display:none" onclick="clearMedia()">✕ Remove image</button>
+          <span class="hint" id="mediaHint"></span>
+        </div>
+        <div class="sel-media" id="selMediaBox">
+          <img id="selMediaImg" src="" alt="">
+          <button class="rm" onclick="clearMedia()">✕</button>
+        </div>
+
+        <div class="sched-row">
+          <div class="fld">
+            <label class="f">When</label>
+            <select id="schedMode">
+              <option value="schedule">📅 Schedule for later</option>
+              <option value="now">🚀 Publish now</option>
+            </select>
+          </div>
+          <div class="fld" id="whenFld">
+            <label class="f">Date &amp; time (UTC)</label>
+            <input type="datetime-local" id="schedWhen">
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-pane">
+        <label class="f" style="margin-bottom:10px">Live preview</label>
+        <div id="previewList"><p class="muted">Select an account to see the preview →</p></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeComposer()">Cancel</button>
+      <button class="btn green" id="saveBtn" onclick="savePost()">🗓 Schedule</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= state ================= */
+let ACCOUNTS = [], POSTS = [], MEDIA = [];
+let calYear, calMonth;                      // calendar cursor
+let comp = { sel: new Set(), mediaUrl: "", editingId: null };
+const PLAT_META = {
+  instagram:{ic:'📸',cls:'ig',limit:2200,label:'Instagram'},
+  facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook'},
+  x:{ic:'🐦',cls:'x',limit:280,label:'X'},
+  linkedin:{ic:'💼',cls:'li',limit:3000,label:'LinkedIn'},
+};
+const api = (p, opt) => fetch(p, opt).then(async r => {
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.statusText);
+  return r.status === 204 ? null : r.json();
+});
+const esc = s => (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDT = dt => new Date(dt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+const toast = (m, ok=true) => { const t=document.getElementById('toast'); t.textContent=m;
+  t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); };
+
+/* ================= nav ================= */
+const TITLES = {
+  calendar:['Calendar','Plan, schedule and auto-publish across all your social accounts'],
+  posts:['Posts','Every scheduled and published post in one place'],
+  bulk:['Bulk / CSV','Upload hundreds of posts at once'],
+  inbox:['Auto-Comment Inbox','Smart replies to every comment, on autopilot'],
+  analytics:['Analytics','Performance across all platforms'],
+  media:['Media Library','Upload once, reuse in any post'],
+  accounts:['Accounts','Connect your social profiles'],
+  deploy:['Deploy','100% free-tier production setup'],
+};
+document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('.main > section').forEach(s=>s.style.display='none');
+  document.getElementById('view-'+b.dataset.view).style.display='block';
+  document.getElementById('viewTitle').textContent = TITLES[b.dataset.view][0];
+  document.getElementById('viewSub').textContent = TITLES[b.dataset.view][1];
+  if (b.dataset.view==='calendar') renderCalendar();
+  if (b.dataset.view==='posts') renderPosts();
+  if (b.dataset.view==='inbox') loadInbox();
+  if (b.dataset.view==='analytics') loadAnalytics();
+  if (b.dataset.view==='media') loadMedia();
+  if (b.dataset.view==='accounts') loadAccounts();
+  if (b.dataset.view==='bulk') renderBulkAccs();
+});
+
+/* ================= accounts ================= */
+async function loadAccounts(){
+  ACCOUNTS = await api('/api/accounts');
+  document.getElementById('accountsList').innerHTML = ACCOUNTS.length ? ACCOUNTS.map(a=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)">
+      <div class="av ${a.platform}" style="width:38px;height:38px;font-size:16px">${PLAT_META[a.platform].ic}</div>
+      <div style="flex:1"><div style="font-weight:700">${esc(a.display_name)}</div>
+        <div class="muted" style="font-size:12px">${PLAT_META[a.platform].label} · auto-comments ${a.auto_comment?'ON':'OFF'}</div></div>
+      <button class="btn red sm" onclick="delAccount(${a.id})">Remove</button>
+    </div>`).join('') : '<p class="muted">No accounts yet — connect one →</p>';
+}
+async function createAccount(){
+  const body = {platform:aPlatform.value, display_name:aName.value.trim(), external_id:aExt.value.trim(),
+    access_token:aToken.value.trim()||'MOCK_TOKEN', auto_comment:aAuto.checked, comment_template:aTmpl.value};
+  if(!body.display_name) return toast('Display name required', false);
+  await api('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  aName.value=aExt.value=aToken.value=aTmpl.value='';
+  toast('Account connected ✅'); loadAccounts();
+}
+async function delAccount(id){ await api('/api/accounts/'+id,{method:'DELETE'}); toast('Account removed'); loadAccounts(); }
+
+function accPill(a, selected, onclick){
+  return `<button type="button" class="acc-pill ${selected?'sel':''}" onclick="${onclick}">
+    <span class="av ${a.platform}">${PLAT_META[a.platform].ic}</span>${esc(a.display_name)}</button>`;
+}
+
+/* ================= composer ================= */
+function openComposer(presetDateISO=null, editPost=null){
+  comp = { sel:new Set(), mediaUrl:'', editingId:null };
+  document.getElementById('composerTitle').textContent = editPost ? '✏️ Edit Post' : '✏️ Create Post';
+  document.getElementById('saveBtn').textContent = editPost ? '💾 Save changes' : '🗓 Schedule';
+  document.getElementById('capText').value = editPost ? editPost.caption : '';
+  comp.mediaUrl = editPost ? (editPost.media_url||'') : '';
+  document.getElementById('schedMode').value = 'schedule';
+  document.getElementById('whenFld').style.display='block';
+  const d = presetDateISO ? new Date(presetDateISO) : new Date(Date.now()+2*3600*1000);
+  document.getElementById('schedWhen').value = toLocalInput(d);
+  if(editPost){
+    comp.editingId = editPost.id;
+    comp.sel.add(editPost.account_id);
+    if(editPost.status==='published'){ /* shouldn't happen */ }
+    document.getElementById('schedWhen').value = toLocalInput(new Date(editPost.scheduled_at));
+  }
+  document.getElementById('mediaPickerFile').onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    const fd = new FormData(); fd.append('file', f);
+    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); loadMedia(); });
+  };
+  renderCompAccs();
+  showSelMedia();
+  renderPreviews();
+  document.getElementById('composerOverlay').classList.add('open');
+}
+function closeComposer(){ document.getElementById('composerOverlay').classList.remove('open'); }
+document.getElementById('composerOverlay').onclick = e => { if(e.target.id==='composerOverlay') closeComposer(); };
+
+function toLocalInput(d){
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function renderCompAccs(){
+  document.getElementById('compAccPick').innerHTML = ACCOUNTS.map(a=>
+    accPill(a, comp.sel.has(a.id), `toggleAcc(${a.id})`)).join('')
+    || '<span class="muted">No accounts — connect one in the Accounts tab.</span>';
+}
+function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); renderPreviews(); }
+function showSelMedia(){
+  const box = document.getElementById('selMediaBox');
+  if(comp.mediaUrl){ box.style.display='block'; document.getElementById('selMediaImg').src = comp.mediaUrl;
+    document.getElementById('clearMediaBtn').style.display='inline-flex'; document.getElementById('mediaHint').textContent=''; }
+  else { box.style.display='none'; document.getElementById('clearMediaBtn').style.display='none'; }
+}
+function clearMedia(){ comp.mediaUrl=''; showSelMedia(); renderPreviews(); }
+
+function renderPreviews(){
+  const cap = document.getElementById('capText').value;
+  const sel = ACCOUNTS.filter(a=>comp.sel.has(a.id));
+  // char count = strictest limit among selected
+  const lim = sel.length ? Math.min(...sel.map(a=>PLAT_META[a.platform].limit)) : 2200;
+  const cc = document.getElementById('charCount');
+  cc.textContent = `${cap.length} / ${lim} characters`;
+  cc.className = 'char-count' + (cap.length > lim ? ' over' : '');
+  if(!sel.length){ document.getElementById('previewList').innerHTML =
+    '<p class="muted">Select an account to see the preview →</p>'; return; }
+  document.getElementById('previewList').innerHTML = sel.map(a=>{
+    const m = PLAT_META[a.platform];
+    const shown = cap.length > m.limit ? cap.slice(0,m.limit)+'…' : cap;
+    return `<div class="pv">
+      <div class="pv-head">
+        <div class="av ${a.platform}">${m.ic}</div>
+        <div><div class="nm">${esc(a.display_name)}</div><div class="hd">${m.label} · just now</div></div>
+        <span class="pv-plat ${a.platform}">${m.label}</span>
+      </div>
+      <div class="pv-cap">${esc(shown) || '<span class="muted">Your caption…</span>'}</div>
+      ${comp.mediaUrl ? `<img class="pv-img" src="${comp.mediaUrl}" alt="">` : ''}
+      <div class="pv-acts"><span>❤️ Like</span><span>💬 Comment</span><span>🔁 Share</span></div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('schedMode').onchange = e => {
+  document.getElementById('whenFld').style.display = e.target.value==='schedule' ? 'block' : 'none';
+  document.getElementById('saveBtn').textContent =
+    e.target.value==='now' ? '🚀 Publish now' : (comp.editingId ? '💾 Save changes' : '🗓 Schedule');
+};
+
+async function savePost(){
+  const caption = document.getElementById('capText').value.trim();
+  const account_ids = [...comp.sel];
+  if(!account_ids.length) return toast('Select at least one account', false);
+  if(!caption) return toast('Caption is empty', false);
+  const mode = document.getElementById('schedMode').value;
+  try{
+    if(comp.editingId){
+      const aid = account_ids[0];
+      await api(`/api/posts/${comp.editingId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({caption, media_url:comp.mediaUrl, account_id:aid,
+          scheduled_at: new Date(document.getElementById('schedWhen').value).toISOString()})});
+      toast('Post updated ✅');
+    } else if(mode==='now'){
+      const created = await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl,
+          scheduled_at:new Date().toISOString()})});
+      for(const p of created) await api(`/api/posts/${p.id}/publish-now`,{method:'POST'});
+      toast('Published now 🚀');
+    } else {
+      const when = new Date(document.getElementById('schedWhen').value).toISOString();
+      await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, scheduled_at:when})});
+      toast('Post scheduled 🗓');
+    }
+    closeComposer();
+    await refreshData();
+  }catch(e){ toast(e.message, false); }
+}
+
+/* ================= calendar ================= */
+function moveMonth(d){ calMonth += d; if(calMonth>11){calMonth=0;calYear++;} if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
+function goToday(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); renderCalendar(); }
+
+function renderCalendar(){
+  const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calTitle').textContent = `${monthNames[calMonth]} ${calYear}`;
+  const first = new Date(calYear, calMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const today = new Date();
+  const grid = document.getElementById('calGrid');
+  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+
+  // index posts by local date key
+  const byDate = {};
+  POSTS.forEach(p=>{
+    const d = new Date(p.status==='published' && p.published_at ? p.published_at : p.scheduled_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    (byDate[key] = byDate[key]||[]).push(p);
+  });
+
+  const prevDays = new Date(calYear, calMonth, 0).getDate();
+  for(let i=0;i<startDow;i++){
+    html += `<div class="cal-cell out"><div class="dnum">${prevDays-startDow+i+1}</div></div>`;
+  }
+  for(let day=1; day<=daysInMonth; day++){
+    const key = `${calYear}-${calMonth}-${day}`;
+    const isToday = today.getFullYear()===calYear && today.getMonth()===calMonth && today.getDate()===day;
+    const posts = byDate[key] || [];
+    const shown = posts.slice(0,3);
+    html += `<div class="cal-cell ${isToday?'today':''}" onclick="openComposer('${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}T10:00')">
+      <div class="dnum">${day}</div>
+      ${shown.map(p=>`<button class="chip ${p.account.platform} ${p.status}" title="${esc(p.caption)}"
+          onclick="event.stopPropagation();editPost(${p.id})">${PLAT_META[p.account.platform].ic} ${esc(p.caption.slice(0,22))}${p.caption.length>22?'…':''}</button>`).join('')}
+      ${posts.length>3?`<span class="chip more">+${posts.length-3} more</span>`:''}
+    </div>`;
+  }
+  const total = startDow + daysInMonth;
+  for(let i=1; i<=(7-total%7)%7; i++){
+    html += `<div class="cal-cell out"><div class="dnum">${i}</div></div>`;
+  }
+  grid.innerHTML = html;
+}
+
+async function editPost(id){
+  await refreshData();
+  const p = POSTS.find(x=>x.id===id);
+  if(!p) return;
+  if(p.status==='published') return toast('Published posts can’t be edited', false);
+  openComposer(null, p);
+}
+
+/* ================= posts list ================= */
+let postFilter = 'all';
+function renderPostFilters(){
+  const counts = {all:POSTS.length, scheduled:0, published:0, failed:0};
+  POSTS.forEach(p=>counts[p.status]!==undefined && counts[p.status]++);
+  const tabs = [['all','All'],['scheduled','Scheduled'],['published','Published'],['failed','Failed']];
+  document.getElementById('postFilters').innerHTML = tabs.map(([k,l])=>
+    `<button class="ftab ${postFilter===k?'active':''}" onclick="postFilter='${k}';renderPosts()">${l} (${counts[k]||0})</button>`).join('');
+}
+function renderPosts(){
+  renderPostFilters();
+  const list = POSTS.filter(p=>postFilter==='all'||p.status===postFilter)
+    .sort((a,b)=> new Date(b.scheduled_at)-new Date(a.scheduled_at));
+  document.getElementById('postsTbody').innerHTML = list.length ? list.map(p=>`
+    <tr>
+      <td>${p.media_url?`<img class="thumb" src="${p.media_url}">`:'<div class="thumb" style="display:flex;align-items:center;justify-content:center;font-size:18px">📝</div>'}</td>
+      <td style="max-width:340px"><div style="font-weight:600">${esc(p.caption.slice(0,90))}${p.caption.length>90?'…':''}</div>
+        ${p.error?`<div style="color:var(--red);font-size:12px;margin-top:3px">⚠ ${esc(p.error)}</div>`:''}</td>
+      <td><span class="plat-tag"><span class="av ${p.account.platform}" style="width:24px;height:24px;font-size:12px">${PLAT_META[p.account.platform].ic}</span>${esc(p.account.display_name)}</span></td>
+      <td style="white-space:nowrap">${fmtDT(p.scheduled_at)}</td>
+      <td><span class="pill ${p.status}">${p.status}</span></td>
+      <td style="white-space:nowrap">
+        ${p.status==='scheduled'?`<button class="btn green sm" onclick="publishNow(${p.id})">🚀 Publish</button>
+          <button class="btn ghost sm" onclick="editPost(${p.id})">✏️</button>
+          <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
+      </td>
+    </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">No posts here. Click “Create Post” →</td></tr>';
+}
+async function publishNow(id){
+  await api(`/api/posts/${id}/publish-now`,{method:'POST'});
+  toast('Published 🚀'); refreshData();
+}
+async function delPost(id){
+  await api('/api/posts/'+id,{method:'DELETE'}); toast('Post deleted'); refreshData();
+}
+
+/* ================= bulk ================= */
+function renderBulkAccs(){
+  document.getElementById('bulkAccPick').innerHTML = ACCOUNTS.map(a=>
+    accPill(a, comp.sel.has('b'+a.id), `toggleBulkAcc(${a.id})`)).join('')
+    || '<span class="muted">No accounts connected yet.</span>';
+}
+function toggleBulkAcc(id){
+  const k='b'+id;
+  comp.sel.has(k) ? comp.sel.delete(k) : comp.sel.add(k);
+  renderBulkAccs();
+}
+const bulkDrop = document.getElementById('bulkDrop');
+bulkDrop.onclick = ()=>document.getElementById('bulkFile').click();
+document.getElementById('bulkFile').onchange = e => e.target.files[0] && uploadBulk(e.target.files[0]);
+['dragover','dragenter'].forEach(ev=>bulkDrop.addEventListener(ev,e=>{e.preventDefault();bulkDrop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>bulkDrop.addEventListener(ev,e=>{e.preventDefault();bulkDrop.classList.remove('over')}));
+bulkDrop.addEventListener('drop',e=>e.dataTransfer.files[0]&&uploadBulk(e.dataTransfer.files[0]));
+async function uploadBulk(file){
+  const ids = ACCOUNTS.filter(a=>comp.sel.has('b'+a.id)).map(a=>a.id);
+  if(!ids.length) return toast('Select target accounts first', false);
+  const fd = new FormData(); fd.append('file',file);
+  try{
+    const res = await api(`/api/posts/bulk/csv?account_ids=${ids.join(',')}`,{method:'POST',body:fd});
+    document.getElementById('bulkResult').innerHTML =
+      `<span class="pill published">✅ ${res.length} posts scheduled across ${ids.length} accounts</span>`;
+    toast(`${res.length} posts scheduled ✅`);
+    refreshData();
+  }catch(e){ toast(e.message,false); }
+}
+function downloadTemplate(){
+  const csv='caption,media_url,scheduled_at\nHello world! 🚀,,2026-09-01T09:00:00\nTip of the day,,2026-09-02T18:30:00\n';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='posts_template.csv'; a.click();
+}
+
+/* ================= inbox ================= */
+async function loadInbox(){
+  const posts = await api('/api/posts?status=published');
+  document.getElementById('simPost').innerHTML = posts.map(p=>
+    `<option value="${p.id}">${PLAT_META[p.account.platform].ic} ${esc(p.caption.slice(0,40))}</option>`).join('')
+    || '<option value="">No published posts</option>';
+  const cs = await api('/api/comments');
+  document.getElementById('inboxBadge').style.display = cs.filter(c=>!c.replied).length ? 'inline-block' : 'none';
+  document.getElementById('inboxBadge').textContent = cs.filter(c=>!c.replied).length;
+  document.getElementById('commentsList').innerHTML = cs.length ? cs.map(c=>`
+    <div class="cmt">
+      <div class="meta">👤 <b>${esc(c.author)}</b> · post #${c.post_id} · ${fmtDT(c.created_at)}</div>
+      <div>${esc(c.text)}</div>
+      ${c.replied ? `<div class="reply">${esc(c.our_reply)}</div>` : '<div class="wait">⏳ awaiting reply</div>'}
+    </div>`).join('') : '<p class="muted">No comments yet — simulate one ☝️</p>';
+}
+async function simulateComment(){
+  const post_id = +simPost.value;
+  if(!post_id) return toast('Publish a post first', false);
+  await api('/api/comments/simulate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({post_id, author:simAuthor.value, text:simText.value})});
+  toast('Comment posted — bot replied 🤖'); loadInbox();
+}
+
+/* ================= analytics ================= */
+async function loadAnalytics(){
+  const d = await api('/api/analytics');
+  const t = d.totals;
+  const cards = [
+    ['📝','Posts published',d.posts_published,'var(--brand)'],
+    ['🗓','Scheduled',d.posts_scheduled,'var(--purple)'],
+    ['❤️','Total likes',t.likes,'var(--red)'],
+    ['💬','Comments',t.comments,'var(--amber)'],
+    ['🔁','Shares',t.shares,'var(--green)'],
+    ['👁','Impressions',t.impressions,'var(--brand)'],
+    ['📡','Reach',t.reach,'var(--purple)'],
+    ['🤖','Auto-replies',d.auto_replied,'var(--green)'],
+  ];
+  document.getElementById('statCards').innerHTML = cards.map(([ic,l,n,c])=>
+    `<div class="card stat"><div class="ic">${ic}</div><div class="num" style="color:${c}">${n.toLocaleString('en-IN')}</div><div class="lbl">${l}</div></div>`).join('');
+  const maxL = Math.max(1,...Object.values(d.by_platform).map(p=>p.likes));
+  document.getElementById('byPlatform').innerHTML = Object.entries(d.by_platform).map(([pl,v])=>`
+    <div style="margin-bottom:13px">
+      <div class="muted" style="font-size:13px;margin-bottom:2px"><b style="color:var(--txt)">${PLAT_META[pl].ic} ${PLAT_META[pl].label}</b>
+        — ${v.posts} posts · ${v.likes} likes · ${v.comments} comments</div>
+      <div class="bar"><div style="width:${v.likes/maxL*100}%"></div></div>
+    </div>`).join('') || '<p class="muted">No data yet.</p>';
+  document.getElementById('commentStats').innerHTML = `
+    💬 Comments ingested: <b>${d.comments_total}</b><br>
+    🤖 Auto-replies sent: <b style="color:var(--green)">${d.auto_replied}</b><br>
+    📈 Reply coverage: <b>${d.comments_total?Math.round(d.auto_replied/d.comments_total*100):0}%</b><br>
+    <span class="muted">Intents: question · praise · purchase · support · generic</span>`;
+  document.getElementById('perPostTbody').innerHTML = d.per_post.length ? d.per_post.map(p=>`<tr>
+    <td style="max-width:280px">${esc(p.caption)}…</td>
+    <td><span class="plat-tag">${PLAT_META[p.platform].ic} ${PLAT_META[p.platform].label}</span></td>
+    <td>${p.likes}</td><td>${p.comments}</td><td>${p.shares}</td>
+    <td>${p.impressions.toLocaleString('en-IN')}</td><td>${p.reach.toLocaleString('en-IN')}</td></tr>`).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:26px">Publish posts to see analytics.</td></tr>';
+}
+
+/* ================= media library ================= */
+async function loadMedia(){
+  MEDIA = await api('/api/media');
+  const grid = document.getElementById('mediaGrid');
+  grid.innerHTML = MEDIA.map(m=>`
+    <div class="media-item ${comp.mediaUrl===m.url?'sel':''}" onclick="pickMedia('${m.url}')">
+      <img src="${m.url}" alt="${esc(m.name)}">
+      <div class="tag">${esc(m.name)}</div>
+    </div>`).join('') || '<p class="muted">No media yet — upload above.</p>';
+}
+function pickMedia(url){
+  // if composer open, attach; else just show toast hint
+  if(document.getElementById('composerOverlay').classList.contains('open')){
+    comp.mediaUrl = url; showSelMedia(); renderPreviews();
+    toast('Image attached 🖼');
+  } else {
+    openComposer();
+    setTimeout(()=>{ comp.mediaUrl=url; showSelMedia(); renderPreviews(); },120);
+  }
+}
+const mediaDrop = document.getElementById('mediaDrop');
+mediaDrop.onclick = ()=>document.getElementById('mediaFile').click();
+document.getElementById('mediaFile').onchange = async e => {
+  for(const f of e.target.files){
+    const fd = new FormData(); fd.append('file',f);
+    try{ await api('/api/media',{method:'POST',body:fd}); }catch(err){ toast(err.message,false); }
+  }
+  toast('Uploaded ✅'); loadMedia();
+};
+['dragover','dragenter'].forEach(ev=>mediaDrop.addEventListener(ev,e=>{e.preventDefault();mediaDrop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>mediaDrop.addEventListener(ev,e=>{e.preventDefault();mediaDrop.classList.remove('over')}));
+mediaDrop.addEventListener('drop',async e=>{
+  for(const f of e.dataTransfer.files){
+    const fd=new FormData(); fd.append('file',f);
+    try{ await api('/api/media',{method:'POST',body:fd}); }catch(err){ toast(err.message,false); }
+  }
+  toast('Uploaded ✅'); loadMedia();
+});
+
+/* ================= sync ================= */
+async function syncNow(){
+  toast('Syncing with platforms…');
+  try{
+    await api('/api/cron/tick',{method:'POST',headers:{'X-Cron-Secret':'dev-cron-secret-change-me'}});
+    toast('Sync complete ✅'); refreshData();
+  }catch(e){ toast(e.message,false); }
+}
+
+/* ================= data refresh ================= */
+async function refreshData(){
+  ACCOUNTS = await api('/api/accounts');
+  POSTS = await api('/api/posts');
+  // embed account object on posts for convenience
+  const accMap = Object.fromEntries(ACCOUNTS.map(a=>[a.id,a]));
+  POSTS.forEach(p=>p.account = accMap[p.account_id] || {platform:'x',display_name:'?'});
+  const cal = document.getElementById('view-calendar');
+  if(cal.style.display!=='none') renderCalendar();
+  if(document.getElementById('view-posts').style.display!=='none') renderPosts();
+  if(document.getElementById('view-inbox').style.display!=='none') loadInbox();
+  if(document.getElementById('view-analytics').style.display!=='none') loadAnalytics();
+  renderBulkAccs();
+}
+
+/* ================= boot ================= */
+(async () => {
+  try{
+    const h = await api('/api/health');
+    if(!h.mock_mode) document.getElementById('modePill').textContent = '● LIVE';
+  }catch(e){}
+  const now = new Date();
+  calYear = now.getFullYear(); calMonth = now.getMonth();
+  await refreshData();
+})();
+</script>
+</body>
+</html>
