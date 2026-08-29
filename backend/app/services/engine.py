@@ -81,6 +81,7 @@ async def sync_comments(db: Session, user_id: int | None = None) -> dict:
                 post_id=post.id,
                 external_comment_id=c["external_id"],
                 author=c["author"],
+                author_avatar=(c["author"][:1].upper() if c.get("author") else "?"),
                 text=c["text"],
             )
             db.add(comment)
@@ -107,7 +108,7 @@ def simulate_incoming_comment(db: Session, post_id: int, author: str, text: str)
     if not post:
         return None
     comment = Comment(post_id=post_id, external_comment_id=f"sim_{post_id}_{datetime.now(timezone.utc).timestamp()}",
-                      author=author, text=text)
+                      author=author, author_avatar=(author[:1].upper() if author else "?"), text=text)
     db.add(comment)
     db.commit()
     if settings.AUTO_COMMENT_ENABLED and post.account.auto_comment:

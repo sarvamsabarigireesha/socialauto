@@ -111,12 +111,28 @@ class Comment(Base):
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     external_comment_id = Column(String(200), default="")
     author = Column(String(200), default="someone")
+    author_avatar = Column(String(20), default="")      # initial letter for avatar
     text = Column(Text, default="")
-    our_reply = Column(Text, default="")                      # auto-comment we posted
+    our_reply = Column(Text, default="")                # auto-comment OR manual reply
+    reply_type = Column(String(10), default="auto")     # auto | manual
     replied = Column(Boolean, default=False)
+    resolved = Column(Boolean, default=False)           # conversation marked handled
     created_at = Column(DateTime, default=utcnow)
 
     post = relationship("Post", back_populates="comments")
+
+
+class Template(Base):
+    """Reusable caption templates (Buffer-style)."""
+    __tablename__ = "templates"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    category = Column(String(50), default="general")
+    builtin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=utcnow)
 
 
 class Metric(Base):

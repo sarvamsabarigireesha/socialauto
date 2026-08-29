@@ -320,7 +320,8 @@
   <button class="nav-item" data-view="calendar">📅 Calendar</button>
   <button class="nav-item" data-view="posts">📋 Posts</button>
   <button class="nav-item" data-view="bulk">📦 Bulk / CSV</button>
-  <button class="nav-item" data-view="inbox">💬 Inbox <span class="badge" id="inboxBadge" style="display:none">0</span></button>
+  <button class="nav-item" data-view="community">💬 Community <span class="badge" id="inboxBadge" style="display:none">0</span></button>
+  <button class="nav-item" data-view="templates">📄 Templates</button>
   <button class="nav-item" data-view="analytics">📊 Analytics</button>
   <button class="nav-item" data-view="media">🖼 Media Library</button>
   <button class="nav-item" data-view="accounts">🔗 Accounts</button>
@@ -446,37 +447,46 @@
     </div>
   </section>
 
-  <!-- INBOX -->
-  <section id="view-inbox" style="display:none">
-    <div class="two-col grid">
-      <div>
-        <div class="card" style="padding:18px;margin-bottom:16px">
-          <h2 class="section-title">🧪 Test the auto-comment bot</h2>
-          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
-            <div><label class="f">On published post</label><select id="simPost" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></select></div>
-            <div><label class="f">Follower name</label><input id="simAuthor" value="priya_99" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
-          </div>
-          <label class="f" style="margin-top:10px">Comment text</label>
-          <input id="simText" value="How much is this? I want to order 😍" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px">
-          <button class="btn green" style="margin-top:12px" onclick="simulateComment()">💬 Post comment</button>
-        </div>
-      </div>
-      <div class="card" style="padding:18px">
-        <h2 class="section-title">How it works</h2>
-        <div class="muted" style="line-height:2">
-          Every comment is scanned for intent and auto-replied:<br>
-          ❓ <b>Question</b> → "Great question! DMing you…"<br>
-          ❤️ <b>Praise</b> → "Thanks for the love! 🙏"<br>
-          🛍 <b>Purchase intent</b> → "Link sent in DM!"<br>
-          🆘 <b>Support</b> → "Let's fix it — DM sent 🙏"<br>
-          Runs every 15 min via cron, or instantly on webhooks.
-        </div>
+  <!-- COMMUNITY INBOX (Buffer-style) -->
+  <section id="view-community" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="font-size:16px;font-weight:800">All Channels <span id="commCount" class="badge" style="background:#f5a524;color:#fff">0</span></div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <select id="commFilter" onchange="loadCommunity()" style="border:1px solid var(--border2);border-radius:9px;padding:8px 12px">
+          <option value="all">All channels</option>
+          <option value="instagram">📸 Instagram</option>
+          <option value="facebook">👍 Facebook</option>
+          <option value="youtube">▶️ YouTube</option>
+          <option value="threads">🧵 Threads</option>
+          <option value="x">🐦 X</option>
+          <option value="linkedin">💼 LinkedIn</option>
+        </select>
+        <button class="btn green sm" style="padding:9px 16px" onclick="syncCommunity()">🔄 Fetch latest comments</button>
+        <button class="btn ghost sm" style="padding:9px 16px" onclick="openSim()">🧪 Simulate comment</button>
       </div>
     </div>
-    <div class="card" style="padding:18px">
-      <h2 class="section-title">Latest comments</h2>
-      <div id="commentsList"></div>
+    <div id="commSummary" style="margin-bottom:14px;font-size:13.5px;color:var(--muted)"></div>
+    <div id="communityThreads"></div>
+  </section>
+
+  <!-- TEMPLATES -->
+  <section id="view-templates" style="display:none">
+    <div class="card" style="padding:20px;max-width:720px;margin-bottom:18px">
+      <h2 class="section-title">➕ Create a template</h2>
+      <div class="row">
+        <div><label class="f">Template name</label><input id="tplTitle" placeholder="e.g. Diwali offer"></div>
+        <div><label class="f">Category</label>
+          <select id="tplCat" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px">
+            <option value="general">General</option><option value="promo">Promo / offer</option>
+            <option value="engagement">Engagement</option><option value="education">Tips / education</option>
+            <option value="story">Story / BTS</option><option value="video">Video / Shorts</option>
+          </select></div>
+      </div>
+      <label class="f" style="margin-top:10px">Content (use [brackets] for placeholders)</label>
+      <textarea id="tplContent" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:10px;min-height:90px"></textarea>
+      <button class="btn" style="margin-top:12px" onclick="saveTemplate()">Save template</button>
     </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))" id="templateGrid"></div>
   </section>
 
   <!-- ANALYTICS -->
@@ -600,6 +610,7 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
           <button class="tool-btn" id="clearMediaBtn" style="display:none" onclick="clearMedia()">✕ Remove</button>
           <button class="tool-btn" style="background:#f0eafe;color:var(--purple);border-color:#d9cbfb" onclick="runAI()">
             ✨ AI suggest <small style="display:block;font-size:10.5px;color:#8b7fd0">caption · hashtags · SEO · disclaimers</small></button>
+          <button class="tool-btn" onclick="pickTemplate()">📄 Templates</button>
           <span class="hint" id="mediaHint"></span>
         </div>
 
@@ -848,6 +859,137 @@ const fmtDT = dt => new Date(dt).toLocaleString('en-IN',{dateStyle:'medium',time
 const toast = (m, ok=true) => { const t=document.getElementById('toast'); t.textContent=m;
   t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); };
 
+/* ================= community inbox ================= */
+async function loadCommunity(){
+  const d = await api('/api/community/summary');
+  const filter = document.getElementById('commFilter').value;
+  let threads = d.threads;
+  if(filter !== 'all') threads = threads.filter(t=>t.platform===filter);
+  document.getElementById('inboxBadge').style.display = d.totals.unresolved ? 'inline-block' : 'none';
+  document.getElementById('inboxBadge').textContent = Math.min(99, d.totals.unresolved) + (d.totals.unresolved>99?'+':'');
+  document.getElementById('commCount').textContent = Math.min(99, d.totals.comments) + (d.totals.comments>99?'+':'');
+  document.getElementById('commSummary').innerHTML =
+    `💬 <b>${d.totals.comments}</b> comments · ✅ <b>${d.totals.replied}</b> replied · ⏳ <b>${d.totals.unresolved}</b> to handle
+     &nbsp; <span class="muted">(auto + manual replies both count)</span>`;
+  if(!threads.length){
+    document.getElementById('communityThreads').innerHTML =
+      '<div class="card" style="padding:30px;text-align:center;color:var(--muted)">No comments yet on published posts.<br>Publish a post (or simulate) and hit “Fetch latest comments”.</div>';
+    return;
+  }
+  document.getElementById('communityThreads').innerHTML = threads.map(t=>{
+    const pct = t.total ? Math.round(t.replied/t.total*100) : 0;
+    const m = PLAT_META[t.platform];
+    return `<div class="card" style="margin-bottom:16px;padding:18px">
+      <div style="display:flex;gap:14px;align-items:center">
+        ${t.media_url?`<img src="${t.media_url}" style="width:56px;height:56px;object-fit:cover;border-radius:10px">`:`<div style="width:56px;height:56px;border-radius:10px;background:#f0f2f7;display:flex;align-items:center;justify-content:center;font-size:24px">${m.ic}</div>`}
+        <div style="flex:1">
+          <div style="font-weight:800"><span class="plat ${t.platform}">${m.ic} ${esc(t.account_name)}</span></div>
+          <div class="muted" style="font-size:13px">${esc(t.caption.slice(0,70))}${t.caption.length>70?'…':''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:800;font-size:15px">${t.replied} replied / ${t.total} total</div>
+          <div class="bar" style="width:150px;margin-top:6px"><div style="width:${pct}%"></div></div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        ${t.comments.map(c=>`
+          <div class="cmt" style="${c.resolved?'opacity:.62':''}">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="av ${t.platform}" style="width:32px;height:32px;font-size:14px">${esc(c.avatar)}</span>
+              <b>@${esc(c.author)}</b>
+              <span class="muted" style="font-size:12px">${new Date(c.created_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})}</span>
+              ${c.resolved?'<span class="pill published">handled ✓</span>':''}
+              <button class="btn ghost sm" style="margin-left:auto;padding:4px 10px" onclick="toggleResolve(${c.id})">${c.resolved?'↺ reopen':'✓ resolve'}</button>
+            </div>
+            <div style="margin:6px 0 0 42px">${esc(c.text)}</div>
+            ${c.our_reply?`<div class="reply" style="margin-left:42px">${esc(c.our_reply)} <span class="pill draft" style="margin-left:6px">${c.reply_type==='manual'?'✍️ manual':'🤖 auto'}</span></div>`
+              :`<div style="margin:8px 0 0 42px;display:flex;gap:8px">
+                  <input id="reply-${c.id}" placeholder="Write a manual reply…" style="flex:1;border:1px solid var(--border2);border-radius:9px;padding:9px 12px"
+                    onkeydown="if(event.key==='Enter')sendReply(${c.id})">
+                  <button class="btn green sm" style="padding:8px 16px" onclick="sendReply(${c.id})">Reply</button>
+                </div>`}
+            ${c.our_reply?`<div style="margin:6px 0 0 42px"><button class="btn ghost sm" style="padding:3px 10px" onclick="document.getElementById('rebox-${c.id}').style.display='flex'">✏️ Reply again</button>
+              <div id="rebox-${c.id}" style="display:none;margin-top:6px;gap:8px">
+                <input id="reply-${c.id}" placeholder="Another reply…" style="flex:1;border:1px solid var(--border2);border-radius:9px;padding:9px 12px" onkeydown="if(event.key==='Enter')sendReply(${c.id})">
+                <button class="btn green sm" style="padding:8px 16px" onclick="sendReply(${c.id})">Send</button>
+              </div></div>`:''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function sendReply(id){
+  const inp = document.getElementById('reply-'+id);
+  const text = inp.value.trim();
+  if(!text) return;
+  try{
+    const r = await api(`/api/community/comments/${id}/reply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    toast('Reply posted ✍️'+(r.note?' (queued)':''));
+    loadCommunity();
+  }catch(e){ toast(e.message,false); }
+}
+async function toggleResolve(id){
+  await api(`/api/community/comments/${id}/resolve`,{method:'POST'});
+  loadCommunity();
+}
+async function syncCommunity(){
+  toast('Fetching latest comments from channels…');
+  try{
+    const r = await api('/api/community/sync',{method:'POST'});
+    toast(`Fetched ${r.new_comments} new comments, ${r.auto_replies} auto-replies`);
+    loadCommunity();
+  }catch(e){ toast(e.message,false); }
+}
+async function openSim(){
+  const posts = await api('/api/posts?status=published');
+  if(!posts.length) return toast('Publish a post first', false);
+  const text = prompt('Simulate a follower comment (this tests the inbox):', 'How much is this? I want to order 😍');
+  if(!text) return;
+  await api('/api/comments/simulate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({post_id:posts[0].id, author:'manual_tester', text})});
+  toast('Comment added — auto-replied 🤖'); loadCommunity();
+}
+
+/* ================= templates ================= */
+async function loadTemplates(){
+  const list = await api('/api/templates');
+  document.getElementById('templateGrid').innerHTML = list.map(t=>`
+    <div class="card" style="padding:16px;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <b>📄 ${esc(t.title)}</b>
+        <span class="pill draft">${esc(t.category)}</span>
+        ${t.builtin?'':'<button class="btn red sm" style="margin-left:auto;padding:2px 9px" onclick="delTemplate('+t.id+')">🗑</button>'}
+      </div>
+      <div class="muted" style="font-size:13px;white-space:pre-wrap;flex:1">${esc(t.content)}</div>
+      <button class="btn sm" style="margin-top:12px" onclick="useTemplate(${JSON.stringify(t.content).replace(/"/g,'&quot;')})">✏️ Use in composer</button>
+    </div>`).join('');
+}
+async function saveTemplate(){
+  const title=document.getElementById('tplTitle').value.trim();
+  const content=document.getElementById('tplContent').value.trim();
+  if(!title||!content) return toast('Title + content required', false);
+  await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({title,content,category:document.getElementById('tplCat').value})});
+  document.getElementById('tplTitle').value=''; document.getElementById('tplContent').value='';
+  toast('Template saved 📄'); loadTemplates();
+}
+async function delTemplate(id){
+  await api('/api/templates/'+id,{method:'DELETE'}); loadTemplates();
+}
+async function pickTemplate(){
+  const list = await api('/api/templates');
+  const use = prompt('Templates: type a number to load\n\n'+list.map((t,i)=>`${i+1}. ${t.title}`).join('\n'));
+  const i = parseInt(use)-1;
+  if(i>=0 && list[i]){
+    document.getElementById('capText').value = list[i].content;
+    renderPreviews(); toast('Template loaded 📄');
+  }
+}
+function useTemplate(content){
+  openComposer();
+  setTimeout(()=>{ document.getElementById('capText').value = content; renderPreviews(); }, 150);
+}
+
 /* ================= home (greeting + metrics) ================= */
 function greeting(){
   const h = new Date().getHours();
@@ -1054,7 +1196,8 @@ const TITLES = {
   calendar:['Calendar','Plan, schedule and auto-publish across all your social accounts'],
   posts:['Posts','Every scheduled and published post in one place'],
   bulk:['Bulk / CSV','Upload hundreds of posts at once'],
-  inbox:['Auto-Comment Inbox','Smart replies to every comment, on autopilot'],
+  community:['Community','Comments from all channels — auto + manual replies'],
+  templates:['Templates','Ready-made captions, one click into the composer'],
   analytics:['Analytics','Performance across all platforms'],
   media:['Media Library','Upload once, reuse in any post'],
   accounts:['Accounts','Connect your social profiles'],
@@ -1071,7 +1214,8 @@ document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => {
   if (b.dataset.view==='ideas') loadIdeas();
   if (b.dataset.view==='calendar') renderCalendar();
   if (b.dataset.view==='posts') renderPosts();
-  if (b.dataset.view==='inbox') loadInbox();
+  if (b.dataset.view==='community') loadCommunity();
+  if (b.dataset.view==='templates') loadTemplates();
   if (b.dataset.view==='analytics') loadAnalytics();
   if (b.dataset.view==='media') loadMedia();
   if (b.dataset.view==='accounts') loadAccounts();
@@ -1465,7 +1609,8 @@ async function refreshData(){
   const cal = document.getElementById('view-calendar');
   if(cal.style.display!=='none') renderCalendar();
   if(document.getElementById('view-posts').style.display!=='none') renderPosts();
-  if(document.getElementById('view-inbox').style.display!=='none') loadInbox();
+  const comm = document.getElementById('view-community');
+  if(comm && comm.style.display!=='none') loadCommunity();
   if(document.getElementById('view-analytics').style.display!=='none') loadAnalytics();
   renderBulkAccs();
 }
