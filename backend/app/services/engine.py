@@ -193,7 +193,18 @@ async def import_channel_content(db: Session, user_id: int, account_id: int) -> 
     db.commit()
     await sync_comments(db, user_id, force_all=True)
     await sync_metrics(db, user_id)
-    return {"imported": imported, "scanned": len(videos)}
+    note = ""
+    if not videos:
+        if acc.platform.value == "youtube":
+            note = ("No UPLOADED videos found on this channel. Note: YouTube "
+                    "Community posts (text/image posts) can NOT be read via any "
+                    "API — only uploaded videos & shorts sync. If you have videos, "
+                    "make sure they're uploaded as Public on THIS channel.")
+        else:
+            note = "No recent posts found on this account (or the API returned none)."
+    elif imported == 0:
+        note = f"{len(videos)} posts already synced — comments refreshed."
+    return {"imported": imported, "scanned": len(videos), "note": note}
 
 
 async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
@@ -220,7 +231,8 @@ async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
                 results.append({"platform": acc.platform.value,
                                 "name": acc.display_name,
                                 "imported": res.get("imported", 0),
-                                "scanned": res.get("scanned", 0)})
+                                "scanned": res.get("scanned", 0),
+                                "note": res.get("note", "")})
         except Exception as e:
             errors.append(f"{acc.display_name}: {e}")
     return {"imported": total, "accounts": len(accs),

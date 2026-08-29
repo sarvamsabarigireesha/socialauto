@@ -985,9 +985,13 @@ async function importAllChannels(){
     const r = await api('/api/community/import-all',{method:'POST'});
     let msg = r.imported
       ? `✅ Synced ${r.imported} existing posts/videos with real comments`
-      : '✅ All existing content already in sync';
-    const ok = (r.per_account||[]).map(a=>`${a.label||a.platform}: ${a.imported} new`);
-    if(ok.length) msg += '\n' + ok.join('\n');
+      : '✅ Sync complete';
+    const ok = (r.per_account||[]).map(a=>{
+      let line = `${a.label||a.name||a.platform}: ${a.scanned||0} found, ${a.imported} new`;
+      if(a.note) line += '\n   ' + a.note;
+      return line;
+    });
+    if(ok.length) msg += '\n\n' + ok.join('\n\n');
     if(r.errors && r.errors.length) msg += '\n\n⚠️ ' + r.errors.slice(0,3).join('\n');
     setTimeout(()=>alert(msg), 400);
     await refreshData();
