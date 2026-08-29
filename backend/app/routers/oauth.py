@@ -293,7 +293,9 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
                 "client_secret": settings.GOOGLE_CLIENT_SECRET,
                 "redirect_uri": redirect_uri})
             r.raise_for_status()
-            token = r.json()["access_token"]
+            tok = r.json()
+            token = tok["access_token"]
+            refresh = tok.get("refresh_token", "")
             me = await c.get(
                 "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
                 headers={"Authorization": f"Bearer {token}"})
@@ -311,7 +313,8 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
             ch = items[0]
         acc = _upsert_account(db, user, Platform.youtube,
                               external_id=ch["id"], token=token,
-                              display_name=ch["snippet"]["title"] + " (YouTube)")
+                              display_name=ch["snippet"]["title"] + " (YouTube)",
+                              refresh=refresh)
         return await _finish(acc, ajax, db)
 
 
@@ -330,17 +333,20 @@ def _detect_platform_from_code(code: str):  # pragma: no cover - placeholder
 
 
 def _upsert_account(db: Session, user: User, plat: Platform, external_id: str,
-                    token: str, display_name: str) -> Account:
+                    token: str, display_name: str, refresh: str = "") -> Account:
     acc = (db.query(Account)
            .filter(Account.user_id == user.id, Account.platform == plat,
                    Account.external_id == external_id).first())
     if not acc:
         acc = Account(user_id=user.id, platform=plat, external_id=external_id,
-                      access_token=token, display_name=display_name, auto_comment=True)
+                      access_token=token, refresh_token=refresh,
+                      display_name=display_name, auto_comment=True)
         db.add(acc)
     else:
         acc.access_token = token
         acc.display_name = display_name
+        if refresh:
+            acc.refresh_token = refresh
     db.commit()
     db.refresh(acc)
     return acc

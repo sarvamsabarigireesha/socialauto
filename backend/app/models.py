@@ -74,6 +74,7 @@ class Account(Base):
     display_name = Column(String(200), nullable=False)          # e.g. "@mybrand"
     external_id = Column(String(200), default="")              # page/ig/user id from the platform
     access_token = Column(String(1000), default="")            # stored token (encrypt in prod!)
+    refresh_token = Column(String(500), default="")            # offline refresh token (Google/Meta)
     auto_comment = Column(Boolean, default=True)               # reply to comments automatically
     comment_template = Column(Text, default="")                # optional fixed reply; "" = AI pool
     created_at = Column(DateTime, default=utcnow)

@@ -164,7 +164,10 @@ async def import_channel_content(db: Session, user_id: int, account_id: int) -> 
     client = platforms.get_client(acc.platform)
     if not hasattr(client, "list_recent_videos"):
         return {"imported": 0, "error": "import not supported on this platform"}
-    videos = await client.list_recent_videos(acc)
+    try:
+        videos = await client.list_recent_videos(acc)
+    except Exception as e:
+        return {"imported": 0, "scanned": 0, "error": f"{acc.platform.value}: {e}"}
     imported = 0
     for v in videos:
         exists = db.query(Post).filter(
@@ -203,19 +206,25 @@ async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
         q = q.filter(Account.user_id == user_id)
     accs = q.all()
     total = 0
+    results, errors = [], []
     for acc in accs:
         client = platforms.get_client(acc.platform)
         if not hasattr(client, "list_recent_videos"):
-            continue
-        # mock client in real mode for moj/sharechat — skip
-        if type(client).__name__ == "_MockClient" and not settings.MOCK_MODE:
-            continue
+            continue  # Moj/ShareChat/Threads/manual helpers — no data API
         try:
             res = await import_channel_content(db, acc.user_id, acc.id)
             total += res.get("imported", 0)
-        except Exception:
-            continue
-    return {"imported": total, "accounts": len(accs)}
+            if res.get("error"):
+                errors.append(f"{acc.display_name}: {res['error']}")
+            else:
+                results.append({"platform": acc.platform.value,
+                                "name": acc.display_name,
+                                "imported": res.get("imported", 0),
+                                "scanned": res.get("scanned", 0)})
+        except Exception as e:
+            errors.append(f"{acc.display_name}: {e}")
+    return {"imported": total, "accounts": len(accs),
+            "per_account": results, "errors": errors}
 
 
 def analytics_summary(db: Session, user_id: int | None = None) -> dict:

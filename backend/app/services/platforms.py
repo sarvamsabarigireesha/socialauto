@@ -179,135 +179,204 @@ class _MetaClient:
         except Exception:
             return False
 
+    async def list_recent_videos(self, account: Account) -> list[dict]:
+        """Recent IG media or FB page posts (used to import into Community inbox)."""
+        is_ig = account.platform == Platform.instagram
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                if is_ig:
+                    r = await c.get(f"{self._v()}/{account.external_id}/media", params={
+                        "fields": "id,caption,media_url,thumbnail_url,timestamp",
+                        "limit": 50,
+                        "access_token": account.access_token})
+                else:
+                    r = await c.get(f"{self._v()}/{account.external_id}/posts", params={
+                        "fields": "id,message,full_picture,created_time",
+                        "limit": 50,
+                        "access_token": account.access_token})
+                if r.status_code != 200:
+                    raise RuntimeError(f"Meta {r.status_code}: {r.text[:200]}")
+                out = []
+                for it in r.json().get("data", []):
+                    out.append({
+                        "id": it["id"],
+                        "title": (it.get("caption") or it.get("message") or "post")[:120],
+                        "published_at": it.get("timestamp") or it.get("created_time") or "",
+                        "thumb": it.get("thumbnail_url") or it.get("full_picture") or "",
+                    })
+                return out
+        except Exception:
+            raise
+
+
+async def _google_refresh_token(account: Account) -> str:
+    """Mint a fresh Google access_token from the stored offline refresh_token."""
+    if not getattr(account, "refresh_token", ""):
+        raise RuntimeError(
+            "Google session expired and no refresh token is stored. "
+            "Please Remove and re-connect the YouTube account once.")
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post("https://oauth2.googleapis.com/token", data={
+            "grant_type": "refresh_token",
+            "refresh_token": account.refresh_token,
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET})
+        if r.status_code != 200:
+            raise RuntimeError(
+                f"Google token refresh failed ({r.status_code}): {r.text[:150]} "
+                "- re-connect the YouTube account.")
+        account.access_token = r.json()["access_token"]
+        return account.access_token
+
 
 class _YouTubeClient(Client):
     """YouTube Data API v3 (Google Cloud free tier)."""
+    BASE = "https://www.googleapis.com/youtube/v3"
+    UPLOAD = "https://www.googleapis.com/upload/youtube/v3"
+
+    async def _req(self, method: str, url: str, account: Account,
+                   retry: bool = True, **kw):
+        """HTTP with bearer token; auto-refresh once on 401/403."""
+        async with httpx.AsyncClient(timeout=kw.pop("_timeout", 30)) as c:
+            r = await c.request(method, url,
+                                headers={"Authorization": f"Bearer {account.access_token}"},
+                                **kw)
+            if r.status_code in (401, 403) and retry:
+                try:
+                    await _google_refresh_token(account)
+                    return await self._req(method, url, account, retry=False, **kw)
+                except RuntimeError as e:
+                    raise RuntimeError(str(e))
+            return r
 
     async def publish(self, account: Account, caption: str, media_url: str,
                       post_type: str = "feed") -> PublishResult:
-        # YouTube Community posts (image/text polls) have NO public API —
-        # Google never opened it. Reminder mode like Buffer/Later do.
         if post_type == "community":
             return PublishResult(False, manual=True,
                 error=("MANUAL: YouTube Community posts can't be published via API. "
-                       "Open studio.youtube.com → Create → Create post (or your channel "
-                       "→ Posts tab), paste the caption and upload the image, then post."))
-        # video | short | feed — all upload a video file
+                       "Open studio.youtube.com -> Create -> Create post (or your "
+                       "channel -> Posts tab), paste the caption, upload the image."))
         if not media_url:
-            return PublishResult(False, error=("YouTube needs a video file/URL to upload "
-                                               f"for a {post_type}. For text-only posts use "
-                                               "a Community post (manual reminder)."))
+            return PublishResult(False, error=(
+                f"YouTube needs a video file/URL for a {post_type}. "
+                "For text/image posts use a Community post (manual reminder)."))
         try:
-            title = caption[:100]
-            desc = caption
+            title, desc = caption[:100], caption
             if post_type == "short":
-                title = (title[:90] + " #Shorts")[:100]
+                title = (caption[:90] + " #Shorts")[:100]
                 desc = caption if "#Shorts" in caption else caption + "\n\n#Shorts"
-            # Download the video, upload to YouTube.
+            import json
             async with httpx.AsyncClient(timeout=180) as c:
                 vid = await c.get(media_url)
                 vid.raise_for_status()
-                r = await c.post(
-                    "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart",
-                    headers={"Authorization": f"Bearer {account.access_token}"},
-                    files={"metadata": (None,
-                            __import__("json").dumps({
-                                "snippet": {"title": title, "description": desc,
-                                            "categoryId": "22"},
-                                "status": {"privacyStatus": "public",
-                                           "selfDeclaredMadeForKids": False}}),
-                            "application/json"),
-                            "media": ("video.mp4", vid.content, "video/mp4")})
-                if r.status_code != 200:
+                # resumable session init
+                init = await c.post(
+                    f"{self.UPLOAD}/videos?uploadType=resumable&part=snippet,status",
+                    headers={"Authorization": f"Bearer {account.access_token}",
+                             "Content-Type": "application/json"},
+                    content=json.dumps({
+                        "snippet": {"title": title, "description": desc,
+                                    "categoryId": "22"},
+                        "status": {"privacyStatus": "public",
+                                   "selfDeclaredMadeForKids": False}}))
+                if init.status_code in (401, 403):
+                    await _google_refresh_token(account)
+                    init = await c.post(
+                        f"{self.UPLOAD}/videos?uploadType=resumable&part=snippet,status",
+                        headers={"Authorization": f"Bearer {account.access_token}",
+                                 "Content-Type": "application/json"},
+                        content=json.dumps({
+                            "snippet": {"title": title, "description": desc,
+                                        "categoryId": "22"},
+                            "status": {"privacyStatus": "public",
+                                       "selfDeclaredMadeForKids": False}}))
+                if init.status_code not in (200, 201):
                     return PublishResult(False,
-                        error=f"YouTube upload failed ({r.status_code}): {r.text[:300]}")
-                return PublishResult(True, platform_post_id=r.json()["id"])
+                        error=f"YouTube upload init failed ({init.status_code}): {init.text[:300]}")
+                up_url = init.headers["location"]
+                done = await c.put(up_url,
+                                   content=vid.content,
+                                   headers={"Content-Type": "video/mp4",
+                                            "Authorization": f"Bearer {account.access_token}"})
+                if done.status_code not in (200, 201):
+                    return PublishResult(False,
+                        error=f"YouTube upload failed ({done.status_code}): {done.text[:300]}")
+                return PublishResult(True, platform_post_id=done.json()["id"])
         except Exception as e:
             return PublishResult(False, error=f"YouTube error: {e}")
 
     async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
         try:
-            async with httpx.AsyncClient(timeout=30) as c:
-                h = {"Authorization": f"Bearer {account.access_token}"}
-                # comments
-                r = await c.get("https://www.googleapis.com/youtube/v3/commentThreads",
+            r = await self._req("GET", f"{self.BASE}/commentThreads", account,
                                 params={"part": "snippet", "videoId": platform_post_id,
-                                        "maxResults": 20, "order": "time"}, headers=h)
-                r.raise_for_status()
-                comments = []
-                for it in r.json().get("items", []):
-                    sn = it["snippet"]["topLevelComment"]["snippet"]
-                    comments.append({
-                        "external_id": it["snippet"]["topLevelComment"]["id"],
-                        "author": sn.get("authorDisplayName", "viewer"),
-                        "text": sn.get("textDisplay", "")})
-                # stats
-                r2 = await c.get("https://www.googleapis.com/youtube/v3/videos",
-                                 params={"part": "statistics", "id": platform_post_id}, headers=h)
-                r2.raise_for_status()
-                st = (r2.json().get("items") or [{}])[0].get("statistics", {})
-                views = int(st.get("viewCount", 0))
-                return FetchResult(comments, {
-                    "likes": int(st.get("likeCount", 0)),
-                    "comments_count": int(st.get("commentCount", len(comments))),
-                    "shares": 0,
-                    "impressions": views, "reach": views})
+                                        "maxResults": 20, "order": "time"})
+            if r.status_code != 200:
+                return FetchResult([], {"error": f"comments {r.status_code}: {r.text[:150]}"})
+            comments = []
+            for it in r.json().get("items", []):
+                sn = it["snippet"]["topLevelComment"]["snippet"]
+                comments.append({
+                    "external_id": it["snippet"]["topLevelComment"]["id"],
+                    "author": sn.get("authorDisplayName", "viewer"),
+                    "avatar": sn.get("authorProfileImageUrl", ""),
+                    "text": sn.get("textDisplay", "")})
+            r2 = await self._req("GET", f"{self.BASE}/videos", account,
+                                 params={"part": "statistics", "id": platform_post_id})
+            r2.raise_for_status()
+            st = (r2.json().get("items") or [{}])[0].get("statistics", {})
+            views = int(st.get("viewCount", 0))
+            return FetchResult(comments, {
+                "likes": int(st.get("likeCount", 0)),
+                "comments_count": int(st.get("commentCount", len(comments))),
+                "shares": 0, "impressions": views, "reach": views})
         except Exception as e:
             return FetchResult([], {"error": str(e)})
 
     async def reply_to_comment(self, account: Account, platform_post_id: str,
                                external_comment_id: str, text: str) -> bool:
         try:
-            import json
-            async with httpx.AsyncClient(timeout=30) as c:
-                r = await c.post(
-                    "https://www.googleapis.com/youtube/v3/comments?part=snippet",
-                    headers={"Authorization": f"Bearer {account.access_token}",
-                             "Content-Type": "application/json"},
-                    json={"snippet": {"parentId": external_comment_id, "textOriginal": text}})
-                r.raise_for_status()
-                return True
+            r = await self._req("POST", f"{self.BASE}/comments?part=snippet", account,
+                                json={"snippet": {"parentId": external_comment_id,
+                                                  "textOriginal": text}})
+            return r.status_code == 200
         except Exception:
             return False
 
     async def list_recent_videos(self, account: Account) -> list[dict]:
-        """Fetch the channel's most recent uploads (from live YouTube channel id)."""
-        try:
-            async with httpx.AsyncClient(timeout=30) as c:
-                h = {"Authorization": f"Bearer {account.access_token}"}
-                r = await c.get("https://www.googleapis.com/youtube/v3/channels",
-                                params={"part": "contentDetails", "id": account.external_id},
-                                headers=h)
-                r.raise_for_status()
-                uploads = (r.json()["items"][0]["contentDetails"]
-                           .get("uploadsPlaylistId"))
-                if not uploads:
-                    return []
-                out = []
-                page_token = None
-                for _ in range(3):  # up to ~150 recent videos
-                    params = {"part": "snippet", "playlistId": uploads,
-                              "maxResults": 50}
-                    if page_token:
-                        params["pageToken"] = page_token
-                    r2 = await c.get("https://www.googleapis.com/youtube/v3/playlistItems",
-                                     params=params, headers=h)
-                    r2.raise_for_status()
-                    data = r2.json()
-                    for it in data.get("items", []):
-                        sn = it["snippet"]
-                        vid = sn.get("resourceId", {}).get("videoId", "")
-                        if vid:
-                            out.append({"id": vid, "title": sn.get("title", "video"),
-                                        "published_at": sn.get("publishedAt", ""),
-                                        "thumb": (sn.get("thumbnails", {}) or {}).get("high", {})
-                                                  .get("url", "")})
-                    page_token = data.get("nextPageToken")
-                    if not page_token:
-                        break
-                return out
-        except Exception:
+        """Channel uploads (uploads playlist), up to ~150. Raises on error."""
+        r = await self._req("GET", f"{self.BASE}/channels", account,
+                            params={"part": "contentDetails,snippet",
+                                    "id": account.external_id})
+        if r.status_code != 200:
+            raise RuntimeError(f"channels API {r.status_code}: {r.text[:200]}")
+        items = r.json().get("items", [])
+        if not items:
+            raise RuntimeError("No channel found for this account (channel id mismatch)")
+        uploads = items[0]["contentDetails"].get("uploadsPlaylistId")
+        if not uploads:
             return []
+        out, page_token = [], None
+        for _ in range(3):
+            params = {"part": "snippet", "playlistId": uploads, "maxResults": 50}
+            if page_token:
+                params["pageToken"] = page_token
+            r2 = await self._req("GET", f"{self.BASE}/playlistItems", account,
+                                 params=params)
+            if r2.status_code != 200:
+                raise RuntimeError(f"playlistItems {r2.status_code}: {r2.text[:200]}")
+            data = r2.json()
+            for it in data.get("items", []):
+                sn = it["snippet"]
+                vid = sn.get("resourceId", {}).get("videoId", "")
+                if vid:
+                    out.append({"id": vid, "title": sn.get("title", "video"),
+                                "published_at": sn.get("publishedAt", ""),
+                                "thumb": (sn.get("thumbnails", {}) or {}).get("high", {})
+                                          .get("url", "")})
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+        return out
 
 
 class _XClient(Client):
@@ -319,9 +388,12 @@ class _XClient(Client):
                 r = await c.post(
                     "https://api.twitter.com/2/tweets",
                     json={"text": caption[:280]},
-                    headers={"Authorization": f"Bearer {settings.X_BEARER_TOKEN}"},
+                    headers={"Authorization": f"Bearer {account.access_token}"},
                 )
-                r.raise_for_status()
+                if r.status_code != 200:
+                    return PublishResult(False,
+                        error=f"X posting failed ({r.status_code}): {r.text[:200]}. "
+                              "X free-tier API requires paid Basic tier for posting.")
                 return PublishResult(True, platform_post_id=r.json()["data"]["id"])
         except Exception as e:
             return PublishResult(False, error=f"X error: {e}")

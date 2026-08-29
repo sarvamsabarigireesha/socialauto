@@ -978,14 +978,18 @@ async function importChannel(acc){
 }
 
 async function importAllChannels(){
-  const real = ACCOUNTS.filter(a=>['youtube','instagram','facebook','threads'].includes(a.platform));
-  if(!real.length) return toast('Connect a YouTube / Instagram / Facebook account first', false);
-  toast(`📥 Syncing existing content from ${real.length} account(s) — fetching comments…`);
+  const real = ACCOUNTS.filter(a=>['youtube','instagram','facebook'].includes(a.platform));
+  if(!real.length) return toast('Connect YouTube / Instagram / Facebook first (Moj, ShareChat, Threads, X, LinkedIn have no data API)', false);
+  toast(`📥 Syncing existing posts/videos + comments from ${real.length} account(s)…`);
   try{
     const r = await api('/api/community/import-all',{method:'POST'});
-    toast(r.imported
-      ? `✅ Synced ${r.imported} existing videos/posts with their comments`
-      : '✅ Everything already in sync (will refresh comments)');
+    let msg = r.imported
+      ? `✅ Synced ${r.imported} existing posts/videos with real comments`
+      : '✅ All existing content already in sync';
+    const ok = (r.per_account||[]).map(a=>`${a.label||a.platform}: ${a.imported} new`);
+    if(ok.length) msg += '\n' + ok.join('\n');
+    if(r.errors && r.errors.length) msg += '\n\n⚠️ ' + r.errors.slice(0,3).join('\n');
+    setTimeout(()=>alert(msg), 400);
     await refreshData();
     loadCommunity();
   }catch(e){ toast(e.message,false); }

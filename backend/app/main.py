@@ -77,6 +77,8 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE comments ADD COLUMN reply_type VARCHAR(10) NOT NULL DEFAULT 'auto'"))
         if "comments" in cols and "author_avatar" not in cols["comments"]:
             conn.execute(text("ALTER TABLE comments ADD COLUMN author_avatar VARCHAR(20) NOT NULL DEFAULT ''"))
+        if "accounts" in cols and "refresh_token" not in cols["accounts"]:
+            conn.execute(text("ALTER TABLE accounts ADD COLUMN refresh_token VARCHAR(500) NOT NULL DEFAULT ''"))
         if "posts" in cols and "post_type" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN post_type VARCHAR(12) NOT NULL DEFAULT 'feed'"))
 
