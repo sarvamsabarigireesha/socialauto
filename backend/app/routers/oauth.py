@@ -58,7 +58,10 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
             "client_id": settings.META_APP_ID,
             "redirect_uri": redirect_uri,
             "state": state,
-            "scope": "instagram_basic,pages_show_list,pages_manage_posts,public_profile",
+            "scope": ("public_profile,pages_show_list,pages_read_engagement,"
+                      "pages_manage_posts,pages_manage_engagement,"
+                      "instagram_basic,instagram_content_publish,"
+                      "instagram_manage_comments,instagram_manage_insights"),
             "response_type": "code",
         })
         url = f"https://www.facebook.com/{settings.META_GRAPH_VERSION}/dialog/oauth?{qs}"
@@ -169,18 +172,40 @@ async def callback(request: Request, code: str | None = None, state: str | None 
     # ---- REAL exchanges ----
     if plat in (Platform.instagram, Platform.facebook):
         async with httpx.AsyncClient(timeout=30) as c:
+            v = settings.META_GRAPH_VERSION
+            # 1) code -> user access token
             r = await c.get("https://graph.facebook.com/oauth/access_token", params={
                 "client_id": settings.META_APP_ID, "client_secret": settings.META_APP_SECRET,
                 "redirect_uri": redirect_uri, "code": code})
             r.raise_for_status()
-            token = r.json()["access_token"]
-            me = await c.get(f"https://graph.facebook.com/{settings.META_GRAPH_VERSION}/me",
-                             params={"access_token": token, "fields": "id,name"})
-            me.raise_for_status()
-            d = me.json()
-        acc = _upsert_account(db, user, plat, external_id=d["id"], token=token,
-                              display_name=d.get("name", "FB Page"))
-        return _finish(acc, ajax)
+            user_token = r.json()["access_token"]
+
+            # 2) list the Facebook Pages this user manages
+            r = await c.get(f"https://graph.facebook.com/{v}/me/accounts",
+                            params={"access_token": user_token,
+                                    "fields": "id,name,access_token,instagram_business_account"})
+            r.raise_for_status()
+            pages = r.json().get("data", [])
+            if not pages:
+                raise HTTPException(400,
+                    "No Facebook Page found. Create a Page (and link an IG Business account) first.")
+
+            first_acc = None
+            for pg in pages:
+                # Facebook page account
+                fb = _upsert_account(db, user, Platform.facebook,
+                                     external_id=pg["id"], token=pg.get("access_token", user_token),
+                                     display_name=pg.get("name", "Facebook Page"))
+                first_acc = first_acc or fb
+                # linked Instagram business account
+                ig = pg.get("instagram_business_account")
+                if ig and ig.get("id"):
+                    first_acc = _upsert_account(
+                        db, user, Platform.instagram,
+                        external_id=ig["id"], token=pg.get("access_token", user_token),
+                        display_name=f"{pg.get('name','IG')} (Instagram)")
+        # browser redirect -> back to app; AJAX (mock-like test) returns an account
+        return _finish(first_acc, ajax)
 
     if plat == Platform.linkedin:
         async with httpx.AsyncClient(timeout=30) as c:
@@ -218,6 +243,24 @@ async def callback(request: Request, code: str | None = None, state: str | None 
             d = me.json()["data"]
         acc = _upsert_account(db, user, Platform.x, external_id=d["id"], token=token,
                               display_name="@" + d["username"])
+        return _finish(acc, ajax)
+
+    if plat == Platform.threads:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get("https://graph.threads.net/oauth/access_token", params={
+                "client_id": settings.META_APP_ID,
+                "client_secret": settings.META_APP_SECRET,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri, "code": code})
+            r.raise_for_status()
+            token = r.json()["access_token"]
+            me = await c.get("https://graph.threads.net/me",
+                             params={"fields": "id,username", "access_token": token})
+            me.raise_for_status()
+            d = me.json()
+        acc = _upsert_account(db, user, Platform.threads,
+                              external_id=d.get("id", ""), token=token,
+                              display_name="@" + d.get("username", "threads"))
         return _finish(acc, ajax)
 
     if plat == Platform.youtube:
