@@ -565,68 +565,81 @@
   .slot-hint b{color:var(--brand-d)}
 
   /* ---------- premium Buffer-like auth landing ---------- */
-  .premium-auth{padding:0;background:#fbfaf6;overflow:auto}
+  .premium-auth{padding:0;background:#fbfaf6;overflow:auto;align-items:stretch;justify-content:stretch}
   .premium-auth::before{content:"";position:fixed;inset:0;background:
-    linear-gradient(rgba(17,24,39,.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17,24,39,.04) 1px, transparent 1px);
-    background-size:60px 60px;pointer-events:none;opacity:.55}
+    linear-gradient(rgba(17,24,39,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17,24,39,.035) 1px, transparent 1px);
+    background-size:58px 58px;pointer-events:none;opacity:.7}
   .auth-premium-shell{max-width:100%;width:100%;min-height:100vh;border:none;border-radius:0;box-shadow:none;background:transparent;padding:0}
-  .premium-auth .auth-shell{display:grid;grid-template-columns:minmax(0,1.2fr) 430px;min-height:100vh}
-  .premium-auth .auth-hero-panel{display:flex;flex-direction:column;padding:24px 34px 34px;position:relative;background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.55))}
-  .premium-auth .auth-site-nav{display:flex;align-items:center;gap:28px;justify-content:space-between;margin-bottom:34px;position:relative;z-index:2}
-  .auth-site-brand{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:900;color:#16232b}
+  .premium-auth .auth-shell{display:block;min-height:100vh}
+  .auth-home-shell{min-height:100vh;display:flex;flex-direction:column;position:relative;padding:18px 22px 40px}
+  .auth-site-nav{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:10px 0;position:relative;z-index:2}
+  .auth-site-brand{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:900;color:#16232b}
   .auth-site-brand .mk{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1f2d3d,#5b6cff);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
-  .auth-site-links{display:flex;gap:28px;color:#30404b;font-size:15px;font-weight:600;flex:1;justify-content:center;flex-wrap:wrap}
-  .auth-site-actions{display:flex;gap:12px;align-items:center}
-  .auth-nav-btn{height:48px;padding:0 28px;border-radius:999px;border:1.5px solid #1f2937;background:#fff;color:#1f2937;font-size:15px;font-weight:700}
-  .auth-nav-btn.primary{border-color:#a8ec87;background:#a8ec87}
-  .premium-auth .auth-hero-stage{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding:26px 24px 60px}
-  .auth-hero-copy{max-width:760px;text-align:center;position:relative;z-index:2}
-  .premium-auth .auth-chip{display:inline-flex;align-items:center;gap:8px;background:#edf7ea;color:#29673b;border:1px solid #d6edcf;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:900;letter-spacing:.02em;margin-bottom:20px}
-  .premium-auth .auth-hero-copy h1{font-size:92px;line-height:.95;letter-spacing:-.055em;font-weight:900;color:#183133;margin:0 auto 22px;max-width:860px}
-  .premium-auth .auth-hero-copy p{font-size:26px;line-height:1.45;color:#43525d;max-width:800px;margin:0 auto 28px}
-  .auth-hero-cta-row{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
-  .auth-email-cta{height:60px;padding:0 28px;border:none;border-radius:999px;background:#acef8b;color:#17331d;font-size:18px;font-weight:800;box-shadow:0 10px 24px rgba(172,239,139,.28)}
+  .auth-site-links{display:flex;gap:24px;align-items:center;flex-wrap:wrap;color:#2d3e47;font-size:15px;font-weight:600}
+  .auth-site-links span{cursor:default}
+  .auth-site-actions{display:flex;gap:12px;align-items:center;flex-shrink:0}
+  .auth-nav-btn{height:52px;padding:0 28px;border-radius:999px;border:1.5px solid #1f2937;background:#fff;color:#1f2937;font-size:15px;font-weight:700}
+  .auth-nav-btn.primary{border-color:#acef8b;background:#acef8b}
+  .auth-home-hero{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding:34px 16px 54px}
+  .auth-hero-copy{max-width:920px;text-align:center;position:relative;z-index:2;margin:0 auto}
+  .auth-chip{display:inline-flex;align-items:center;gap:8px;background:#edf7ea;color:#29673b;border:1px solid #d6edcf;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:900;letter-spacing:.02em;margin-bottom:22px}
+  .auth-hero-copy h1{font-size:98px;line-height:.94;letter-spacing:-.06em;font-weight:900;color:#173236;margin:0 auto 22px;max-width:880px}
+  .auth-hero-copy p{font-size:24px;line-height:1.5;color:#4a5a66;max-width:860px;margin:0 auto 28px}
+  .auth-email-bar{display:flex;align-items:center;gap:0;max-width:800px;margin:0 auto;border:1.5px solid #232f3c;border-radius:999px;background:#fff;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.05)}
+  .auth-email-bar input{flex:1;border:none;background:transparent;padding:0 28px;height:84px;font-size:21px;outline:none;color:#183133}
+  .auth-email-bar button{border:none;background:#acef8b;color:#17331d;height:74px;margin:5px;padding:0 34px;border-radius:999px;font-size:22px;font-weight:800;white-space:nowrap}
+  .auth-inline-note{margin-top:16px;color:#6b7280;font-size:14px}
+  .auth-secondary-actions{display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:20px}
   .auth-text-link{border:none;background:transparent;color:#30404b;font-size:16px;font-weight:700;padding:8px 10px}
-  .auth-proof{margin-top:18px;color:#6b7280;font-size:14px;font-weight:600}
+  .auth-proof{margin-top:12px;color:#6b7280;font-size:14px;font-weight:600}
   .auth-float{position:absolute;width:62px;height:62px;border-radius:16px;background:#fff;border:1px solid #ece7df;display:flex;align-items:center;justify-content:center;font-size:27px;font-weight:900;box-shadow:0 10px 24px rgba(15,23,42,.08);z-index:1}
-  .auth-float.yt{left:8%;top:28%;color:#ff0000}.auth-float.fb{right:8%;bottom:20%;color:#1877f2}.auth-float.ig{left:22%;bottom:10%;color:#e1306c}.auth-float.th{right:18%;top:18%;color:#111}.auth-float.sc{left:13%;top:12%}.auth-float.moj{right:12%;top:46%}
-  .premium-auth .auth-form-card{align-self:center;justify-self:end;width:min(430px,calc(100vw - 28px));margin:24px 28px 24px 0;background:#fff;border:1px solid #ece7df;border-radius:28px;box-shadow:0 22px 60px rgba(15,23,42,.12);padding:30px 28px;display:flex}
-  .premium-auth .auth-form-panel .big{margin:0 0 14px;width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#5b6cff,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px}
-  .premium-auth .auth-form-panel h2{font-size:32px;line-height:1.1;margin-bottom:6px;color:#16232b}
-  .premium-auth .auth-form-panel .sub{font-size:15px;color:#63707c;margin-bottom:18px}
-  .premium-auth .auth-card input{border-radius:18px;padding:15px 16px;border-color:#dcd6cd}
-  .premium-auth .auth-card .btn{border-radius:18px;padding:14px 18px;background:#163238;color:#fff;font-size:15px}
-  .premium-auth .auth-card .btn:hover{background:#10292e}
-  .premium-auth .pw-toggle{background:#f3f0ea;color:#30404b}
-  .premium-auth .demo-hint{background:#f6f8ef;border:1px solid #d9eccb;color:#29503b;border-radius:18px;text-align:center;font-weight:700}
-  .premium-auth .auth-trust{background:#fbfaf6;border:1px solid #ece7df;border-radius:18px;color:#6b7280}
-  .premium-auth .auth-switch,.premium-auth .auth-switch a{font-size:14px}
+  .auth-float.yt{left:8%;top:30%;color:#ff0000}.auth-float.fb{right:9%;bottom:18%;color:#1877f2}.auth-float.ig{left:24%;bottom:11%;color:#e1306c}.auth-float.th{right:18%;top:18%;color:#111}.auth-float.sc{left:14%;top:15%;color:#8b5cf6}.auth-float.moj{right:12%;top:48%;color:#ff4d00}.auth-float.in{left:18%;top:54%;color:#2563eb}.auth-float.pin{right:14%;top:30%;color:#e11d48}
+  .auth-modal-backdrop{position:fixed;inset:0;background:rgba(13,20,34,.18);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:22px;z-index:550}
+  .auth-modal-backdrop.open{display:flex}
+  .auth-form-card{width:min(430px,calc(100vw - 28px));margin:0;background:#fff;border:1px solid #ece7df;border-radius:28px;box-shadow:0 24px 80px rgba(15,23,42,.16);padding:28px 26px;display:flex;flex-direction:column;position:relative}
+  .auth-close{position:absolute;right:16px;top:16px;width:36px;height:36px;border:none;border-radius:50%;background:#f5f1eb;color:#51606b;font-size:18px}
+  .auth-form-panel .big{margin:0 0 14px;width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#5b6cff,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px}
+  .auth-form-panel h2{font-size:32px;line-height:1.1;margin-bottom:6px;color:#16232b}
+  .auth-form-panel .sub{font-size:15px;color:#63707c;margin-bottom:18px}
+  .auth-card input{border-radius:18px;padding:15px 16px;border-color:#dcd6cd}
+  .auth-card .btn{border-radius:18px;padding:14px 18px;background:#163238;color:#fff;font-size:15px}
+  .auth-card .btn:hover{background:#10292e}
+  .pw-toggle{background:#f3f0ea;color:#30404b}
+  .demo-hint{background:#f6f8ef;border:1px solid #d9eccb;color:#29503b;border-radius:18px;text-align:center;font-weight:700}
+  .auth-trust{background:#fbfaf6;border:1px solid #ece7df;border-radius:18px;color:#6b7280}
+  .auth-switch,.auth-switch a{font-size:14px}
+  .auth-form-card.hidden{display:none}
   @media(max-width:1280px){
-    .premium-auth .auth-hero-copy h1{font-size:76px}
-    .premium-auth .auth-hero-copy p{font-size:22px}
-    .premium-auth .auth-shell{grid-template-columns:minmax(0,1fr) 390px}
+    .auth-hero-copy h1{font-size:80px}
+    .auth-hero-copy p{font-size:21px}
+    .auth-email-bar{max-width:720px}
+    .auth-email-bar input{height:74px;font-size:19px}
+    .auth-email-bar button{height:64px;font-size:19px}
   }
-  @media(max-width:1080px){
-    .premium-auth .auth-shell{grid-template-columns:1fr}
-    .premium-auth .auth-form-card{justify-self:center;margin:0 18px 28px;width:min(560px,calc(100vw - 36px))}
-    .premium-auth .auth-hero-panel{padding:18px 18px 10px}
+  @media(max-width:980px){
+    .auth-home-shell{padding:16px 16px 34px}
     .auth-site-links{display:none}
-    .premium-auth .auth-hero-copy h1{font-size:58px}
-    .premium-auth .auth-hero-copy p{font-size:19px}
+    .auth-home-hero{padding:28px 4px 36px}
+    .auth-hero-copy h1{font-size:60px;max-width:620px}
+    .auth-hero-copy p{font-size:18px;max-width:620px}
+    .auth-email-bar{max-width:100%;flex-direction:column;border-radius:28px;padding:10px}
+    .auth-email-bar input{width:100%;height:62px;padding:0 16px;border:1px solid #e7e1d7;border-radius:20px;font-size:17px}
+    .auth-email-bar button{width:100%;height:56px;margin:8px 0 0;font-size:18px}
     .auth-float{width:54px;height:54px;font-size:23px}
   }
   @media(max-width:720px){
-    .premium-auth .auth-site-nav{gap:12px;align-items:flex-start;flex-direction:column}
+    .auth-site-nav{gap:14px;flex-wrap:wrap}
     .auth-site-actions{width:100%;justify-content:flex-start;flex-wrap:wrap}
     .auth-nav-btn{height:44px;padding:0 20px}
-    .premium-auth .auth-hero-stage{padding:20px 8px 26px}
-    .premium-auth .auth-hero-copy h1{font-size:42px}
-    .premium-auth .auth-hero-copy p{font-size:16px}
-    .auth-email-cta{height:52px;font-size:16px;padding:0 22px}
+    .auth-hero-copy h1{font-size:42px}
+    .auth-hero-copy p{font-size:16px}
+    .auth-home-hero{padding:18px 0 28px}
+    .auth-secondary-actions{gap:10px}
     .auth-float{display:none}
+    .auth-form-card{padding:24px 18px;border-radius:24px}
+    .auth-form-panel h2{font-size:28px}
   }
-
 </style>
 </head>
 <body>
@@ -641,66 +654,79 @@
 <div class="auth-overlay premium-auth" id="authOverlay">
   <div class="auth-card auth-card-split auth-premium-shell">
     <div class="auth-shell">
-      <div class="auth-hero-panel">
+      <div class="auth-home-shell">
         <div class="auth-site-nav">
           <div class="auth-site-brand"><span class="mk">⚡</span><span>SocialAuto</span></div>
           <div class="auth-site-links">
             <span>Features</span>
             <span>Integrations</span>
+            <span>Made for</span>
             <span>Resources</span>
             <span>Pricing</span>
           </div>
           <div class="auth-site-actions">
-            <button class="auth-nav-btn" onclick="if(authMode!=='login')toggleAuth();focusAuthPanel()">Log in</button>
-            <button class="auth-nav-btn primary" onclick="if(authMode==='login')toggleAuth();focusAuthPanel()">Get started for free</button>
+            <button class="auth-nav-btn" onclick="openAuthPanel('login')">Log in</button>
+            <button class="auth-nav-btn primary" onclick="openAuthPanel('signup')">Get started for free</button>
           </div>
         </div>
-        <div class="auth-hero-stage">
+
+        <div class="auth-home-hero">
+          <span class="auth-float sc">💬</span>
           <span class="auth-float yt">▶</span>
-          <span class="auth-float fb">f</span>
+          <span class="auth-float in">in</span>
           <span class="auth-float ig">◎</span>
           <span class="auth-float th">@</span>
-          <span class="auth-float sc">💬</span>
           <span class="auth-float moj">🎬</span>
+          <span class="auth-float pin">P</span>
+          <span class="auth-float fb">f</span>
           <div class="auth-hero-copy">
             <div class="auth-chip">Premium social media workspace</div>
             <h1>Your social media workspace</h1>
-            <p>Connected to every platform and tool you use. Plan, publish, reply, and analyze from one clean SocialAuto workspace.</p>
-            <div class="auth-hero-cta-row">
-              <button class="auth-email-cta" onclick="if(authMode==='login')toggleAuth();focusAuthPanel()">Get started for free →</button>
+            <p>Connected to every platform and tool you use.</p>
+            <div class="auth-email-bar">
+              <input type="email" id="authLeadEmail" placeholder="Enter your email..." onkeydown="if(event.key==='Enter')startSignupFromLead()">
+              <button onclick="startSignupFromLead()">Get started for free →</button>
+            </div>
+            <div class="auth-inline-note">By entering your email, you agree to receive emails from SocialAuto.</div>
+            <div class="auth-secondary-actions">
               <button class="auth-text-link" onclick="demoLogin()">Try demo workspace</button>
+              <button class="auth-text-link" onclick="openAuthPanel('login')">Already have an account? Log in</button>
             </div>
             <div class="auth-proof">Instagram · Facebook · YouTube · Threads · Moj · ShareChat</div>
           </div>
         </div>
       </div>
-      <div class="auth-form-panel auth-form-card">
-        <div class="big">⚡</div>
-        <div class="auth-tag" id="authModeTag">Log in</div>
-        <h2 id="authTitle">Welcome back</h2>
-        <div class="sub" id="authSub">Log in to your SocialAuto workspace</div>
-        <label class="auth-label">Email</label>
-        <input type="email" id="authEmail" placeholder="Enter your email" autocomplete="username" onkeydown="if(event.key==='Enter')submitAuth()">
-        <label class="auth-label">Password</label>
-        <div class="pw-wrap">
-          <input type="password" id="authPassword" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()">
-          <button type="button" class="pw-toggle" onclick="togglePassword('authPassword', this)">Show</button>
-        </div>
-        <div id="authNameWrap" style="display:none">
-          <label class="auth-label" style="margin-top:12px">Your name</label>
-          <input type="text" id="authName" placeholder="e.g. SocialAuto Admin" onkeydown="if(event.key==='Enter')submitAuth()">
-        </div>
-        <button class="btn" id="authSubmit" onclick="submitAuth()">Log in</button>
-        <div class="auth-mini-links">
-          <div class="auth-switch" id="authForgotWrap">
-            <a onclick="openForgotPassword()">Forgot password?</a>
+
+      <div class="auth-modal-backdrop" id="authPanelBackdrop" onclick="closeAuthPanel(event)">
+        <div class="auth-form-panel auth-form-card" id="authPanel" onclick="event.stopPropagation()">
+          <button type="button" class="auth-close" onclick="closeAuthPanel()">✕</button>
+          <div class="big">⚡</div>
+          <div class="auth-tag" id="authModeTag">Log in</div>
+          <h2 id="authTitle">Welcome back</h2>
+          <div class="sub" id="authSub">Log in to your SocialAuto workspace</div>
+          <label class="auth-label">Email</label>
+          <input type="email" id="authEmail" placeholder="Enter your email" autocomplete="username" onkeydown="if(event.key==='Enter')submitAuth()">
+          <label class="auth-label">Password</label>
+          <div class="pw-wrap">
+            <input type="password" id="authPassword" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()">
+            <button type="button" class="pw-toggle" onclick="togglePassword('authPassword', this)">Show</button>
           </div>
-          <div class="auth-switch" id="authSwitch">
-            No account? <a onclick="toggleAuth()">Sign up free</a>
+          <div id="authNameWrap" style="display:none">
+            <label class="auth-label" style="margin-top:12px">Your name</label>
+            <input type="text" id="authName" placeholder="e.g. SocialAuto Admin" onkeydown="if(event.key==='Enter')submitAuth()">
           </div>
+          <button class="btn" id="authSubmit" onclick="submitAuth()">Log in</button>
+          <div class="auth-mini-links">
+            <div class="auth-switch" id="authForgotWrap">
+              <a onclick="openForgotPassword()">Forgot password?</a>
+            </div>
+            <div class="auth-switch" id="authSwitch">
+              No account? <a onclick="toggleAuth()">Sign up free</a>
+            </div>
+          </div>
+          <div class="auth-trust">No credit card needed. Start instantly with the demo workspace or create your own account in seconds.</div>
+          <div class="demo-hint" onclick="demoLogin()">🎯 Demo login — <b>demo@socialauto.app</b></div>
         </div>
-        <div class="auth-trust">No credit card needed. Start instantly with the demo workspace or create your own account in seconds.</div>
-        <div class="demo-hint" onclick="demoLogin()">🎯 Demo login — <b>demo@socialauto.app</b></div>
       </div>
     </div>
   </div>
@@ -1600,13 +1626,7 @@ const api = (p, opt) => {
 
 /* ---------- auth ---------- */
 let authMode = 'login';
-function focusAuthPanel(){
-  const email = document.getElementById('authEmail');
-  if(email){ setTimeout(()=>email.focus(), 60); }
-}
-
-function toggleAuth(){
-  authMode = authMode==='login' ? 'signup' : 'login';
+function updateAuthUI(){
   document.getElementById('authTitle').textContent = authMode==='login' ? 'Welcome back' : 'Create your account';
   document.getElementById('authSub').textContent = authMode==='login'
     ? 'Log in to your SocialAuto workspace' : 'Start your own SocialAuto workspace in seconds';
@@ -1618,6 +1638,32 @@ function toggleAuth(){
   document.getElementById('authNameWrap').style.display = authMode==='signup' ? 'block' : 'none';
   document.getElementById('authForgotWrap').style.display = authMode==='signup' ? 'none' : 'block';
   document.getElementById('authPassword').setAttribute('autocomplete', authMode==='login' ? 'current-password' : 'new-password');
+}
+function setAuthMode(mode){ authMode = mode==='signup' ? 'signup' : 'login'; updateAuthUI(); }
+function focusAuthPanel(){
+  const email = document.getElementById('authEmail');
+  if(email){ setTimeout(()=>email.focus(), 60); }
+}
+function openAuthPanel(mode='login', email=''){
+  setAuthMode(mode);
+  const backdrop = document.getElementById('authPanelBackdrop');
+  if(backdrop) backdrop.classList.add('open');
+  if(email) document.getElementById('authEmail').value = email.trim();
+  focusAuthPanel();
+}
+function closeAuthPanel(e){
+  if(e && e.target && e.target.id!=='authPanelBackdrop') return;
+  const backdrop = document.getElementById('authPanelBackdrop');
+  if(backdrop) backdrop.classList.remove('open');
+}
+function startSignupFromLead(){
+  const lead = document.getElementById('authLeadEmail');
+  const email = (lead?.value || '').trim();
+  openAuthPanel('signup', email);
+}
+function toggleAuth(){
+  setAuthMode(authMode==='login' ? 'signup' : 'login');
+  openAuthPanel(authMode);
 }
 async function submitAuth(){
   const email = document.getElementById('authEmail').value.trim().toLowerCase();
@@ -1635,10 +1681,8 @@ async function submitAuth(){
   }catch(e){ toast(e.message, false); }
 }
 function demoLogin(){
-  if(authMode !== 'login') toggleAuth();
-  document.getElementById('authEmail').value = 'demo@socialauto.app';
+  openAuthPanel('login', 'demo@socialauto.app');
   document.getElementById('authPassword').value = 'demo1234';
-  authMode = 'login';
   submitAuth();
 }
 function logout(){
@@ -1648,6 +1692,7 @@ function logout(){
 
 /* ---------- forgot / reset password ---------- */
 function openForgotPassword(){
+  closeAuthPanel();
   document.getElementById('authOverlay').style.display = 'none';
   document.getElementById('forgotOverlay').style.display = 'flex';
   document.getElementById('forgotResult').style.display = 'none';
@@ -1657,6 +1702,7 @@ function openForgotPassword(){
 function closeForgotPassword(){
   document.getElementById('forgotOverlay').style.display = 'none';
   document.getElementById('authOverlay').style.display = 'flex';
+  openAuthPanel('login', document.getElementById('forgotEmail').value || '');
 }
 async function submitForgotPassword(){
   const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
@@ -1680,6 +1726,7 @@ async function submitForgotPassword(){
   }catch(e){ toast(e.message, false); }
 }
 function openResetPassword(prefillToken){
+  closeAuthPanel();
   document.getElementById('forgotOverlay').style.display = 'none';
   document.getElementById('authOverlay').style.display = 'none';
   document.getElementById('resetOverlay').style.display = 'flex';
@@ -1690,6 +1737,7 @@ function openResetPassword(prefillToken){
 function closeResetPassword(){
   document.getElementById('resetOverlay').style.display = 'none';
   document.getElementById('authOverlay').style.display = 'flex';
+  openAuthPanel('login', document.getElementById('authEmail').value || '');
 }
 async function submitResetPassword(){
   const token = document.getElementById('resetToken').value.trim();
