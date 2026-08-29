@@ -135,8 +135,10 @@ async def _gemini(caption: str, media_url: str, platforms: list[str], public_bas
         return None
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}")
-    parts: list[dict] = [{"text": PROMPT.format(platforms=", ".join(platforms) or "instagram",
-                                                caption=caption or "(no caption yet — describe the image)")}]
+    prompt = (PROMPT
+              .replace("{platforms}", ", ".join(platforms) or "instagram")
+              .replace("{caption}", caption or "(no caption yet — describe the image)"))
+    parts: list[dict] = [{"text": prompt}]
     # attach image if publicly fetchable
     img_url = media_url if media_url.startswith("http") else ""
     if not img_url and media_url.startswith("/media/") and public_base:
@@ -152,7 +154,7 @@ async def _gemini(caption: str, media_url: str, platforms: list[str], public_bas
         except Exception:
             pass
     try:
-        async with httpx.AsyncClient(timeout=45) as c:
+        async with httpx.AsyncClient(timeout=90) as c:
             r = await c.post(url, json={"contents": [{"parts": parts}]})
             r.raise_for_status()
             text = r.json()["candidates"][0]["content"]["parts"][0]["text"]

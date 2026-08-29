@@ -42,7 +42,7 @@ class Settings:
 
     # AI assistant (Google Gemini free tier — optional; app works without it)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
     # Meta webhook verification token (real-time comment events)
     META_VERIFY_TOKEN: str = os.getenv("META_VERIFY_TOKEN", "socialauto-verify-token")
