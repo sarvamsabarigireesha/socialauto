@@ -52,7 +52,7 @@ async def on_startup():
 
 def _run_migrations(db):
     """Lightweight additive migration for existing DBs (SQLite + Postgres):
-    adds new NOT NULL owner columns and back-fills a demo owner for old rows."""
+    adds new NOT NULL owner columns, new enum values, and back-fills demo owner."""
     from sqlalchemy import text, inspect
     insp = inspect(engine)
     cols = {t: {c["name"] for c in insp.get_columns(t)} for t in insp.get_table_names()}
@@ -62,6 +62,13 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE accounts ADD COLUMN user_id INTEGER"))
         if "posts" in cols and "user_id" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN user_id INTEGER"))
+
+    # Postgres: add new ENUM values (e.g. youtube) that create_all won't add on existing DBs.
+    if engine.dialect.name == "postgresql":
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            for e in insp.get_enums():
+                if "instagram" in (e.get("labels") or []) and "youtube" not in e["labels"]:
+                    conn.execute(text(f"ALTER TYPE {e['name']} ADD VALUE 'youtube'"))
 
     demo = db.query(User).filter(User.email == "demo@socialauto.app").first()
     if not demo:
