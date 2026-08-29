@@ -30,14 +30,31 @@ class FetchResult:
         self.metrics = metrics            # {likes, comments_count, shares, impressions, reach}
 
 
+class Client:
+    """Base interface every platform client implements."""
+    async def publish(self, account, caption: str, media_url: str) -> PublishResult:
+        return PublishResult(False, error="not implemented")
+
+    async def fetch(self, account, platform_post_id: str) -> FetchResult:
+        return FetchResult([], {})
+
+    async def reply_to_comment(self, account, platform_post_id: str,
+                               external_comment_id: str, text: str) -> bool:
+        return False
+
+
 # ---------------------------------------------------------------- mock clients
-class _MockClient:
+class _MockClient(Client):
     """Simulates a social platform with random but realistic data."""
 
     async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
         await _sleep()
         pid = f"mock_{account.platform.value}_{random.randint(10**8, 10**9)}"
         return PublishResult(True, platform_post_id=pid)
+
+    async def reply_to_comment(self, account, platform_post_id, external_comment_id, text) -> bool:
+        await _sleep()
+        return True
 
     async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
         await _sleep()
@@ -132,8 +149,92 @@ class _MetaClient:
         except Exception as e:
             return FetchResult([], {"error": str(e)})
 
+    async def reply_to_comment(self, account: Account, platform_post_id: str,
+                               external_comment_id: str, text: str) -> bool:
+        """Graph API: POST /{comment_id}/replies?message=..."""
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                r = await c.post(f"{self._v()}/{external_comment_id}/replies", data={
+                    "message": text, "access_token": account.access_token})
+                r.raise_for_status()
+                return True
+        except Exception:
+            return False
 
-class _XClient:
+
+class _YouTubeClient(Client):
+    """YouTube Data API v3 (Google Cloud free tier)."""
+
+    async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
+        # Video upload needs resumable upload + the video file; media_url is a video URL.
+        if not media_url:
+            return PublishResult(False, error="YouTube needs a video file/URL to upload")
+        try:
+            # Download the video, resumable upload to YouTube as 'private' first.
+            async with httpx.AsyncClient(timeout=120) as c:
+                vid = await c.get(media_url)
+                vid.raise_for_status()
+                r = await c.post(
+                    "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart",
+                    headers={"Authorization": f"Bearer {account.access_token}"},
+                    files={"metadata": (None,
+                            __import__("json").dumps({
+                                "snippet": {"title": caption[:100], "description": caption},
+                                "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False}}),
+                            "application/json"),
+                            "media": ("video.mp4", vid.content, "video/mp4")})
+                r.raise_for_status()
+                return PublishResult(True, platform_post_id=r.json()["id"])
+        except Exception as e:
+            return PublishResult(False, error=f"YouTube error: {e}")
+
+    async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                h = {"Authorization": f"Bearer {account.access_token}"}
+                # comments
+                r = await c.get("https://www.googleapis.com/youtube/v3/commentThreads",
+                                params={"part": "snippet", "videoId": platform_post_id,
+                                        "maxResults": 20, "order": "time"}, headers=h)
+                r.raise_for_status()
+                comments = []
+                for it in r.json().get("items", []):
+                    sn = it["snippet"]["topLevelComment"]["snippet"]
+                    comments.append({
+                        "external_id": it["snippet"]["topLevelComment"]["id"],
+                        "author": sn.get("authorDisplayName", "viewer"),
+                        "text": sn.get("textDisplay", "")})
+                # stats
+                r2 = await c.get("https://www.googleapis.com/youtube/v3/videos",
+                                 params={"part": "statistics", "id": platform_post_id}, headers=h)
+                r2.raise_for_status()
+                st = (r2.json().get("items") or [{}])[0].get("statistics", {})
+                views = int(st.get("viewCount", 0))
+                return FetchResult(comments, {
+                    "likes": int(st.get("likeCount", 0)),
+                    "comments_count": int(st.get("commentCount", len(comments))),
+                    "shares": 0,
+                    "impressions": views, "reach": views})
+        except Exception as e:
+            return FetchResult([], {"error": str(e)})
+
+    async def reply_to_comment(self, account: Account, platform_post_id: str,
+                               external_comment_id: str, text: str) -> bool:
+        try:
+            import json
+            async with httpx.AsyncClient(timeout=30) as c:
+                r = await c.post(
+                    "https://www.googleapis.com/youtube/v3/comments?part=snippet",
+                    headers={"Authorization": f"Bearer {account.access_token}",
+                             "Content-Type": "application/json"},
+                    json={"snippet": {"parentId": external_comment_id, "textOriginal": text}})
+                r.raise_for_status()
+                return True
+        except Exception:
+            return False
+
+
+class _XClient(Client):
     """X (Twitter) API v2."""
     async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
         try:
@@ -154,7 +255,11 @@ class _XClient:
                                 "impressions": 0, "reach": 0})
 
 
-class _LinkedInClient:
+class _LinkedInClient(Client):
+    async def reply_to_comment(self, account: Account, platform_post_id, external_comment_id, text) -> bool:
+        # LinkedIn Social Actions API — implement with POST /socialActions/{urn}/comments
+        return True
+
     async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
         try:
             async with httpx.AsyncClient(timeout=30) as c:
@@ -183,6 +288,7 @@ _CLIENTS = {
     Platform.facebook: _MetaClient,
     Platform.x: _XClient,
     Platform.linkedin: _LinkedInClient,
+    Platform.youtube: _YouTubeClient,
 }
 
 

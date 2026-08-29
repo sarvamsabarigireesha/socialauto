@@ -72,6 +72,7 @@
     font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .chip.ig{background:var(--ig)} .chip.fb{background:var(--fb)}
   .chip.x{background:var(--x)} .chip.li{background:var(--li)}
+  .chip.yt{background:#ff0000}
   .chip.published{opacity:.72}
   .chip.scheduled{box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
   .chip.failed{background:var(--red)}
@@ -130,6 +131,7 @@
     color:#fff;font-size:13px;font-weight:800}
   .av.ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366)}
   .av.fb{background:var(--fb)} .av.x{background:var(--x)} .av.li{background:var(--li)}
+  .av.yt{background:#ff0000}
   .cap-wrap{position:relative}
   textarea.cap{width:100%;min-height:130px;border:1px solid var(--border2);border-radius:12px;padding:13px 14px;
     resize:vertical;font-size:14.5px;line-height:1.5;outline:none}
@@ -161,6 +163,7 @@
   .pv .pv-plat{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
   .pv-plat.ig{background:#fdeef4;color:var(--ig)} .pv-plat.fb{background:#e9f2fe;color:var(--fb)}
   .pv-plat.x{background:#eef0f2;color:var(--x)} .pv-plat.li{background:#e9f2fb;color:var(--li)}
+  .pv-plat.yt{background:#ffe9e9;color:#ff0000}
 
   /* media library grid */
   .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
@@ -222,6 +225,7 @@
   .connect-btn small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
   .cico.ig{background:linear-gradient(45deg,#f09433,#dc2743,#cc2366)}
   .cico.fb{background:#1877f2} .cico.x{background:#0f1419} .cico.li{background:#0a66c2}
+  .cico.yt{background:#ff0000}
   .connected-ok{background:#e3f6ee;color:var(--green);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700}
   .muted{color:var(--muted)}
   .section-title{font-size:16px;font-weight:800;margin:0 0 14px}
@@ -297,6 +301,7 @@
       <span><i class="dot" style="background:var(--fb)"></i> Facebook</span>
       <span><i class="dot" style="background:var(--x)"></i> X (Twitter)</span>
       <span><i class="dot" style="background:var(--li)"></i> LinkedIn</span>
+      <span><i class="dot" style="background:#ff0000"></i> YouTube</span>
       <span class="muted">· Click a day to create · Click a post to edit</span>
     </div>
   </section>
@@ -396,6 +401,7 @@
           <button class="connect-btn" onclick="connectOAuth('facebook')"><span class="cico fb">👍</span><span>Facebook Page<small>Meta OAuth · page posts</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('x')"><span class="cico x">🐦</span><span>X (Twitter)<small>OAuth 2.0 · tweets</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('linkedin')"><span class="cico li">💼</span><span>LinkedIn<small>OAuth · profile posts</small></span></button>
+          <button class="connect-btn" onclick="connectOAuth('youtube')"><span class="cico yt">▶️</span><span>YouTube<small>Google OAuth · videos & comments</small></span></button>
         </div>
         <details style="margin:6px 0 4px">
           <summary class="muted" style="cursor:pointer;font-size:12.5px;font-weight:600">Advanced: add account manually with token (instead of OAuth)</summary>
@@ -406,6 +412,7 @@
               <option value="facebook">👍 Facebook Page</option>
               <option value="x">🐦 X (Twitter)</option>
               <option value="linkedin">💼 LinkedIn</option>
+              <option value="youtube">▶️ YouTube</option>
             </select></div>
           <div><label class="f">Display name</label><input id="aName" placeholder="@yourbrand" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
           <div><label class="f">Account / Page ID</label><input id="aExt" placeholder="IG user id / page id" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
@@ -515,6 +522,7 @@ const PLAT_META = {
   facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook'},
   x:{ic:'🐦',cls:'x',limit:280,label:'X'},
   linkedin:{ic:'💼',cls:'li',limit:3000,label:'LinkedIn'},
+  youtube:{ic:'▶️',cls:'yt',limit:5000,label:'YouTube'},
 };
 let TOKEN = localStorage.getItem('sa_token') || null;
 let ME = null;

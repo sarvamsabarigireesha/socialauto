@@ -36,6 +36,13 @@ class Settings:
     X_CLIENT_ID: str = os.getenv("X_CLIENT_ID", "")
     X_CLIENT_SECRET: str = os.getenv("X_CLIENT_SECRET", "")
 
+    # Google / YouTube (Google Cloud free tier — YouTube Data API v3)
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
+    # Meta webhook verification token (real-time comment events)
+    META_VERIFY_TOKEN: str = os.getenv("META_VERIFY_TOKEN", "socialauto-verify-token")
+
     # Public URL of this app (OAuth redirect base) — set in production
     APP_PUBLIC_URL: str = os.getenv("APP_PUBLIC_URL", "")
 

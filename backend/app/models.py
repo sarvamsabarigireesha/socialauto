@@ -32,6 +32,7 @@ class Platform(str, enum.Enum):
     facebook = "facebook"
     x = "x"
     linkedin = "linkedin"
+    youtube = "youtube"
 
 
 class PostStatus(str, enum.Enum):

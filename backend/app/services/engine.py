@@ -87,11 +87,12 @@ async def sync_comments(db: Session, user_id: int | None = None) -> dict:
             db.commit()
             ingested += 1
 
-            # auto-reply?
+            # auto-reply via the real platform comment-reply API (mock in demo mode)
             if settings.AUTO_COMMENT_ENABLED and post.account.auto_comment:
                 reply = autocomment.generate_reply(c["text"], post.account)
-                ok = autocomment.post_reply(post.account, post.platform_post_id,
-                                            c["external_id"], reply)
+                client = platforms.get_client(post.account.platform)
+                ok = await client.reply_to_comment(post.account, post.platform_post_id,
+                                                   c["external_id"], reply)
                 if ok:
                     comment.our_reply = reply
                     comment.replied = True

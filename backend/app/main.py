@@ -16,7 +16,7 @@ from .config import settings
 from .database import Base, engine, SessionLocal
 from .models import Account, Post, PostStatus, Platform, User
 from .security import hash_password
-from .routers import auth as auth_router, oauth as oauth_router
+from .routers import auth as auth_router, oauth as oauth_router, webhooks as webhooks_router
 from .routers import accounts, posts, comments, analytics, cron, media
 from .routers.media import MEDIA_DIR
 
@@ -29,6 +29,7 @@ app.add_middleware(
 
 app.include_router(auth_router.router)
 app.include_router(oauth_router.router)
+app.include_router(webhooks_router.router)
 app.include_router(accounts.router)
 app.include_router(posts.router)
 app.include_router(comments.router)
@@ -99,6 +100,7 @@ async def _seed_demo_data(demo_user: User):
              "Thanks for commenting! Check our bio for the full menu 🙌"),
             (Platform.x, "@hyd_foodie", "x_demo_3003", True, ""),
             (Platform.linkedin, "Foodie Media", "li_demo_4004", False, ""),
+            (Platform.youtube, "Foodie Tube", "yt_demo_5005", True, ""),
         ]
         accs = []
         for plat, name, ext, ac, tmpl in demo:

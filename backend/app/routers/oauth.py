@@ -95,6 +95,21 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
         return {"mode": "real",
                 "authorize_url": f"https://twitter.com/i/oauth2/authorize?{qs}"}
 
+    if plat == Platform.youtube:
+        if not settings.GOOGLE_CLIENT_ID:
+            raise HTTPException(400, "GOOGLE_CLIENT_ID not set — Google/YouTube OAuth not configured")
+        qs = urlencode({
+            "response_type": "code",
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "scope": "https://www.googleapis.com/auth/youtube.force-ssl openid profile",
+            "state": state,
+            "access_type": "offline",
+            "prompt": "consent",
+        })
+        return {"mode": "real",
+                "authorize_url": f"https://accounts.google.com/o/oauth2/v2/auth?{qs}"}
+
 
 _X_PKCE: dict[str, str] = {}
 
@@ -118,7 +133,8 @@ async def callback(request: Request, code: str | None = None, state: str | None 
     if mock == "1":
         plat = _require_platform(platform)
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
-                 "x": "@your_x_handle", "linkedin": "Your LinkedIn"}
+                 "x": "@your_x_handle", "linkedin": "Your LinkedIn",
+                 "youtube": "Your YouTube Channel"}
         acc = _upsert_account(db, user, plat, external_id=f"mock_{plat.value}_{user.id}",
                               token="MOCK_OAUTH_TOKEN", display_name=names[plat.value])
         return _finish(acc, ajax)
@@ -186,6 +202,28 @@ async def callback(request: Request, code: str | None = None, state: str | None 
             d = me.json()["data"]
         acc = _upsert_account(db, user, Platform.x, external_id=d["id"], token=token,
                               display_name="@" + d["username"])
+        return _finish(acc, ajax)
+
+    if plat == Platform.youtube:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post("https://oauth2.googleapis.com/token", data={
+                "grant_type": "authorization_code", "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": redirect_uri})
+            r.raise_for_status()
+            token = r.json()["access_token"]
+            me = await c.get(
+                "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+                headers={"Authorization": f"Bearer {token}"})
+            me.raise_for_status()
+            items = me.json().get("items", [])
+            if not items:
+                raise HTTPException(400, "No YouTube channel found on this Google account")
+            ch = items[0]
+        acc = _upsert_account(db, user, Platform.youtube,
+                              external_id=ch["id"], token=token,
+                              display_name=ch["snippet"]["title"] + " (YouTube)")
         return _finish(acc, ajax)
 
 
