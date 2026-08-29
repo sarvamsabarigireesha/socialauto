@@ -20,7 +20,7 @@ gcloud run deploy socialauto \
   --region asia-south1 \
   --allow-unauthenticated \
   --port 8000 \
-  --set-env-vars MOCK_MODE=false,CRON_SECRET=put-a-long-random-secret-here
+  --set-env-vars MOCK_MODE=false,CRON_SECRET=put-a-long-random-secret-here,DATABASE_URL='postgresql://neondb_owner:PASSWORD@ep-xxxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
 
 # 3. Done — you get a free HTTPS URL instantly:
 #    https://socialauto-xxxxx-el.a.run.app
@@ -29,9 +29,11 @@ gcloud run deploy socialauto \
 > Add real platform tokens later with `--set-env-vars` or in Console → Service → Edit & deploy → Variables:
 > `META_APP_ID`, `META_APP_SECRET`, `X_BEARER_TOKEN`, `LINKEDIN_ACCESS_TOKEN` (see `.env.example`).
 >
-> Free DB: create a Turso (https://turso.tech) or Neon (https://neon.tech) database and set
-> `DATABASE_URL=sqlite+... / postgresql+...` env var. Until then SQLite works (note: Cloud Run
-> filesystem is ephemeral — data resets on redeploy; use Turso/Neon for persistence).
+> **Database — Neon Postgres (free, recommended):**
+> 1. Sign up at https://neon.tech → create project (region: Mumbai/Singapore) → Connect → copy the
+>    `postgresql://neondb_owner:...@ep-....aws.neon.tech/neondb?sslmode=require` string.
+> 2. Set it as the `DATABASE_URL` env var — no code changes; tables auto-create on first boot.
+>    (Cloud Run filesystem is ephemeral, so Postgres keeps data across redeploys. SQLite is local-demo only.)
 
 ### Option 2 — Render (simplest dashboard deploy)
 1. https://render.com → New → **Web Service** → connect your GitHub repo
