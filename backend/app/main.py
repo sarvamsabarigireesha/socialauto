@@ -68,12 +68,15 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE posts ADD COLUMN user_id INTEGER"))
         if "posts" in cols and "group_id" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN group_id VARCHAR(40) DEFAULT ''"))
+        pg = engine.dialect.name == "postgresql"
         if "comments" in cols and "resolved" not in cols["comments"]:
-            conn.execute(text("ALTER TABLE comments ADD COLUMN resolved BOOLEAN DEFAULT 0"))
+            conn.execute(text("ALTER TABLE comments ADD COLUMN resolved BOOLEAN NOT NULL DEFAULT false"))
+            if pg:
+                conn.execute(text("UPDATE comments SET resolved=false"))
         if "comments" in cols and "reply_type" not in cols["comments"]:
-            conn.execute(text("ALTER TABLE comments ADD COLUMN reply_type VARCHAR(10) DEFAULT 'auto'"))
+            conn.execute(text("ALTER TABLE comments ADD COLUMN reply_type VARCHAR(10) NOT NULL DEFAULT 'auto'"))
         if "comments" in cols and "author_avatar" not in cols["comments"]:
-            conn.execute(text("ALTER TABLE comments ADD COLUMN author_avatar VARCHAR(20) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE comments ADD COLUMN author_avatar VARCHAR(20) NOT NULL DEFAULT ''"))
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
