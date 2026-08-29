@@ -30,8 +30,6 @@ class User(Base):
 class Platform(str, enum.Enum):
     instagram = "instagram"
     facebook = "facebook"
-    x = "x"
-    linkedin = "linkedin"
     youtube = "youtube"
     threads = "threads"
     moj = "moj"

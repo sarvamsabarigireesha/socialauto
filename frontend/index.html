@@ -9,7 +9,7 @@
     --bg:#f3f5f9; --panel:#ffffff; --border:#e3e7ee; --border2:#d5dae3;
     --txt:#1c2430; --muted:#7b8494; --brand:#5b6cff; --brand-d:#4856e0;
     --green:#22a06b; --red:#e5484d; --amber:#f5a524; --purple:#8b5cf6;
-    --ig:#e1306c; --fb:#1877f2; --x:#0f1419; --li:#0a66c2;
+    --ig:#e1306c; --fb:#1877f2;
     --shadow:0 1px 3px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
     --radius:14px;
   }
@@ -71,7 +71,6 @@
   .chip{display:block;text-align:left;width:100%;border:none;border-radius:7px;padding:3px 7px;margin-top:4px;
     font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .chip.ig{background:var(--ig)} .chip.fb{background:var(--fb)}
-  .chip.x{background:var(--x)} .chip.li{background:var(--li)}
   .chip.yt{background:#ff0000}
   .chip.published{opacity:.72}
   .chip.scheduled{box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
@@ -130,7 +129,7 @@
   .acc-pill .av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     color:#fff;font-size:13px;font-weight:800}
   .av.ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366)}
-  .av.fb{background:var(--fb)} .av.x{background:var(--x)} .av.li{background:var(--li)}
+  .av.fb{background:var(--fb)}
   .av.yt{background:#ff0000}
   .cap-wrap{position:relative}
   textarea.cap{width:100%;min-height:130px;border:1px solid var(--border2);border-radius:12px;padding:13px 14px;
@@ -162,7 +161,6 @@
   .pv .pv-acts{padding:9px 14px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);display:flex;gap:16px}
   .pv .pv-plat{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
   .pv-plat.ig{background:#fdeef4;color:var(--ig)} .pv-plat.fb{background:#e9f2fe;color:var(--fb)}
-  .pv-plat.x{background:#eef0f2;color:var(--x)} .pv-plat.li{background:#e9f2fb;color:var(--li)}
   .pv-plat.yt{background:#ffe9e9;color:#ff0000}
 
   /* media library grid */
@@ -224,7 +222,7 @@
     justify-content:center;color:#fff;font-size:19px;flex-shrink:0}
   .connect-btn small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
   .cico.ig{background:linear-gradient(45deg,#f09433,#dc2743,#cc2366)}
-  .cico.fb{background:#1877f2} .cico.x{background:#0f1419} .cico.li{background:#0a66c2}
+  .cico.fb{background:#1877f2}
   .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981}
   .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}
   .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}
@@ -419,8 +417,6 @@
     <div class="legend">
       <span><i class="dot" style="background:var(--ig)"></i> Instagram</span>
       <span><i class="dot" style="background:var(--fb)"></i> Facebook</span>
-      <span><i class="dot" style="background:var(--x)"></i> X (Twitter)</span>
-      <span><i class="dot" style="background:var(--li)"></i> LinkedIn</span>
       <span><i class="dot" style="background:#ff0000"></i> YouTube</span>
       <span class="muted">· Click a day to create · Click a post to edit</span>
     </div>
@@ -440,7 +436,7 @@
     <div class="card" style="padding:22px;max-width:760px">
       <h2 class="section-title">📦 Bulk schedule via CSV</h2>
       <p class="muted" style="margin-bottom:14px">Upload <code>caption,scheduled_at</code> — <b>media is OPTIONAL</b>:
-        text-only posts (X, Facebook, LinkedIn, YouTube Community) need just the caption.
+        text-only posts (Facebook, YouTube Community) need just the caption.
         Add <code>media_url</code> (image/video link) only for photo/video rows, and optional
         <code>post_type</code> (<code>feed</code>, <code>video</code>, <code>short</code>, <code>community</code>).
         Each row is posted to every selected account.</p>
@@ -466,8 +462,6 @@
           <option value="threads">🧵 Threads</option>
           <option value="moj">🎬 Moj</option>
           <option value="sharechat">💬 ShareChat</option>
-          <option value="x">🐦 X</option>
-          <option value="linkedin">💼 LinkedIn</option>
         </select>
         <button class="btn green sm" style="padding:9px 16px" onclick="syncCommunity()">🔄 Fetch latest comments</button>
         <button class="btn ghost sm" style="padding:9px 16px" onclick="importAllChannels()" title="Import existing videos/posts from ALL connected accounts">📥 Sync all my content</button>
@@ -530,12 +524,10 @@
     <div class="grid two-col">
       <div class="card" style="padding:20px">
         <h2 class="section-title">🔗 Connect a social account</h2>
-        <p class="muted" style="margin-bottom:12px;font-size:13px">Click a platform — real OAuth popup (Meta/X/LinkedIn) or instant demo connect in mock mode:</p>
+        <p class="muted" style="margin-bottom:12px;font-size:13px">Click a platform — real OAuth popup (Meta/Google) or instant demo connect in mock mode:</p>
         <div class="connect-grid">
           <button class="connect-btn" onclick="connectOAuth('instagram')"><span class="cico ig">📸</span><span>Instagram<small>Meta OAuth · photos & reels</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('facebook')"><span class="cico fb">👍</span><span>Facebook Page<small>Meta OAuth · page posts</small></span></button>
-          <button class="connect-btn" onclick="connectOAuth('x')"><span class="cico x">🐦</span><span>X (Twitter)<small>OAuth 2.0 · tweets</small></span></button>
-          <button class="connect-btn" onclick="connectOAuth('linkedin')"><span class="cico li">💼</span><span>LinkedIn<small>OAuth · profile posts</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('youtube')"><span class="cico yt">▶️</span><span>YouTube<small>Google OAuth · videos & comments</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('threads')"><span class="cico th">🧵</span><span>Threads<small>Meta API · text + images</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('moj')"><span class="cico moj">🎬</span><span>Moj<small>short video (manual-post helper)</small></span></button>
@@ -548,8 +540,6 @@
             <select id="aPlatform" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px">
               <option value="instagram">📸 Instagram</option>
               <option value="facebook">👍 Facebook Page</option>
-              <option value="x">🐦 X (Twitter)</option>
-              <option value="linkedin">💼 LinkedIn</option>
               <option value="youtube">▶️ YouTube</option>
               <option value="threads">🧵 Threads</option>
               <option value="moj">🎬 Moj</option>
@@ -580,7 +570,7 @@
       <div class="card" style="padding:18px"><h2 class="section-title">⏰ Scheduler</h2><p class="muted">GitHub Actions cron every 15 min (2,000 free min/mo) calls <code>/api/cron/tick</code>.</p></div>
       <div class="card" style="padding:18px"><h2 class="section-title">⚡ Edge worker</h2><p class="muted">Cloudflare Worker (100k req/day free) — <code>cloudflare/worker.js</code>.</p></div>
       <div class="card" style="padding:18px"><h2 class="section-title">🔄 No-code</h2><p class="muted">Self-hosted n8n workflow JSON included for visual automation.</p></div>
-      <div class="card" style="padding:18px"><h2 class="section-title">🔑 APIs</h2><p class="muted">Meta Developer, X, LinkedIn — free; Meta needs app review for advanced perms.</p></div>
+      <div class="card" style="padding:18px"><h2 class="section-title">🔑 APIs</h2><p class="muted">Meta Developer, Google Cloud (YouTube) — free; Meta needs app review for advanced perms.</p></div>
       <div class="card" style="padding:18px"><h2 class="section-title">🗄 Database</h2><p class="muted">SQLite for demo; Turso (9GB free) or Neon Postgres via <code>DATABASE_URL</code>.</p></div>
     </div>
     <div class="card" style="margin-top:16px;padding:18px">
@@ -784,8 +774,6 @@ let comp = { sel: new Set(), mediaUrl: "", editingId: null };
 const PLAT_META = {
   instagram:{ic:'📸',cls:'ig',limit:2200,label:'Instagram', ratio:'4/5', ratioNote:'4:5 portrait (best feed)'},
   facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook', ratio:'1.91/1', ratioNote:'1.91:1 link / 4:5 photo'},
-  x:{ic:'🐦',cls:'x',limit:280,label:'X', ratio:'16/9', ratioNote:'16:9 landscape'},
-  linkedin:{ic:'💼',cls:'li',limit:3000,label:'LinkedIn', ratio:'1.91/1', ratioNote:'1.91:1 landscape'},
   youtube:{ic:'▶️',cls:'yt',limit:5000,label:'YouTube', ratio:'16/9', ratioNote:'16:9 video / 9:16 Shorts'},
   threads:{ic:'🧵',cls:'th',limit:500,label:'Threads', ratio:'4/5', ratioNote:'4:5 portrait'},
   moj:{ic:'🎬',cls:'moj',limit:150,label:'Moj', ratio:'9/16', ratioNote:'9:16 vertical short'},
@@ -979,7 +967,7 @@ async function importChannel(acc){
 
 async function importAllChannels(){
   const real = ACCOUNTS.filter(a=>['youtube','instagram','facebook'].includes(a.platform));
-  if(!real.length) return toast('Connect YouTube / Instagram / Facebook first (Moj, ShareChat, Threads, X, LinkedIn have no data API)', false);
+  if(!real.length) return toast('Connect YouTube / Instagram / Facebook first (Moj, ShareChat, Threads have no data API)', false);
   toast(`📥 Syncing existing posts/videos + comments from ${real.length} account(s)…`);
   try{
     const r = await api('/api/community/import-all',{method:'POST'});
@@ -1192,7 +1180,7 @@ function openCrop(){
     const labelFor = r => Object.values(PLAT_META).find(m=>m.ratio===r)?.ratioNote || r;
     document.getElementById('ratioRow').innerHTML = [
       ['1/1','1:1 Square (IG feed/FB)'],['4/5','4:5 Portrait (IG feed best)'],
-      ['9/16','9:16 Reels/Shorts/Moj'],['16/9','16:9 YouTube/FB'],['1.91/1','1.91:1 FB/LinkedIn']
+      ['9/16','9:16 Reels/Shorts/Moj'],['16/9','16:9 YouTube/FB'],['1.91/1','1.91:1 FB link']
     ].map(([r,l])=>`<button class="ratio-btn ${r===cropState.ratio.join('/')?'sel':''}" onclick="setRatio('${r}','${l}')">${l}</button>`).join('');
     drawCrop();
     document.getElementById('cropOverlay').classList.add('open');
@@ -1362,7 +1350,7 @@ function onPostType(){
     return onPostType();
   }
   const hints = {
-    feed: '📸 Photo or text post: image optional (text works on X/FB/LinkedIn; IG needs a photo).',
+    feed: '📸 Photo or text post: image optional (text works on FB; IG needs a photo).',
     video: '🎬 Long-form video: attach the video file (URL or upload). Published to YouTube videos / IG & FB as reels.',
     short: '⚡ Short/Reel: attach a vertical 9:16 video (≤60s works best). YouTube adds #Shorts automatically.',
     community: '📢 YouTube Community post (image/text). ⚠️ Google has NO API for Community posts — SocialAuto creates a ready-to-post reminder with your caption + image; one click opens YouTube to finish.',
@@ -1714,7 +1702,7 @@ async function refreshData(){
   POSTS = await api('/api/posts');
   // embed account object on posts for convenience
   const accMap = Object.fromEntries(ACCOUNTS.map(a=>[a.id,a]));
-  POSTS.forEach(p=>p.account = accMap[p.account_id] || {platform:'x',display_name:'?'});
+  POSTS.forEach(p=>p.account = accMap[p.account_id] || {platform:'instagram',display_name:'?'});
   const cal = document.getElementById('view-calendar');
   if(cal.style.display!=='none') renderCalendar();
   if(document.getElementById('view-posts').style.display!=='none') renderPosts();

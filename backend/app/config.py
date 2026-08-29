@@ -20,22 +20,6 @@ class Settings:
     META_APP_SECRET: str = os.getenv("META_APP_SECRET", "")
     META_GRAPH_VERSION: str = os.getenv("META_GRAPH_VERSION", "v21.0")
 
-    # X (Twitter) API v2
-    X_BEARER_TOKEN: str = os.getenv("X_BEARER_TOKEN", "")
-    X_API_KEY: str = os.getenv("X_API_KEY", "")
-    X_API_SECRET: str = os.getenv("X_API_SECRET", "")
-    X_ACCESS_TOKEN: str = os.getenv("X_ACCESS_TOKEN", "")
-    X_ACCESS_SECRET: str = os.getenv("X_ACCESS_SECRET", "")
-
-    # LinkedIn
-    LINKEDIN_ACCESS_TOKEN: str = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
-    LINKEDIN_CLIENT_ID: str = os.getenv("LINKEDIN_CLIENT_ID", "")
-    LINKEDIN_CLIENT_SECRET: str = os.getenv("LINKEDIN_CLIENT_SECRET", "")
-
-    # X (Twitter) OAuth2
-    X_CLIENT_ID: str = os.getenv("X_CLIENT_ID", "")
-    X_CLIENT_SECRET: str = os.getenv("X_CLIENT_SECRET", "")
-
     # Google / YouTube (Google Cloud free tier — YouTube Data API v3)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")

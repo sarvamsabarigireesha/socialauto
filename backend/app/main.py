@@ -61,6 +61,33 @@ def _run_migrations(db):
     insp = inspect(engine)
     cols = {t: {c["name"] for c in insp.get_columns(t)} for t in insp.get_table_names()}
 
+    # X and LinkedIn were removed from the Platform enum. Any pre-existing rows
+    # for those platforms would crash every future query that touches them
+    # (SQLAlchemy can't deserialize a DB value that's no longer a Python enum
+    # member) — Postgres also can't drop enum values via ALTER TYPE. So we
+    # purge those accounts (and their posts/comments/metrics) up front, using
+    # raw SQL comparisons that don't go through the Python enum at all.
+    if "accounts" in cols:
+        with engine.begin() as conn:
+            try:
+                conn.execute(text("""
+                    DELETE FROM metrics WHERE post_id IN (
+                        SELECT id FROM posts WHERE account_id IN (
+                            SELECT id FROM accounts WHERE platform IN ('x','linkedin')))
+                """))
+                conn.execute(text("""
+                    DELETE FROM comments WHERE post_id IN (
+                        SELECT id FROM posts WHERE account_id IN (
+                            SELECT id FROM accounts WHERE platform IN ('x','linkedin')))
+                """))
+                conn.execute(text("""
+                    DELETE FROM posts WHERE account_id IN (
+                        SELECT id FROM accounts WHERE platform IN ('x','linkedin'))
+                """))
+                conn.execute(text("DELETE FROM accounts WHERE platform IN ('x','linkedin')"))
+            except Exception:
+                pass  # tables not created yet on a brand-new DB, or already clean
+
     with engine.begin() as conn:
         if "accounts" in cols and "user_id" not in cols["accounts"]:
             conn.execute(text("ALTER TABLE accounts ADD COLUMN user_id INTEGER"))
@@ -130,8 +157,6 @@ async def _seed_demo_data(demo_user: User):
             (Platform.instagram, "@hyderabad.foodie", "ig_demo_1001", True, ""),
             (Platform.facebook, "Hyderabad Foodie Page", "fb_demo_2002", True,
              "Thanks for commenting! Check our bio for the full menu 🙌"),
-            (Platform.x, "@hyd_foodie", "x_demo_3003", True, ""),
-            (Platform.linkedin, "Foodie Media", "li_demo_4004", False, ""),
             (Platform.youtube, "Foodie Tube", "yt_demo_5005", True, ""),
         ]
         accs = []

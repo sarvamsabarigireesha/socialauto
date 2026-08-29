@@ -53,8 +53,6 @@ def _hashtags(caption: str, platforms: list[str]) -> list[str]:
     boosters = ["#contentcreator", "#trending", "#viral", "#explore", "#fyp", "#smallbusiness"]
     if "youtube" in platforms:
         boosters = ["#shorts", "#youtube", "#videos", "#trending", "#subscribe", "#contentcreator"]
-    if "linkedin" in platforms:
-        boosters = ["#networking", "#growth", "#business", "#contentstrategy", "#personalbranding"]
     out = []
     for t in tags + boosters:
         if t not in out:
@@ -99,8 +97,6 @@ def _rule_based(caption: str, platforms: list[str]) -> dict:
         "instagram": "11 AM–1 PM & 7–9 PM IST (lunch/evening scroll peaks)",
         "facebook": "1–4 PM IST on weekdays",
         "youtube": "Fri–Sun, 2–4 PM IST (weekend watch time)",
-        "x": "8–10 AM & 6–9 PM IST",
-        "linkedin": "Tue–Thu, 9–11 AM IST",
     }
     return {
         "engine": "rules",

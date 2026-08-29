@@ -5,8 +5,7 @@ works with zero API credentials. Set MOCK_MODE=false + tokens to go live.
 
 Real publishing uses the official APIs:
   - Instagram/Facebook: Graph API media container -> publish flow
-  - X: POST /2/tweets
-  - LinkedIn: POST /rest/posts
+  - YouTube: Data API v3 (uploads / Community via manual-helper)
 """
 import random
 from datetime import datetime, timezone
@@ -399,60 +398,6 @@ class _YouTubeClient(Client):
         return out
 
 
-class _XClient(Client):
-    """X (Twitter) API v2."""
-    async def publish(self, account: Account, caption: str, media_url: str,
-                      post_type: str = "feed") -> PublishResult:
-        try:
-            async with httpx.AsyncClient(timeout=30) as c:
-                r = await c.post(
-                    "https://api.twitter.com/2/tweets",
-                    json={"text": caption[:280]},
-                    headers={"Authorization": f"Bearer {account.access_token}"},
-                )
-                if r.status_code != 200:
-                    return PublishResult(False,
-                        error=f"X posting failed ({r.status_code}): {r.text[:200]}. "
-                              "X free-tier API requires paid Basic tier for posting.")
-                return PublishResult(True, platform_post_id=r.json()["data"]["id"])
-        except Exception as e:
-            return PublishResult(False, error=f"X error: {e}")
-
-    async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
-        # Real impl: GET /2/tweets/:id?expansions=attachments... + public metrics
-        return FetchResult([], {"likes": 0, "comments_count": 0, "shares": 0,
-                                "impressions": 0, "reach": 0})
-
-
-class _LinkedInClient(Client):
-    async def reply_to_comment(self, account: Account, platform_post_id, external_comment_id, text) -> bool:
-        # LinkedIn Social Actions API — implement with POST /socialActions/{urn}/comments
-        return True
-
-    async def publish(self, account: Account, caption: str, media_url: str,
-                      post_type: str = "feed") -> PublishResult:
-        try:
-            async with httpx.AsyncClient(timeout=30) as c:
-                headers = {"Authorization": f"Bearer {settings.LINKEDIN_ACCESS_TOKEN}",
-                           "X-Restli-Protocol-Version": "2.0.0"}
-                r = await c.post("https://api.linkedin.com/v2/ugcPosts", headers=headers, json={
-                    "author": f"urn:li:person:{account.external_id}",
-                    "lifecycleState": "PUBLISHED",
-                    "specificContent": {"com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {"text": caption},
-                        "shareMediaCategory": "NONE"}},
-                    "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
-                })
-                r.raise_for_status()
-                return PublishResult(True, platform_post_id=r.headers.get("x-restli-id", "li_post"))
-        except Exception as e:
-            return PublishResult(False, error=f"LinkedIn error: {e}")
-
-    async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
-        return FetchResult([], {"likes": 0, "comments_count": 0, "shares": 0,
-                                "impressions": 0, "reach": 0})
-
-
 class _ManualHelperClient(Client):
     """Platforms with NO public posting API (Moj, ShareChat) or API gated
     behind Meta app review (Threads). Posts become ready-to-publish reminders:
@@ -478,8 +423,6 @@ class _ManualHelperClient(Client):
 _CLIENTS = {
     Platform.instagram: _MetaClient,
     Platform.facebook: _MetaClient,
-    Platform.x: _XClient,
-    Platform.linkedin: _LinkedInClient,
     Platform.youtube: _YouTubeClient,
     Platform.threads: _ManualHelperClient,
     Platform.moj: _ManualHelperClient,
