@@ -16,6 +16,15 @@ from ..services.engine import _aware, next_slot_for
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
+VALID_POST_TYPES = {"feed", "video", "short", "community"}
+
+
+def _normalize_post_type(value: str | None, *, default: str = "feed") -> str:
+    ptype = (value or default or "feed").strip().lower()
+    if ptype not in VALID_POST_TYPES:
+        raise HTTPException(400, "post_type must be one of: feed, video, short, community")
+    return ptype
+
 
 def _to_out(p: Post) -> dict:
     return {
@@ -77,6 +86,7 @@ def create_post(data: PostIn, db: Session = Depends(get_db),
     tags = _owned_tags(db, user, data.tag_ids or [])
     created = []
     group = uuid.uuid4().hex[:16]
+    base_post_type = _normalize_post_type(data.post_type)
     post_status = PostStatus.draft if data.status == "draft" else PostStatus.scheduled
     source = (data.source or "scheduled").lower()
     if data.status == "draft":
@@ -96,7 +106,7 @@ def create_post(data: PostIn, db: Session = Depends(get_db),
         p = Post(user_id=user.id, account_id=aid,
                  caption=v.caption if v else data.caption,
                  media_url=v.media_url if v else data.media_url,
-                 post_type=(v.post_type if v else data.post_type) or "feed",
+                 post_type=_normalize_post_type(v.post_type if v else base_post_type),
                  scheduled_at=when, status=post_status, group_id=group,
                  source=source)
         p.tags = tags
@@ -125,9 +135,10 @@ def bulk_create(data: BulkPostIn, db: Session = Depends(get_db),
     created = []
     for row in data.posts:
         group = uuid.uuid4().hex[:16]
+        row_type = _normalize_post_type(row.post_type)
         for aid in data.account_ids:
             p = Post(user_id=user.id, account_id=aid, caption=row.caption,
-                     media_url=row.media_url, post_type=(row.post_type or "feed"),
+                     media_url=row.media_url, post_type=row_type,
                      scheduled_at=_aware(row.scheduled_at),
                      status=PostStatus.scheduled, group_id=group,
                      source="scheduled")
@@ -159,9 +170,7 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
     for row in reader:
         caption = (row.get("caption") or "").strip()
         when = (row.get("scheduled_at") or "").strip()
-        ptype = (row.get("post_type") or "feed").strip() or "feed"
-        if ptype not in ("feed", "video", "short", "community"):
-            raise HTTPException(400, f"bad post_type: {ptype} (use feed|video|short|community)")
+        ptype = _normalize_post_type((row.get("post_type") or "feed").strip() or "feed")
         if not caption or not when:
             continue
         try:
@@ -206,6 +215,8 @@ def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db),
     tag_ids = payload.pop("tag_ids", None)
     if "scheduled_at" in payload:
         payload["scheduled_at"] = _aware(payload["scheduled_at"])
+    if "post_type" in payload:
+        payload["post_type"] = _normalize_post_type(payload.get("post_type"))
     tags = _owned_tags(db, user, tag_ids) if tag_ids is not None else None
     for tgt in targets:
         if tgt.status == PostStatus.published:

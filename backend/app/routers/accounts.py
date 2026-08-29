@@ -52,7 +52,22 @@ def update_account(account_id: int, data: AccountUpdate, db: Session = Depends(g
 @router.post("", response_model=AccountOut, status_code=201)
 def create_account(data: AccountIn, db: Session = Depends(get_db),
                    user: User = Depends(get_current_user)):
-    acc = Account(user_id=user.id, **data.model_dump())
+    display_name = data.display_name.strip()
+    external_id = data.external_id.strip()
+    dup_q = db.query(Account).filter(Account.user_id == user.id, Account.platform == data.platform)
+    dup = (dup_q.filter(Account.external_id == external_id).first() if external_id
+           else dup_q.filter(Account.display_name == display_name).first())
+    if dup:
+        raise HTTPException(409, "This social account is already connected")
+    acc = Account(
+        user_id=user.id,
+        platform=data.platform,
+        display_name=display_name,
+        external_id=external_id,
+        access_token=data.access_token.strip(),
+        auto_comment=data.auto_comment,
+        comment_template=data.comment_template.strip(),
+    )
     db.add(acc)
     db.commit()
     db.refresh(acc)
