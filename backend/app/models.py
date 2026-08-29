@@ -67,6 +67,7 @@ class Post(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    group_id = Column(String(40), default="", index=True)   # shared by same-post multi-account rows
     platform_post_id = Column(String(200), default="")        # id returned after publishing
     caption = Column(Text, nullable=False)
     media_url = Column(String(500), default="")               # image/video URL (or local path)

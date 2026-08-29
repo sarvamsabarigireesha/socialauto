@@ -474,9 +474,33 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
 
         <div class="comp-actions">
           <button class="tool-btn" onclick="document.getElementById('mediaPickerFile').click()">🖼 Media library</button>
-          <input type="file" id="mediaPickerFile" accept="image/*" style="display:none">
-          <button class="tool-btn" id="clearMediaBtn" style="display:none" onclick="clearMedia()">✕ Remove image</button>
+          <input type="file" id="mediaPickerFile" accept="image/*,video/*" style="display:none">
+          <button class="tool-btn" id="clearMediaBtn" style="display:none" onclick="clearMedia()">✕ Remove</button>
+          <button class="tool-btn" style="background:#f0eafe;color:var(--purple);border-color:#d9cbfb" onclick="runAI()">
+            ✨ AI suggest <small style="display:block;font-size:10.5px;color:#8b7fd0">caption · hashtags · SEO · disclaimers</small></button>
           <span class="hint" id="mediaHint"></span>
+        </div>
+
+        <!-- AI assistant panel -->
+        <div id="aiPanel" style="display:none;margin-top:12px;border:1px solid #d9cbfb;background:#faf8ff;border-radius:12px;padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:var(--purple);margin-bottom:8px">
+            ✨ AI suggestions <span id="aiEngine" class="pill draft" style="margin-left:auto"></span>
+            <button class="tool-btn sm" style="padding:3px 8px" onclick="document.getElementById('aiPanel').style.display='none'">✕</button>
+          </div>
+          <div id="aiLoading" style="display:none;color:var(--muted);font-size:13px">🤖 Thinking… analyzing your post & image</div>
+          <div id="aiBody">
+            <label class="f">📝 Improved caption <button class="tool-btn sm" style="float:right;padding:2px 8px" onclick="applyCaption()">Use this</button></label>
+            <div id="aiCaption" style="background:#fff;border:1px solid var(--border);border-radius:9px;padding:10px;font-size:13px;white-space:pre-wrap"></div>
+            <label class="f" style="margin-top:10px">▶️ YouTube title (if posting to YT)</label>
+            <div id="aiYtTitle" style="background:#fff;border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:13px"></div>
+            <label class="f" style="margin-top:10px">#️⃣ Hashtags <button class="tool-btn sm" style="float:right;padding:2px 8px" onclick="applyHashtags()">Append to caption</button></label>
+            <div id="aiTags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            <label class="f" style="margin-top:10px">🔍 SEO keywords (video tags / search)</label>
+            <div id="aiKeywords" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            <div id="aiDisclaimers" style="margin-top:10px"></div>
+            <label class="f" style="margin-top:10px">⏰ Best times to post</label>
+            <div id="aiTimes" style="font-size:12.5px;color:var(--muted);line-height:1.8"></div>
+          </div>
         </div>
         <div class="sel-media" id="selMediaBox">
           <img id="selMediaImg" src="" alt="">
@@ -484,6 +508,12 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
         </div>
 
         <div class="sched-row">
+          <div class="fld" id="applyAllWrap" style="display:none;min-width:140px">
+            <label class="f" style="visibility:hidden">.</label>
+            <label style="display:flex;align-items:center;gap:7px;font-weight:600;font-size:13px;cursor:pointer;padding:9px 0">
+              <input type="checkbox" id="applyAll" checked> Apply to ALL linked accounts
+            </label>
+          </div>
           <div class="fld">
             <label class="f">When</label>
             <select id="schedMode">
@@ -513,6 +543,70 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
 <div class="toast" id="toast"></div>
 
 <script>
+/* ---------- AI assistant ---------- */
+let lastAI = null;
+async function runAI(){
+  const cap = document.getElementById('capText').value;
+  if(!cap && !comp.mediaUrl) return toast('Type a caption or attach an image first', false);
+  const platforms = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
+  const panel = document.getElementById('aiPanel');
+  panel.style.display = 'block';
+  document.getElementById('aiLoading').style.display = 'block';
+  document.getElementById('aiBody').style.display = 'none';
+  try{
+    const r = await api('/api/ai/suggest', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({caption: cap, media_url: comp.mediaUrl, platforms})});
+    lastAI = r;
+    document.getElementById('aiEngine').textContent = r.engine === 'gemini' ? 'Gemini AI' : 'smart rules';
+    document.getElementById('aiCaption').textContent = r.caption_suggestion || '';
+    document.getElementById('aiYtTitle').textContent = r.title_youtube || '—';
+    document.getElementById('aiTags').innerHTML = (r.hashtags||[]).map(t=>
+      `<span style="background:#f0eafe;color:var(--purple);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer"
+        onclick="navigator.clipboard.writeText('${t}');toast('copied ${t}')">${esc(t)}</span>`).join('');
+    document.getElementById('aiKeywords').innerHTML = (r.keywords||[]).map(k=>
+      `<span style="background:#e8f0fe;color:#1a56db;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600">${esc(k)}</span>`).join('');
+    document.getElementById('aiDisclaimers').innerHTML = (r.disclaimers||[]).slice(0,4).map(d=>`
+      <div style="background:#fff8e6;border:1px solid #f3d59a;border-radius:9px;padding:8px 10px;margin-top:6px;font-size:12.5px">
+        <b>⚠️ ${esc(d.label)}</b> — ${esc(d.why)}
+        <div style="color:var(--muted);margin-top:2px">${esc(d.text)}</div>
+        <button class="tool-btn sm" style="margin-top:5px;padding:2px 8px" onclick="appendText(${JSON.stringify(d.text).replace(/"/g,'&quot;')})">Append to caption</button>
+      </div>`).join('');
+    document.getElementById('aiTimes').innerHTML = Object.entries(r.best_times||{})
+      .filter(([k])=>platforms.includes(k)).map(([k,v])=>`• <b>${PLAT_META[k].label}</b>: ${esc(v)}`).join('<br>');
+  }catch(e){ toast('AI error: '+e.message, false); panel.style.display='none'; }
+  document.getElementById('aiLoading').style.display = 'none';
+  document.getElementById('aiBody').style.display = 'block';
+}
+function applyCaption(){
+  if(!lastAI) return;
+  document.getElementById('capText').value = lastAI.caption_suggestion;
+  renderPreviews(); toast('Caption applied ✨');
+}
+function applyHashtags(){
+  if(!lastAI) return;
+  const ta = document.getElementById('capText');
+  ta.value = ta.value.trimEnd() + '\n\n' + (lastAI.hashtags||[]).join(' ');
+  renderPreviews(); toast('Hashtags added #️⃣');
+}
+function appendText(t){
+  const ta = document.getElementById('capText');
+  ta.value = ta.value.trimEnd() + '\n\n' + t;
+  renderPreviews(); toast('Disclaimer added');
+}
+// auto-suggest after selecting accounts + caption (debounced), and right after media attach
+let aiDebounce = null;
+function maybeAutoAI(){
+  clearTimeout(aiDebounce);
+  aiDebounce = setTimeout(()=>{
+    const cap = document.getElementById('capText').value.trim();
+    const platforms = ACCOUNTS.filter(a=>comp.sel.has(a.id)).length;
+    if((cap.length > 25 || comp.mediaUrl) && platforms && !document.getElementById('aiPanel').style.display.includes('block') === false){
+      // only auto-open if user hasn't seen it yet this session
+      if(!sessionStorage.getItem('ai_shown')){ runAI(); sessionStorage.setItem('ai_shown','1'); }
+    }
+  }, 2500);
+}
+
 /* ================= state ================= */
 let ACCOUNTS = [], POSTS = [], MEDIA = [];
 let calYear, calMonth;                      // calendar cursor
@@ -670,6 +764,8 @@ function openComposer(presetDateISO=null, editPost=null){
   document.getElementById('composerTitle').textContent = editPost ? '✏️ Edit Post' : '✏️ Create Post';
   document.getElementById('saveBtn').textContent = editPost ? '💾 Save changes' : '🗓 Schedule';
   document.getElementById('capText').value = editPost ? editPost.caption : '';
+  document.getElementById('aiPanel').style.display = 'none';
+  document.getElementById('applyAllWrap').style.display = editPost && editPost.group_id ? 'block' : 'none';
   comp.mediaUrl = editPost ? (editPost.media_url||'') : '';
   document.getElementById('schedMode').value = 'schedule';
   document.getElementById('whenFld').style.display='block';
@@ -752,17 +848,19 @@ async function savePost(){
   const mode = document.getElementById('schedMode').value;
   try{
     if(comp.editingId){
-      const aid = account_ids[0];
-      await api(`/api/posts/${comp.editingId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({caption, media_url:comp.mediaUrl, account_id:aid,
+      const applyAll = document.getElementById('applyAll').checked ? 1 : 0;
+      await api(`/api/posts/${comp.editingId}?apply_all=${applyAll}`,
+        {method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({caption, media_url:comp.mediaUrl,
           scheduled_at: new Date(document.getElementById('schedWhen').value).toISOString()})});
-      toast('Post updated ✅');
+      toast(applyAll ? 'Updated on ALL linked accounts ✅' : 'Post updated ✅');
     } else if(mode==='now'){
       const created = await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl,
           scheduled_at:new Date().toISOString()})});
-      for(const p of created) await api(`/api/posts/${p.id}/publish-now`,{method:'POST'});
-      toast('Published now 🚀');
+      toast(`Publishing to ${created.length} account${created.length>1?'s':''} — same post, same time…`);
+      await Promise.all(created.map(p => api(`/api/posts/${p.id}/publish-now`,{method:'POST'})));
+      toast(`Published to ${created.length} accounts 🚀`);
     } else {
       const when = new Date(document.getElementById('schedWhen').value).toISOString();
       await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -807,8 +905,12 @@ function renderCalendar(){
     const shown = posts.slice(0,3);
     html += `<div class="cal-cell ${isToday?'today':''}" onclick="openComposer('${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}T10:00')">
       <div class="dnum">${day}</div>
-      ${shown.map(p=>`<button class="chip ${p.account.platform} ${p.status}" title="${esc(p.caption)}"
-          onclick="event.stopPropagation();editPost(${p.id})">${PLAT_META[p.account.platform].ic} ${esc(p.caption.slice(0,22))}${p.caption.length>22?'…':''}</button>`).join('')}
+      ${shown.map(p=>{
+        const sibs = posts.filter(q=>q.group_id && q.group_id===p.group_id).length;
+        const multi = sibs>1 ? ` <span style="opacity:.85">·${sibs}⧉</span>` : '';
+        return `<button class="chip ${p.account.platform} ${p.status}" title="${esc(p.caption)}${sibs>1?` (${sibs} accounts)`:''}"
+          onclick="event.stopPropagation();editPost(${p.id})">${PLAT_META[p.account.platform].ic} ${esc(p.caption.slice(0,18))}${p.caption.length>18?'…':''}${multi}</button>`;
+      }).join('')}
       ${posts.length>3?`<span class="chip more">+${posts.length-3} more</span>`:''}
     </div>`;
   }

@@ -40,6 +40,10 @@ class Settings:
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
+    # AI assistant (Google Gemini free tier — optional; app works without it)
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
     # Meta webhook verification token (real-time comment events)
     META_VERIFY_TOKEN: str = os.getenv("META_VERIFY_TOKEN", "socialauto-verify-token")
 

@@ -89,6 +89,7 @@ class PostOut(BaseModel):
     status: PostStatus
     error: str
     published_at: Optional[datetime] = None
+    group_id: str = ""
 
     class Config:
         from_attributes = True
