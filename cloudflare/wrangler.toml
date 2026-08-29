@@ -1,0 +1,11 @@
+name = "socialauto-cron"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Runs the cron tick every 15 minutes (free tier: 100k requests/day)
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Set secrets once with:
+#   wrangler secret put APP_URL      -> e.g. https://socialauto-abc.el.run.app
+#   wrangler secret put CRON_SECRET  -> same secret as the FastAPI app
