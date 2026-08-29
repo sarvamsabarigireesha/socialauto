@@ -92,8 +92,6 @@ async def _seed_demo_data(demo_user: User):
     db = SessionLocal()
     try:
         uid = demo_user.id
-        if db.query(Account).filter(Account.user_id == uid).count() > 0:
-            return
         demo = [
             (Platform.instagram, "@hyderabad.foodie", "ig_demo_1001", True, ""),
             (Platform.facebook, "Hyderabad Foodie Page", "fb_demo_2002", True,
@@ -103,12 +101,21 @@ async def _seed_demo_data(demo_user: User):
             (Platform.youtube, "Foodie Tube", "yt_demo_5005", True, ""),
         ]
         accs = []
+        created = False
         for plat, name, ext, ac, tmpl in demo:
+            exists = (db.query(Account)
+                      .filter(Account.user_id == uid, Account.external_id == ext).first())
+            if exists:
+                accs.append(exists)
+                continue
             a = Account(user_id=uid, platform=plat, display_name=name, external_id=ext,
                         access_token="MOCK_TOKEN", auto_comment=ac, comment_template=tmpl)
             db.add(a)
             accs.append(a)
+            created = True
         db.commit()
+        if not created and db.query(Post).filter(Post.user_id == uid).count() > 0:
+            return
 
         now = datetime.now(timezone.utc)
         pub_captions = [
