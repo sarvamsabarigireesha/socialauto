@@ -77,6 +77,8 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE comments ADD COLUMN reply_type VARCHAR(10) NOT NULL DEFAULT 'auto'"))
         if "comments" in cols and "author_avatar" not in cols["comments"]:
             conn.execute(text("ALTER TABLE comments ADD COLUMN author_avatar VARCHAR(20) NOT NULL DEFAULT ''"))
+        if "posts" in cols and "post_type" not in cols["posts"]:
+            conn.execute(text("ALTER TABLE posts ADD COLUMN post_type VARCHAR(12) NOT NULL DEFAULT 'feed'"))
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":

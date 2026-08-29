@@ -171,7 +171,7 @@ async def callback(request: Request, code: str | None = None, state: str | None 
                  "moj": "Your Moj account", "sharechat": "Your ShareChat"}
         acc = _upsert_account(db, user, plat, external_id=f"mock_{plat.value}_{user.id}",
                               token="MOCK_OAUTH_TOKEN", display_name=names[plat.value])
-        return _finish(acc, ajax)
+        return await _finish(acc, ajax, db)
 
     if not code and mock != "1":
         return RedirectResponse(url="/?oauth_error=" + _ue("Missing authorization code from provider."))
@@ -226,7 +226,7 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
                         external_id=ig["id"], token=pg.get("access_token", user_token),
                         display_name=f"{pg.get('name','IG')} (Instagram)")
         # browser redirect -> back to app; AJAX (mock-like test) returns an account
-        return _finish(first_acc, ajax)
+        return await _finish(first_acc, ajax, db)
 
     if plat == Platform.linkedin:
         async with httpx.AsyncClient(timeout=30) as c:
@@ -244,7 +244,7 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
         acc = _upsert_account(db, user, Platform.linkedin,
                               external_id=d.get("sub", ""), token=token,
                               display_name=d.get("name", "LinkedIn User"))
-        return _finish(acc, ajax)
+        return await _finish(acc, ajax, db)
 
     if plat == Platform.x:
         sig = hashlib.sha256(state.encode()).hexdigest()[:16]
@@ -265,7 +265,7 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
             d = me.json()["data"]
         acc = _upsert_account(db, user, Platform.x, external_id=d["id"], token=token,
                               display_name="@" + d["username"])
-        return _finish(acc, ajax)
+        return await _finish(acc, ajax, db)
 
     if plat == Platform.threads:
         async with httpx.AsyncClient(timeout=30) as c:
@@ -283,7 +283,7 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
         acc = _upsert_account(db, user, Platform.threads,
                               external_id=d.get("id", ""), token=token,
                               display_name="@" + d.get("username", "threads"))
-        return _finish(acc, ajax)
+        return await _finish(acc, ajax, db)
 
     if plat == Platform.youtube:
         async with httpx.AsyncClient(timeout=30) as c:
@@ -312,7 +312,7 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
         acc = _upsert_account(db, user, Platform.youtube,
                               external_id=ch["id"], token=token,
                               display_name=ch["snippet"]["title"] + " (YouTube)")
-        return _finish(acc, ajax)
+        return await _finish(acc, ajax, db)
 
 
 _REDIRECT_PLATFORM: dict[str, Platform] = {}
@@ -346,8 +346,17 @@ def _upsert_account(db: Session, user: User, plat: Platform, external_id: str,
     return acc
 
 
-def _finish(acc: Account, ajax: str | None):
-    """AJAX (mock flow from SPA) -> JSON; browser redirect (real OAuth) -> back to app."""
+async def _finish(acc: Account, ajax: str | None, db: Session | None = None):
+    """AJAX (mock flow from SPA) -> JSON; browser redirect (real OAuth) -> back to app.
+    Fire-and-forget: auto-import the channel's existing content so comments and
+    analytics appear without the user pressing anything."""
+    if db is not None:
+        import asyncio
+        from ..services import engine
+        try:
+            asyncio.create_task(engine.auto_import_all(db, acc.user_id))
+        except Exception:
+            pass
     if ajax == "1":
         from ..schemas import AccountOut
         return AccountOut.model_validate(acc)

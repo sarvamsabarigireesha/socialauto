@@ -92,6 +92,7 @@ class Post(Base):
     platform_post_id = Column(String(200), default="")        # id returned after publishing
     caption = Column(Text, nullable=False)
     media_url = Column(String(500), default="")               # image/video URL (or local path)
+    post_type = Column(String(12), default="feed", nullable=False)  # feed | video | short | community
     scheduled_at = Column(DateTime, nullable=False)
     status = Column(Enum(PostStatus), default=PostStatus.scheduled, nullable=False)
     error = Column(Text, default="")

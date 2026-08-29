@@ -26,7 +26,8 @@ async def publish_due_posts(db: Session, user_id: int | None = None) -> dict:
     for post in due:
         post.status = PostStatus.publishing
         db.commit()
-        result = await platforms.publish_post(post.account, post.caption, post.media_url)
+        result = await platforms.publish_post(post.account, post.caption, post.media_url,
+                                              post_type=getattr(post, "post_type", "feed") or "feed")
         if result.ok:
             post.status = PostStatus.published
             post.platform_post_id = result.platform_post_id
@@ -44,7 +45,8 @@ async def publish_one(db: Session, post_id: int) -> Post:
     post = db.get(Post, post_id)
     if not post or post.status != PostStatus.scheduled:
         return post
-    result = await platforms.publish_post(post.account, post.caption, post.media_url)
+    result = await platforms.publish_post(post.account, post.caption, post.media_url,
+                                          post_type=getattr(post, "post_type", "feed") or "feed")
     if result.ok:
         post.status = PostStatus.published
         post.platform_post_id = result.platform_post_id
@@ -57,13 +59,15 @@ async def publish_one(db: Session, post_id: int) -> Post:
 
 
 # ------------------------------------------------------- comments + auto-reply
-async def sync_comments(db: Session, user_id: int | None = None) -> dict:
+async def sync_comments(db: Session, user_id: int | None = None,
+                        force_all: bool = False) -> dict:
     """Fetch new comments on published posts and auto-reply to each once."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.COMMENT_WATCH_WINDOW_HOURS)
     q = (db.query(Post)
          .filter(Post.status == PostStatus.published)
-         .filter(Post.platform_post_id != "")
-         .filter(Post.published_at >= cutoff))
+         .filter(Post.platform_post_id != ""))
+    if not force_all:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.COMMENT_WATCH_WINDOW_HOURS)
+        q = q.filter(Post.published_at >= cutoff)
     if user_id is not None:
         q = q.filter(Post.user_id == user_id)
     posts = q.all()
@@ -184,9 +188,34 @@ async def import_channel_content(db: Session, user_id: int, account_id: int) -> 
         db.add(p)
         imported += 1
     db.commit()
-    await sync_comments(db, user_id)
+    await sync_comments(db, user_id, force_all=True)
     await sync_metrics(db, user_id)
     return {"imported": imported, "scanned": len(videos)}
+
+
+async def auto_import_all(db: Session, user_id: int | None = None) -> dict:
+    """Background safety net: for every connected account that supports it,
+    make sure existing channel content is imported (idempotent). Called after
+    OAuth connect and periodically by cron — that's what makes the app feel
+    'connected for real' without a manual button press."""
+    q = db.query(Account).filter(Account.access_token != "")
+    if user_id is not None:
+        q = q.filter(Account.user_id == user_id)
+    accs = q.all()
+    total = 0
+    for acc in accs:
+        client = platforms.get_client(acc.platform)
+        if not hasattr(client, "list_recent_videos"):
+            continue
+        # mock client in real mode for moj/sharechat — skip
+        if type(client).__name__ == "_MockClient" and not settings.MOCK_MODE:
+            continue
+        try:
+            res = await import_channel_content(db, acc.user_id, acc.id)
+            total += res.get("imported", 0)
+        except Exception:
+            continue
+    return {"imported": total, "accounts": len(accs)}
 
 
 def analytics_summary(db: Session, user_id: int | None = None) -> dict:

@@ -229,6 +229,9 @@
   .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}
   .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}
   .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}
+  .ptype{display:flex;align-items:center;gap:7px;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .ptype:has(input:checked){border-color:var(--purple);background:#f3efff;color:var(--purple)}
+  .ptype input{accent-color:var(--purple)}
   .plat.threads{color:#000}.plat.moj{color:#ff4d00}.plat.sharechat{color:#10b981}
 
   /* ---------- home greeting ---------- */
@@ -436,8 +439,11 @@
   <section id="view-bulk" style="display:none">
     <div class="card" style="padding:22px;max-width:760px">
       <h2 class="section-title">📦 Bulk schedule via CSV</h2>
-      <p class="muted" style="margin-bottom:14px">Upload <code>caption,media_url,scheduled_at</code> — each row is
-        posted to every selected account. Hundreds of posts at once.</p>
+      <p class="muted" style="margin-bottom:14px">Upload <code>caption,scheduled_at</code> — <b>media is OPTIONAL</b>:
+        text-only posts (X, Facebook, LinkedIn, YouTube Community) need just the caption.
+        Add <code>media_url</code> (image/video link) only for photo/video rows, and optional
+        <code>post_type</code> (<code>feed</code>, <code>video</code>, <code>short</code>, <code>community</code>).
+        Each row is posted to every selected account.</p>
       <label class="f">Target accounts</label>
       <div class="acc-pick" id="bulkAccPick" style="margin-bottom:14px"></div>
       <div class="upload-drop" id="bulkDrop">📄 Drag &amp; drop <b>posts.csv</b> here, or click to browse</div>
@@ -458,11 +464,13 @@
           <option value="facebook">👍 Facebook</option>
           <option value="youtube">▶️ YouTube</option>
           <option value="threads">🧵 Threads</option>
+          <option value="moj">🎬 Moj</option>
+          <option value="sharechat">💬 ShareChat</option>
           <option value="x">🐦 X</option>
           <option value="linkedin">💼 LinkedIn</option>
         </select>
         <button class="btn green sm" style="padding:9px 16px" onclick="syncCommunity()">🔄 Fetch latest comments</button>
-        <button class="btn ghost sm" style="padding:9px 16px" onclick="importChannel()">📥 Import my videos</button>
+        <button class="btn ghost sm" style="padding:9px 16px" onclick="importAllChannels()" title="Import existing videos/posts from ALL connected accounts">📥 Sync all my content</button>
         <button class="btn ghost sm" style="padding:9px 16px" onclick="openSim()">🧪 Simulate comment</button>
       </div>
     </div>
@@ -599,6 +607,16 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
       <div class="composer">
         <label class="f">Select accounts</label>
         <div class="acc-pick" id="compAccPick"></div>
+
+        <!-- Post type: video / short / image-feed / YouTube community -->
+        <label class="f">Post type</label>
+        <div id="postTypeRow" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          <label class="ptype"><input type="radio" name="ptype" value="feed" checked onchange="onPostType()"><span>📸 Photo / Text post</span></label>
+          <label class="ptype"><input type="radio" name="ptype" value="video" onchange="onPostType()"><span>🎬 Video (long-form)</span></label>
+          <label class="ptype"><input type="radio" name="ptype" value="short" onchange="onPostType()"><span>⚡ Short / Reel (9:16)</span></label>
+          <label class="ptype yt-only" style="display:none"><input type="radio" name="ptype" value="community" onchange="onPostType()"><span>📢 YouTube Community post</span></label>
+        </div>
+        <div id="ptypeHint" class="hint" style="margin-bottom:8px"></div>
 
         <div class="cap-wrap">
           <textarea class="cap" id="capText" placeholder="What do you want to share?" oninput="renderPreviews()"></textarea>
@@ -951,23 +969,29 @@ async function openSim(){
   toast('Comment added — auto-replied 🤖'); loadCommunity();
 }
 
-async function importChannel(){
-  const accs = ACCOUNTS;
-  const yt = accs.filter(a=>a.platform==='youtube');
-  const opts = yt.length
-    ? yt.map((a,i)=>`${i+1}. ${a.display_name}`).join('\n')
-    : '';
-  if(!yt.length) return toast('Connect a YouTube/channel account first', false);
-  let pick = yt.length>1 ? prompt('Which channel? (enter number)\n'+opts, '1') : '1';
-  const acc = yt[(parseInt(pick)-1)||0];
-  if(!acc) return;
-  toast('📥 Importing your videos + their comments…');
+async function importChannel(acc){
+  toast(`📥 Importing content from ${acc.display_name}…`);
   try{
     const r = await api(`/api/community/import/${acc.id}`,{method:'POST'});
-    toast(r.imported ? `Imported ${r.imported} videos — comments loaded ✅` : 'No new videos to import (already synced) ✅');
+    return r.imported || 0;
+  }catch(e){ toast(e.message,false); return 0; }
+}
+
+async function importAllChannels(){
+  const real = ACCOUNTS.filter(a=>['youtube','instagram','facebook','threads'].includes(a.platform));
+  if(!real.length) return toast('Connect a YouTube / Instagram / Facebook account first', false);
+  toast(`📥 Syncing existing content from ${real.length} account(s) — fetching comments…`);
+  try{
+    const r = await api('/api/community/import-all',{method:'POST'});
+    toast(r.imported
+      ? `✅ Synced ${r.imported} existing videos/posts with their comments`
+      : '✅ Everything already in sync (will refresh comments)');
+    await refreshData();
     loadCommunity();
   }catch(e){ toast(e.message,false); }
 }
+
+function copyText(t){ navigator.clipboard.writeText(t).then(()=>toast('📋 Caption copied — paste it on the platform')); }
 
 /* ================= templates ================= */
 async function loadTemplates(){
@@ -1270,6 +1294,12 @@ function accPill(a, selected, onclick){
 /* ================= composer ================= */
 function openComposer(presetDateISO=null, editPost=null){
   comp = { sel:new Set(), mediaUrl:'', editingId:null };
+  const ptRadio = document.querySelector('input[name=ptype][value="feed"]');
+  if(ptRadio) ptRadio.checked = true;
+  if(editPost && editPost.post_type){
+    const r = document.querySelector(`input[name=ptype][value="${editPost.post_type}"]`);
+    if(r) r.checked = true;
+  }
   document.getElementById('composerTitle').textContent = editPost ? '✏️ Edit Post' : '✏️ Create Post';
   document.getElementById('saveBtn').textContent = editPost ? '💾 Save changes' : '🗓 Schedule';
   document.getElementById('capText').value = editPost ? editPost.caption : '';
@@ -1292,6 +1322,7 @@ function openComposer(presetDateISO=null, editPost=null){
     api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); loadMedia(); });
   };
   renderCompAccs();
+  onPostType();
   showSelMedia();
   renderPreviews();
   document.getElementById('composerOverlay').classList.add('open');
@@ -1308,7 +1339,33 @@ function renderCompAccs(){
     accPill(a, comp.sel.has(a.id), `toggleAcc(${a.id})`)).join('')
     || '<span class="muted">No accounts — connect one in the Accounts tab.</span>';
 }
-function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); renderPreviews(); }
+function toggleAcc(id){ comp.sel.has(id) ? comp.sel.delete(id) : comp.sel.add(id); renderCompAccs(); onPostType(); renderPreviews(); }
+
+/* ---- post type (feed photo/text | video | short | YouTube community) ---- */
+function curPostType(){ return (document.querySelector('input[name=ptype]:checked')||{}).value || 'feed'; }
+function onPostType(){
+  const t = curPostType();
+  const selPlats = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
+  const hasYT = selPlats.includes('youtube');
+  // YouTube community option only when YouTube selected
+  document.querySelectorAll('.ptype.yt-only').forEach(el=>el.style.display = hasYT ? 'flex' : 'none');
+  if(t==='community' && !hasYT){
+    document.querySelector('input[name=ptype][value=feed]').checked = true;
+    return onPostType();
+  }
+  const hints = {
+    feed: '📸 Photo or text post: image optional (text works on X/FB/LinkedIn; IG needs a photo).',
+    video: '🎬 Long-form video: attach the video file (URL or upload). Published to YouTube videos / IG & FB as reels.',
+    short: '⚡ Short/Reel: attach a vertical 9:16 video (≤60s works best). YouTube adds #Shorts automatically.',
+    community: '📢 YouTube Community post (image/text). ⚠️ Google has NO API for Community posts — SocialAuto creates a ready-to-post reminder with your caption + image; one click opens YouTube to finish.',
+  };
+  document.getElementById('ptypeHint').innerHTML = hints[t] || '';
+  // media label tweak
+  const picker = document.getElementById('mediaPickerFile');
+  if(t==='video'||t==='short'){ picker.setAttribute('accept','video/*'); }
+  else if(t==='community'){ picker.setAttribute('accept','image/*'); }
+  else { picker.setAttribute('accept','image/*,video/*'); }
+}
 function showSelMedia(){
   const box = document.getElementById('selMediaBox');
   if(comp.mediaUrl){ box.style.display='block'; document.getElementById('selMediaImg').src = comp.mediaUrl;
@@ -1352,28 +1409,40 @@ document.getElementById('schedMode').onchange = e => {
 async function savePost(){
   const caption = document.getElementById('capText').value.trim();
   const account_ids = [...comp.sel];
+  const post_type = curPostType();
   if(!account_ids.length) return toast('Select at least one account', false);
   if(!caption) return toast('Caption is empty', false);
+  // media requirement by type
+  const needsVideo = (post_type==='video'||post_type==='short');
+  const selPlats = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
+  const allYT = selPlats.length && selPlats.every(p=>p==='youtube');
+  if(needsVideo && !comp.mediaUrl)
+    return toast(post_type==='short' ? 'Short/Reel needs a vertical video file 🎬' : 'Video post needs a video file 🎬', false);
+  if(post_type==='community' && allYT && !comp.mediaUrl){
+    if(!confirm('No image attached — post a TEXT community post? (image posts get more reach)')) return;
+  }
   const mode = document.getElementById('schedMode').value;
   try{
     if(comp.editingId){
       const applyAll = document.getElementById('applyAll').checked ? 1 : 0;
       await api(`/api/posts/${comp.editingId}?apply_all=${applyAll}`,
         {method:'PATCH',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({caption, media_url:comp.mediaUrl,
+        body:JSON.stringify({caption, media_url:comp.mediaUrl, post_type,
           scheduled_at: new Date(document.getElementById('schedWhen').value).toISOString()})});
       toast(applyAll ? 'Updated on ALL linked accounts ✅' : 'Post updated ✅');
     } else if(mode==='now'){
       const created = await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl,
+        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type,
           scheduled_at:new Date().toISOString()})});
       toast(`Publishing to ${created.length} account${created.length>1?'s':''} — same post, same time…`);
-      await Promise.all(created.map(p => api(`/api/posts/${p.id}/publish-now`,{method:'POST'})));
-      toast(`Published to ${created.length} accounts 🚀`);
+      const res = await Promise.all(created.map(p => api(`/api/posts/${p.id}/publish-now`,{method:'POST'})));
+      const manual = res.filter(p=>p.status==='failed' && (p.error||'').startsWith('MANUAL:'));
+      if(manual.length) toast(`⚠️ ${manual.length} post(s) need a manual finish (YouTube Community has no API) — see Posts tab`, false);
+      else toast(`Published to ${created.length} accounts 🚀`);
     } else {
       const when = new Date(document.getElementById('schedWhen').value).toISOString();
       await api('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, scheduled_at:when})});
+        body:JSON.stringify({account_ids, caption, media_url:comp.mediaUrl, post_type, scheduled_at:when})});
       toast('Post scheduled 🗓');
     }
     closeComposer();
@@ -1455,14 +1524,21 @@ function renderPosts(){
     <tr>
       <td>${p.media_url?`<img class="thumb" src="${p.media_url}">`:'<div class="thumb" style="display:flex;align-items:center;justify-content:center;font-size:18px">📝</div>'}</td>
       <td style="max-width:340px"><div style="font-weight:600">${esc(p.caption.slice(0,90))}${p.caption.length>90?'…':''}</div>
-        ${p.error?`<div style="color:var(--red);font-size:12px;margin-top:3px">⚠ ${esc(p.error)}</div>`:''}</td>
-      <td><span class="plat-tag"><span class="av ${p.account.platform}" style="width:24px;height:24px;font-size:12px">${PLAT_META[p.account.platform].ic}</span>${esc(p.account.display_name)}</span></td>
+        ${p.error?(p.error.startsWith('MANUAL:')
+          ? `<div style="background:#fff7e6;border:1px solid #ffd591;border-radius:8px;padding:6px 9px;font-size:12px;margin-top:4px;color:#ad6800">✋ <b>Manual step needed</b> — ${esc(p.error.replace('MANUAL:',''))}
+             <div style="margin-top:5px;display:flex;gap:6px">
+               <button class="btn ghost sm" style="padding:3px 9px" onclick="copyText(${JSON.stringify(p.caption).replace(/"/g,'&quot;')})">📋 Copy caption</button>
+               ${p.account.platform==='youtube'?'<a class="btn ghost sm" style="padding:3px 9px;text-decoration:none" href="https://studio.youtube.com" target="_blank">▶️ Open YouTube</a>':''}
+             </div></div>`
+          : `<div style="color:var(--red);font-size:12px;margin-top:3px">⚠ ${esc(p.error)}</div>`):''}</td>
+      <td><span class="plat-tag"><span class="av ${p.account.platform}" style="width:24px;height:24px;font-size:12px">${PLAT_META[p.account.platform].ic}</span>${esc(p.account.display_name)}${p.post_type&&p.post_type!=='feed'?` <small style="color:var(--muted)">· ${p.post_type}</small>`:''}</span></td>
       <td style="white-space:nowrap">${fmtDT(p.scheduled_at)}</td>
-      <td><span class="pill ${p.status}">${p.status}</span></td>
+      <td>${(p.error||'').startsWith('MANUAL:') ? '<span class="pill draft" style="background:#fff7e6;color:#ad6800">✋ manual</span>' : `<span class="pill ${p.status}">${p.status}</span>`}</td>
       <td style="white-space:nowrap">
         ${p.status==='scheduled'?`<button class="btn green sm" onclick="publishNow(${p.id})">🚀 Publish</button>
           <button class="btn ghost sm" onclick="editPost(${p.id})">✏️</button>
           <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
+        ${(p.error||'').startsWith('MANUAL:')?`<button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
       </td>
     </tr>`).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">No posts here. Click “Create Post” →</td></tr>';
@@ -1505,7 +1581,7 @@ async function uploadBulk(file){
   }catch(e){ toast(e.message,false); }
 }
 function downloadTemplate(){
-  const csv='caption,media_url,scheduled_at\nHello world! 🚀,,2026-09-01T09:00:00\nTip of the day,,2026-09-02T18:30:00\n';
+  const csv='caption,media_url,post_type,scheduled_at\nHello world! Text-only works 🚧,,feed,2026-09-01T09:00:00\nMy new Short 🎬,https://example.com/clip.mp4,short,2026-09-02T18:30:00\nYouTube community note,,community,2026-09-03T10:00:00\n';
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download='posts_template.csv'; a.click();
 }
@@ -1644,9 +1720,15 @@ async function refreshData(){
   // returning from a real OAuth redirect?
   const qp = new URLSearchParams(location.search);
   if(qp.get('oauth') === 'connected'){
-    setTimeout(()=>flashConnected('instagram'), 400);
     history.replaceState({}, '', '/');
-    setTimeout(async()=>{ await refreshData(); toast('✅ Channel connected! Check Accounts tab.'); }, 800);
+    setTimeout(async()=>{
+      await refreshData();
+      toast('✅ Channel connected! Auto-syncing your existing videos & comments…');
+      try{
+        const r = await api('/api/community/import-all', {method:'POST'});
+        if(r.imported) toast(`✅ Synced ${r.imported} existing videos/posts with real comments — check Community tab`);
+      }catch(e){/* user can press Sync button later */}
+    }, 900);
   }
   const oerr = qp.get('oauth_error');
   if(oerr){

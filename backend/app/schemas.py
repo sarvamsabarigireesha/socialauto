@@ -63,6 +63,7 @@ class PostIn(BaseModel):
     account_ids: list[int] = Field(..., min_length=1)
     caption: str = Field(..., min_length=1)
     media_url: str = ""
+    post_type: str = "feed"   # feed | video | short | community
     scheduled_at: datetime
 
 
@@ -75,6 +76,7 @@ class BulkPostIn(BaseModel):
 class BulkRow(BaseModel):
     caption: str
     media_url: str = ""
+    post_type: str = "feed"
     scheduled_at: datetime
 
 
@@ -85,6 +87,7 @@ class PostOut(BaseModel):
     account_name: Optional[str] = None
     caption: str
     media_url: str
+    post_type: str = "feed"
     scheduled_at: datetime
     status: PostStatus
     error: str
@@ -96,6 +99,7 @@ class PostOut(BaseModel):
 
 
 class PostUpdate(BaseModel):
+    post_type: Optional[str] = None
     caption: Optional[str] = None
     media_url: Optional[str] = None
     scheduled_at: Optional[datetime] = None

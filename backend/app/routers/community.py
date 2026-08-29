@@ -74,6 +74,12 @@ async def import_channel(account_id: int,
     return await engine.import_channel_content(db, user.id, account_id)
 
 
+@router.post("/import-all")
+async def import_all(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Import existing content from EVERY connected account (full auto-sync)."""
+    return await engine.auto_import_all(db, user.id)
+
+
 @router.post("/comments/{comment_id}/reply")
 async def manual_reply(comment_id: int, data: ReplyIn,
                        db: Session = Depends(get_db), user: User = Depends(get_current_user)):

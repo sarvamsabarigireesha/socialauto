@@ -20,7 +20,7 @@ def _to_out(p: Post) -> dict:
         "id": p.id, "account_id": p.account_id,
         "platform": p.account.platform.value if p.account else None,
         "account_name": p.account.display_name if p.account else None,
-        "caption": p.caption, "media_url": p.media_url,
+        "caption": p.caption, "media_url": p.media_url, "post_type": getattr(p, "post_type", "feed") or "feed",
         "scheduled_at": p.scheduled_at, "status": p.status,
         "error": p.error, "published_at": p.published_at, "group_id": p.group_id or "",
     }
@@ -51,7 +51,7 @@ def create_post(data: PostIn, db: Session = Depends(get_db),
     group = uuid.uuid4().hex[:16]
     for aid in data.account_ids:
         p = Post(user_id=user.id, account_id=aid, caption=data.caption,
-                 media_url=data.media_url, scheduled_at=data.scheduled_at,
+                 media_url=data.media_url, post_type=(data.post_type or "feed"), scheduled_at=data.scheduled_at,
                  status=PostStatus.scheduled, group_id=group)
         db.add(p)
         created.append(p)
@@ -70,7 +70,7 @@ def bulk_create(data: BulkPostIn, db: Session = Depends(get_db),
         group = uuid.uuid4().hex[:16]
         for aid in data.account_ids:
             p = Post(user_id=user.id, account_id=aid, caption=row.caption,
-                     media_url=row.media_url, scheduled_at=row.scheduled_at,
+                     media_url=row.media_url, post_type=(row.post_type or "feed"), scheduled_at=row.scheduled_at,
                      status=PostStatus.scheduled, group_id=group)
             db.add(p)
             created.append(p)
@@ -89,9 +89,9 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
 
     raw = (await file.read()).decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(raw))
-    required = {"caption", "scheduled_at"}
-    if not required.issubset({c.strip() for c in (reader.fieldnames or [])}):
-        raise HTTPException(400, "CSV must have headers: caption, media_url, scheduled_at")
+    headers = {c.strip() for c in (reader.fieldnames or [])}
+    if not {"caption", "scheduled_at"}.issubset(headers):
+        raise HTTPException(400, "CSV must have headers: caption,scheduled_at (media_url and post_type are optional)")
 
     created = []
     for row in reader:
@@ -107,6 +107,7 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
         for aid in aids:
             p = Post(user_id=user.id, account_id=aid, caption=caption,
                      media_url=(row.get("media_url") or "").strip(),
+                     post_type=(row.get("post_type") or "feed").strip() or "feed",
                      scheduled_at=dt, status=PostStatus.scheduled, group_id=group)
             db.add(p)
             created.append(p)
@@ -166,6 +167,7 @@ def delete_post(post_id: int, db: Session = Depends(get_db),
 @router.get("/csv-template")
 def csv_template():
     return {"filename": "posts_template.csv",
-            "content": "caption,media_url,scheduled_at\n"
-                       "Hello world! First post 🚧,https://example.com/img.jpg,2026-09-01T09:00:00\n"
-                       "Tip of the day,,2026-09-02T18:30:00\n"}
+            "content": "caption,media_url,post_type,scheduled_at\n"
+                       "Hello world! Text-only post works 🚧,,feed,2026-09-01T09:00:00\n"
+                       "My new Short 🎬,https://example.com/clip.mp4,short,2026-09-02T18:30:00\n"
+                       "YouTube community note,,community,2026-09-03T10:00:00\n"}

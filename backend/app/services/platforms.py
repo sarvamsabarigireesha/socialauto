@@ -18,10 +18,12 @@ from ..models import Platform, Account
 
 
 class PublishResult:
-    def __init__(self, ok: bool, platform_post_id: str = "", error: str = ""):
+    def __init__(self, ok: bool, platform_post_id: str = "", error: str = "",
+                 manual: bool = False):
         self.ok = ok
         self.platform_post_id = platform_post_id
         self.error = error
+        self.manual = manual  # API cannot post this — needs manual app action
 
 
 class FetchResult:
@@ -32,7 +34,8 @@ class FetchResult:
 
 class Client:
     """Base interface every platform client implements."""
-    async def publish(self, account, caption: str, media_url: str) -> PublishResult:
+    async def publish(self, account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
         return PublishResult(False, error="not implemented")
 
     async def fetch(self, account, platform_post_id: str) -> FetchResult:
@@ -47,7 +50,8 @@ class Client:
 class _MockClient(Client):
     """Simulates a social platform with random but realistic data."""
 
-    async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
+    async def publish(self, account: Account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
         await _sleep()
         pid = f"mock_{account.platform.value}_{random.randint(10**8, 10**9)}"
         return PublishResult(True, platform_post_id=pid)
@@ -111,7 +115,8 @@ class _MetaClient:
     def _v(self):
         return f"{self.BASE}/{settings.META_GRAPH_VERSION}"
 
-    async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
+    async def publish(self, account: Account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
         try:
             async with httpx.AsyncClient(timeout=30) as c:
                 if media_url:
@@ -178,13 +183,28 @@ class _MetaClient:
 class _YouTubeClient(Client):
     """YouTube Data API v3 (Google Cloud free tier)."""
 
-    async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
-        # Video upload needs resumable upload + the video file; media_url is a video URL.
+    async def publish(self, account: Account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
+        # YouTube Community posts (image/text polls) have NO public API —
+        # Google never opened it. Reminder mode like Buffer/Later do.
+        if post_type == "community":
+            return PublishResult(False, manual=True,
+                error=("MANUAL: YouTube Community posts can't be published via API. "
+                       "Open studio.youtube.com → Create → Create post (or your channel "
+                       "→ Posts tab), paste the caption and upload the image, then post."))
+        # video | short | feed — all upload a video file
         if not media_url:
-            return PublishResult(False, error="YouTube needs a video file/URL to upload")
+            return PublishResult(False, error=("YouTube needs a video file/URL to upload "
+                                               f"for a {post_type}. For text-only posts use "
+                                               "a Community post (manual reminder)."))
         try:
-            # Download the video, resumable upload to YouTube as 'private' first.
-            async with httpx.AsyncClient(timeout=120) as c:
+            title = caption[:100]
+            desc = caption
+            if post_type == "short":
+                title = (title[:90] + " #Shorts")[:100]
+                desc = caption if "#Shorts" in caption else caption + "\n\n#Shorts"
+            # Download the video, upload to YouTube.
+            async with httpx.AsyncClient(timeout=180) as c:
                 vid = await c.get(media_url)
                 vid.raise_for_status()
                 r = await c.post(
@@ -192,11 +212,15 @@ class _YouTubeClient(Client):
                     headers={"Authorization": f"Bearer {account.access_token}"},
                     files={"metadata": (None,
                             __import__("json").dumps({
-                                "snippet": {"title": caption[:100], "description": caption},
-                                "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False}}),
+                                "snippet": {"title": title, "description": desc,
+                                            "categoryId": "22"},
+                                "status": {"privacyStatus": "public",
+                                           "selfDeclaredMadeForKids": False}}),
                             "application/json"),
                             "media": ("video.mp4", vid.content, "video/mp4")})
-                r.raise_for_status()
+                if r.status_code != 200:
+                    return PublishResult(False,
+                        error=f"YouTube upload failed ({r.status_code}): {r.text[:300]}")
                 return PublishResult(True, platform_post_id=r.json()["id"])
         except Exception as e:
             return PublishResult(False, error=f"YouTube error: {e}")
@@ -259,19 +283,28 @@ class _YouTubeClient(Client):
                            .get("uploadsPlaylistId"))
                 if not uploads:
                     return []
-                r2 = await c.get("https://www.googleapis.com/youtube/v3/playlistItems",
-                                 params={"part": "snippet", "playlistId": uploads,
-                                         "maxResults": 10}, headers=h)
-                r2.raise_for_status()
                 out = []
-                for it in r2.json().get("items", []):
-                    sn = it["snippet"]
-                    vid = sn.get("resourceId", {}).get("videoId", "")
-                    if vid:
-                        out.append({"id": vid, "title": sn.get("title", "video"),
-                                    "published_at": sn.get("publishedAt", ""),
-                                    "thumb": (sn.get("thumbnails", {}) or {}).get("high", {})
-                                              .get("url", "")})
+                page_token = None
+                for _ in range(3):  # up to ~150 recent videos
+                    params = {"part": "snippet", "playlistId": uploads,
+                              "maxResults": 50}
+                    if page_token:
+                        params["pageToken"] = page_token
+                    r2 = await c.get("https://www.googleapis.com/youtube/v3/playlistItems",
+                                     params=params, headers=h)
+                    r2.raise_for_status()
+                    data = r2.json()
+                    for it in data.get("items", []):
+                        sn = it["snippet"]
+                        vid = sn.get("resourceId", {}).get("videoId", "")
+                        if vid:
+                            out.append({"id": vid, "title": sn.get("title", "video"),
+                                        "published_at": sn.get("publishedAt", ""),
+                                        "thumb": (sn.get("thumbnails", {}) or {}).get("high", {})
+                                                  .get("url", "")})
+                    page_token = data.get("nextPageToken")
+                    if not page_token:
+                        break
                 return out
         except Exception:
             return []
@@ -279,7 +312,8 @@ class _YouTubeClient(Client):
 
 class _XClient(Client):
     """X (Twitter) API v2."""
-    async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
+    async def publish(self, account: Account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
         try:
             async with httpx.AsyncClient(timeout=30) as c:
                 r = await c.post(
@@ -303,7 +337,8 @@ class _LinkedInClient(Client):
         # LinkedIn Social Actions API — implement with POST /socialActions/{urn}/comments
         return True
 
-    async def publish(self, account: Account, caption: str, media_url: str) -> PublishResult:
+    async def publish(self, account: Account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
         try:
             async with httpx.AsyncClient(timeout=30) as c:
                 headers = {"Authorization": f"Bearer {settings.LINKEDIN_ACCESS_TOKEN}",
@@ -326,18 +361,37 @@ class _LinkedInClient(Client):
                                 "impressions": 0, "reach": 0})
 
 
+class _ManualHelperClient(Client):
+    """Platforms with NO public posting API (Moj, ShareChat) or API gated
+    behind Meta app review (Threads). Posts become ready-to-publish reminders:
+    caption + media copied, one click opens the app to finish manually."""
+
+    URLS = {"moj": "https://mojapp.in",
+            "sharechat": "https://sharechat.com",
+            "threads": "https://threads.net"}
+
+    async def publish(self, account: Account, caption: str, media_url: str,
+                      post_type: str = "feed") -> PublishResult:
+        url = self.URLS.get(account.platform.value, "")
+        return PublishResult(False, manual=True, error=(
+            f"MANUAL: {account.platform.value.capitalize()} has no public posting API. "
+            f"Open {url or 'the app'} → create post, paste this caption and attach the "
+            f"{'video' if post_type in ('video','short') else 'media'}, then publish. "
+            "SocialAuto keeps it here so your calendar/stats stay in one place."))
+
+    async def fetch(self, account: Account, platform_post_id: str) -> FetchResult:
+        return FetchResult([], {})
+
+
 _CLIENTS = {
     Platform.instagram: _MetaClient,
     Platform.facebook: _MetaClient,
     Platform.x: _XClient,
     Platform.linkedin: _LinkedInClient,
     Platform.youtube: _YouTubeClient,
-    # Threads has an official Meta API (developers.facebook.com/docs/threads) —
-    # wire via _MetaClient-style OAuth in real mode; Moj / ShareChat have no
-    # public posting API, so they run on the mock client (manual-post reminders).
-    Platform.threads: _MockClient,
-    Platform.moj: _MockClient,
-    Platform.sharechat: _MockClient,
+    Platform.threads: _ManualHelperClient,
+    Platform.moj: _ManualHelperClient,
+    Platform.sharechat: _ManualHelperClient,
 }
 
 
@@ -347,8 +401,10 @@ def get_client(platform: Platform):
     return _CLIENTS[platform]()
 
 
-async def publish_post(account: Account, caption: str, media_url: str) -> PublishResult:
-    return await get_client(account.platform).publish(account, caption, media_url)
+async def publish_post(account: Account, caption: str, media_url: str,
+                        post_type: str = "feed") -> PublishResult:
+    return await get_client(account.platform).publish(
+        account, caption, media_url, post_type=post_type)
 
 
 async def fetch_post(account: Account, platform_post_id: str) -> FetchResult:

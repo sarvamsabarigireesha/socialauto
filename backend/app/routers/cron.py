@@ -23,10 +23,12 @@ async def tick(x_cron_secret: str | None = Header(default=None),
                db: Session = Depends(get_db)):
     """One cron tick = publish due posts + sync comments/auto-reply + refresh analytics."""
     _check(x_cron_secret)
+    imported = await engine.auto_import_all(db)
     published = await engine.publish_due_posts(db)
     comments = await engine.sync_comments(db)
     metrics = await engine.sync_metrics(db)
-    return {"ok": True, "published": published, "comments": comments, "metrics": metrics}
+    return {"ok": True, "imported": imported, "published": published,
+            "comments": comments, "metrics": metrics}
 
 
 @router.post("/publish")
