@@ -110,6 +110,21 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
         return {"mode": "real",
                 "authorize_url": f"https://accounts.google.com/o/oauth2/v2/auth?{qs}"}
 
+    # Threads: official Meta Threads API (same OAuth infra as Meta App)
+    # https://developers.facebook.com/docs/threads
+    if plat == Platform.threads:
+        if not settings.META_APP_ID:
+            raise HTTPException(400, "Threads uses your Meta App ID — set META_APP_ID to connect for real")
+        qs = urlencode({
+            "client_id": settings.META_APP_ID,
+            "redirect_uri": redirect_uri,
+            "state": state,
+            "scope": "threads_basic,threads_content_publish",
+            "response_type": "code",
+        })
+        return {"mode": "real",
+                "authorize_url": f"https://threads.net/oauth/authorize?{qs}"}
+
 
 _X_PKCE: dict[str, str] = {}
 
@@ -134,7 +149,8 @@ async def callback(request: Request, code: str | None = None, state: str | None 
         plat = _require_platform(platform)
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
                  "x": "@your_x_handle", "linkedin": "Your LinkedIn",
-                 "youtube": "Your YouTube Channel"}
+                 "youtube": "Your YouTube Channel", "threads": "@your.threads",
+                 "moj": "Your Moj account", "sharechat": "Your ShareChat"}
         acc = _upsert_account(db, user, plat, external_id=f"mock_{plat.value}_{user.id}",
                               token="MOCK_OAUTH_TOKEN", display_name=names[plat.value])
         return _finish(acc, ajax)

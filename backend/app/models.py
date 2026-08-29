@@ -33,6 +33,27 @@ class Platform(str, enum.Enum):
     x = "x"
     linkedin = "linkedin"
     youtube = "youtube"
+    threads = "threads"
+    moj = "moj"
+    sharechat = "sharechat"
+
+
+class IdeaStatus(str, enum.Enum):
+    unassigned = "unassigned"
+    todo = "todo"
+    inprogress = "inprogress"
+    done = "done"
+
+
+class Idea(Base):
+    """Content idea in the Buffer-style Kanban board."""
+    __tablename__ = "ideas"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    status = Column(Enum(IdeaStatus), default=IdeaStatus.unassigned, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
 
 
 class PostStatus(str, enum.Enum):

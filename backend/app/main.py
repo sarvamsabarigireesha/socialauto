@@ -17,7 +17,7 @@ from .database import Base, engine, SessionLocal
 from .models import Account, Post, PostStatus, Platform, User
 from .security import hash_password
 from .routers import auth as auth_router, oauth as oauth_router, webhooks as webhooks_router
-from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router
+from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router
 from .routers.media import MEDIA_DIR
 
 app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.0.0")
@@ -31,6 +31,7 @@ app.include_router(auth_router.router)
 app.include_router(oauth_router.router)
 app.include_router(webhooks_router.router)
 app.include_router(ai_router.router)
+app.include_router(ideas_router.router)
 app.include_router(accounts.router)
 app.include_router(posts.router)
 app.include_router(comments.router)
@@ -66,12 +67,20 @@ def _run_migrations(db):
         if "posts" in cols and "group_id" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN group_id VARCHAR(40) DEFAULT ''"))
 
-    # Postgres: add new ENUM values (e.g. youtube) that create_all won't add on existing DBs.
+    # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
+        wanted = ["youtube", "threads", "moj", "sharechat"]
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             for e in insp.get_enums():
-                if "instagram" in (e.get("labels") or []) and "youtube" not in e["labels"]:
-                    conn.execute(text(f"ALTER TYPE {e['name']} ADD VALUE 'youtube'"))
+                labels = e.get("labels") or []
+                if "instagram" not in labels:
+                    continue
+                for val in wanted:
+                    if val not in labels:
+                        try:
+                            conn.execute(text(f"ALTER TYPE {e['name']} ADD VALUE '{val}'"))
+                        except Exception:
+                            pass  # value already added
 
     demo = db.query(User).filter(User.email == "demo@socialauto.app").first()
     if not demo:

@@ -225,7 +225,64 @@
   .connect-btn small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
   .cico.ig{background:linear-gradient(45deg,#f09433,#dc2743,#cc2366)}
   .cico.fb{background:#1877f2} .cico.x{background:#0f1419} .cico.li{background:#0a66c2}
-  .cico.yt{background:#ff0000}
+  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981}
+  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}
+  .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}
+  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}
+  .plat.threads{color:#000}.plat.moj{color:#ff4d00}.plat.sharechat{color:#10b981}
+
+  /* ---------- home greeting ---------- */
+  .greet{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+  .greet .wave{width:64px;height:64px;border-radius:18px;background:#e8f0fe;display:flex;align-items:center;
+    justify-content:center;font-size:32px}
+  .greet h1{font-size:27px;font-weight:800}
+  .greet .date{color:var(--muted);font-size:14px}
+  .metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px}
+  @media(max-width:860px){.metric-row{grid-template-columns:1fr}}
+  .metric-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;
+    display:flex;align-items:center;gap:16px;box-shadow:var(--shadow)}
+  .ring{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:26px;font-weight:800;flex-shrink:0}
+  .ring.streak{background:#f0eafe;color:#7c3aed}
+  .ring.goals{background:#f1f3f7;color:#8b94a3}
+  .ring.score{background:#fdf3e0;color:#d97706}
+  .metric-card .ttl{font-size:19px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .metric-card .sub{color:var(--muted);font-size:13.5px;margin-top:2px}
+  .pct{background:#f3e8ff;color:#7c3aed;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700}
+  .up{color:var(--green);font-weight:700}
+
+  /* ---------- ideas kanban ---------- */
+  .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:1000px){.kanban{grid-template-columns:repeat(2,1fr)}}
+  .kcol{background:#f7f8fb;border:1px solid var(--border);border-radius:14px;padding:12px;min-height:300px}
+  .kcol h3{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--txt)}
+  .kcol .cnt{background:#e6e9f1;border-radius:20px;padding:1px 9px;font-size:12px;color:var(--muted)}
+  .kcard{background:#fff;border:1px solid var(--border);border-radius:11px;padding:12px;margin:10px 0;
+    box-shadow:0 1px 3px rgba(16,24,40,.05);font-size:13.5px;cursor:grab;position:relative}
+  .kcard:hover{border-color:var(--brand)}
+  .kcard .moves{margin-top:10px;display:flex;gap:5px}
+  .kcard .moves button{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border2);
+    background:#fff;cursor:pointer;color:var(--muted)}
+  .kcard .moves button:hover{border-color:var(--brand);color:var(--brand)}
+  .kcard .del{position:absolute;top:7px;right:9px;border:none;background:none;color:var(--muted);
+    cursor:pointer;font-size:13px}
+  .add-idea{width:100%;border:1px dashed var(--border2);background:transparent;border-radius:10px;
+    padding:9px;color:var(--muted);font-weight:600;cursor:pointer;margin-top:8px}
+  .add-idea:hover{border-color:var(--brand);color:var(--brand)}
+
+  /* ---------- crop & growth ---------- */
+  .crop-modal{max-width:760px}
+  .crop-stage{position:relative;background:#111;border-radius:12px;overflow:hidden;max-height:380px;
+    display:flex;align-items:center;justify-content:center}
+  .crop-stage canvas{max-width:100%;max-height:380px;display:block}
+  .ratio-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .ratio-btn{border:1.5px solid var(--border2);background:#fff;border-radius:10px;padding:8px 14px;
+    font-weight:700;font-size:13px;cursor:pointer}
+  .ratio-btn.sel{border-color:var(--brand);background:#f0f3ff;color:var(--brand-d)}
+  .score-ring{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:30px;font-weight:800;color:#fff;margin:0 auto 10px}
+  .check-row{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .check-row .ok{color:var(--green)} .check-row .bad{color:var(--red)}
   .connected-ok{background:#e3f6ee;color:var(--green);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700}
   .muted{color:var(--muted)}
   .section-title{font-size:16px;font-weight:800;margin:0 0 14px}
@@ -258,7 +315,9 @@
 <!-- ================= SIDEBAR ================= -->
 <aside class="sidebar">
   <div class="logo"><div class="mk">⚡</div> SocialAuto</div>
-  <button class="nav-item active" data-view="calendar">📅 Calendar</button>
+  <button class="nav-item active" data-view="home">🏠 Home</button>
+  <button class="nav-item" data-view="ideas">💡 Ideas</button>
+  <button class="nav-item" data-view="calendar">📅 Calendar</button>
   <button class="nav-item" data-view="posts">📋 Posts</button>
   <button class="nav-item" data-view="bulk">📦 Bulk / CSV</button>
   <button class="nav-item" data-view="inbox">💬 Inbox <span class="badge" id="inboxBadge" style="display:none">0</span></button>
@@ -276,7 +335,64 @@
 
 <!-- ================= MAIN ================= -->
 <div class="main">
-  <div class="topbar">
+  <!-- HOME -->
+  <section id="view-home">
+    <div class="greet">
+      <div class="wave">👋</div>
+      <div>
+        <h1 id="greetLine">Good afternoon!</h1>
+        <div class="date" id="greetDate"></div>
+      </div>
+    </div>
+    <div class="metric-row">
+      <div class="metric-card">
+        <div class="ring streak" id="streakRing">0</div>
+        <div><div class="ttl">Week Streak <span class="pct" id="streakPct"></span></div>
+        <div class="sub" id="streakSub">Start posting this week!</div></div>
+      </div>
+      <div class="metric-card">
+        <div class="ring goals" id="goalsRing">0</div>
+        <div><div class="ttl">Posting Goals</div>
+        <div class="sub" id="goalsSub">Set a weekly posting rhythm</div></div>
+      </div>
+      <div class="metric-card">
+        <div class="ring score" id="scoreRing">55</div>
+        <div><div class="ttl">Comment Score</div>
+        <div class="sub"><span class="up" id="scoreDelta">↗ 28%</span> from last week (auto-replies count!)</div></div>
+      </div>
+    </div>
+    <div class="grid two-col">
+      <div class="card" style="padding:20px">
+        <h2 class="section-title">🚀 VidIQ-style YouTube Growth Kit</h2>
+        <label class="f">Video title</label>
+        <input id="grTitle" placeholder="e.g. 5 Irani Chai spots in Hyderabad you MUST try 🔥" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:10px">
+        <label class="f" style="margin-top:10px">Description</label>
+        <textarea id="grDesc" placeholder="Keywords + summary (200 words recommended)" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:10px;min-height:70px"></textarea>
+        <button class="btn" style="margin-top:12px" onclick="runGrowth()">📈 Analyze & get SEO plan</button>
+        <div id="growthOut" style="margin-top:16px"></div>
+      </div>
+      <div class="card" style="padding:20px">
+        <h2 class="section-title">📊 Quick stats</h2>
+        <div id="homeStats" style="line-height:2.1;font-size:14.5px"></div>
+        <h2 class="section-title" style="margin-top:20px">💡 Idea of the moment</h2>
+        <div id="ideaPrompt" class="muted" style="font-size:13.5px;line-height:1.8"></div>
+        <button class="btn ghost sm" style="margin-top:10px" onclick="saveQuickIdea()">＋ Save to Ideas board</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- IDEAS KANBAN -->
+  <section id="view-ideas" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <input id="newIdeaText" placeholder="💡 Capture a content idea… (Enter to save)" style="flex:1;border:1.5px solid var(--border2);border-radius:11px;padding:12px 16px" onkeydown="if(event.key==='Enter')addIdea()">
+      <button class="btn" onclick="addIdea()">+ New Idea</button>
+      <button class="btn ghost" onclick="runIdeaAI()">✨ Generate Ideas</button>
+    </div>
+    <div class="kanban" id="kanban"></div>
+    <p class="muted" style="margin-top:14px">Click the arrows to move an idea across the funnel · turn a Done idea into a post with Create Post.</p>
+  </section>
+
+  <div class="topbar" style="display:none">
     <div>
       <h1 id="viewTitle">Calendar</h1>
       <div class="sub" id="viewSub">Plan, schedule and auto-publish across all your social accounts</div>
@@ -402,6 +518,9 @@
           <button class="connect-btn" onclick="connectOAuth('x')"><span class="cico x">🐦</span><span>X (Twitter)<small>OAuth 2.0 · tweets</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('linkedin')"><span class="cico li">💼</span><span>LinkedIn<small>OAuth · profile posts</small></span></button>
           <button class="connect-btn" onclick="connectOAuth('youtube')"><span class="cico yt">▶️</span><span>YouTube<small>Google OAuth · videos & comments</small></span></button>
+          <button class="connect-btn" onclick="connectOAuth('threads')"><span class="cico th">🧵</span><span>Threads<small>Meta API · text + images</small></span></button>
+          <button class="connect-btn" onclick="connectOAuth('moj')"><span class="cico moj">🎬</span><span>Moj<small>short video (manual-post helper)</small></span></button>
+          <button class="connect-btn" onclick="connectOAuth('sharechat')"><span class="cico sc">💬</span><span>ShareChat<small>regional social (helper)</small></span></button>
         </div>
         <details style="margin:6px 0 4px">
           <summary class="muted" style="cursor:pointer;font-size:12.5px;font-weight:600">Advanced: add account manually with token (instead of OAuth)</summary>
@@ -413,6 +532,9 @@
               <option value="x">🐦 X (Twitter)</option>
               <option value="linkedin">💼 LinkedIn</option>
               <option value="youtube">▶️ YouTube</option>
+              <option value="threads">🧵 Threads</option>
+              <option value="moj">🎬 Moj</option>
+              <option value="sharechat">💬 ShareChat</option>
             </select></div>
           <div><label class="f">Display name</label><input id="aName" placeholder="@yourbrand" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
           <div><label class="f">Account / Page ID</label><input id="aExt" placeholder="IG user id / page id" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
@@ -505,6 +627,7 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
         <div class="sel-media" id="selMediaBox">
           <img id="selMediaImg" src="" alt="">
           <button class="rm" onclick="clearMedia()">✕</button>
+          <button class="tool-btn" style="position:absolute;bottom:8px;left:8px" onclick="openCrop()">✂️ Auto-crop for platforms</button>
         </div>
 
         <div class="sched-row">
@@ -536,6 +659,23 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
     <div class="modal-foot">
       <button class="btn ghost" onclick="closeComposer()">Cancel</button>
       <button class="btn green" id="saveBtn" onclick="savePost()">🗓 Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- CROP MODAL -->
+<div class="overlay" id="cropOverlay">
+  <div class="modal crop-modal">
+    <div class="modal-head"><h3>✂️ Auto-crop image per platform</h3>
+      <button class="x" onclick="document.getElementById('cropOverlay').classList.remove('open')">✕</button></div>
+    <div style="padding:18px 22px">
+      <p class="muted" style="margin-bottom:6px">Instagram full image cut avthundi (4:5/1:1 kavali), Facebook full-width teeskuntundi. Select chesi crop cheste preview + posts correct ratio lo velthayi:</p>
+      <div class="ratio-row" id="ratioRow"></div>
+      <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
+      <div class="modal-foot" style="padding:14px 0 0;border:none">
+        <button class="btn ghost" onclick="document.getElementById('cropOverlay').classList.remove('open')">Cancel</button>
+        <button class="btn green" onclick="applyCrop()">✔ Apply cropped image</button>
+      </div>
     </div>
   </div>
 </div>
@@ -612,11 +752,14 @@ let ACCOUNTS = [], POSTS = [], MEDIA = [];
 let calYear, calMonth;                      // calendar cursor
 let comp = { sel: new Set(), mediaUrl: "", editingId: null };
 const PLAT_META = {
-  instagram:{ic:'📸',cls:'ig',limit:2200,label:'Instagram'},
-  facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook'},
-  x:{ic:'🐦',cls:'x',limit:280,label:'X'},
-  linkedin:{ic:'💼',cls:'li',limit:3000,label:'LinkedIn'},
-  youtube:{ic:'▶️',cls:'yt',limit:5000,label:'YouTube'},
+  instagram:{ic:'📸',cls:'ig',limit:2200,label:'Instagram', ratio:'4/5', ratioNote:'4:5 portrait (best feed)'},
+  facebook:{ic:'👍',cls:'fb',limit:2200,label:'Facebook', ratio:'1.91/1', ratioNote:'1.91:1 link / 4:5 photo'},
+  x:{ic:'🐦',cls:'x',limit:280,label:'X', ratio:'16/9', ratioNote:'16:9 landscape'},
+  linkedin:{ic:'💼',cls:'li',limit:3000,label:'LinkedIn', ratio:'1.91/1', ratioNote:'1.91:1 landscape'},
+  youtube:{ic:'▶️',cls:'yt',limit:5000,label:'YouTube', ratio:'16/9', ratioNote:'16:9 video / 9:16 Shorts'},
+  threads:{ic:'🧵',cls:'th',limit:500,label:'Threads', ratio:'4/5', ratioNote:'4:5 portrait'},
+  moj:{ic:'🎬',cls:'moj',limit:150,label:'Moj', ratio:'9/16', ratioNote:'9:16 vertical short'},
+  sharechat:{ic:'💬',cls:'sc',limit:500,label:'ShareChat', ratio:'9/16', ratioNote:'9:16 vertical short'},
 };
 let TOKEN = localStorage.getItem('sa_token') || null;
 let ME = null;
@@ -705,8 +848,209 @@ const fmtDT = dt => new Date(dt).toLocaleString('en-IN',{dateStyle:'medium',time
 const toast = (m, ok=true) => { const t=document.getElementById('toast'); t.textContent=m;
   t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); };
 
+/* ================= home (greeting + metrics) ================= */
+function greeting(){
+  const h = new Date().getHours();
+  return h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+}
+async function loadHome(){
+  const name = (ME?.name||ME?.email||'creator').split('@')[0];
+  document.getElementById('greetLine').textContent = `${greeting()}, ${name}! 👋`;
+  document.getElementById('greetDate').textContent =
+    new Date().toLocaleDateString('en-IN',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+  const d = await api('/api/analytics');
+  // week streak: days with scheduled/published posts in last 7 days
+  const weekAgo = Date.now()-7*864e5;
+  const days = new Set((await api('/api/posts'))
+    .filter(p=> new Date(p.published_at||p.scheduled_at).getTime() > weekAgo)
+    .map(p=>new Date(p.published_at||p.scheduled_at).toDateString()));
+  const streak = days.size;
+  document.getElementById('streakRing').textContent = streak;
+  document.getElementById('streakPct').textContent = streak>=5?'Top 15%':streak>=3?'On track':'Warm up';
+  document.getElementById('streakSub').textContent = streak>=5?'Streak hit, keep going!':`${7-streak} more day(s) this week for Top 15%`;
+  const goal = 7, done = streak;
+  document.getElementById('goalsRing').textContent = `${done}/${goal}`;
+  document.getElementById('goalsSub').textContent = done>=goal?'Weekly goal smashed 🎉':'Goal: post once daily (7/week)';
+  const coverage = d.comments_total ? Math.round(d.auto_replied/d.comments_total*100) : 55;
+  document.getElementById('scoreRing').textContent = Math.max(55, coverage);
+  document.getElementById('homeStats').innerHTML = `
+    📝 <b>${d.posts_published}</b> posts published · <b>${d.posts_scheduled}</b> scheduled<br>
+    ❤️ <b>${d.totals.likes.toLocaleString('en-IN')}</b> likes · 👁 <b>${d.totals.impressions.toLocaleString('en-IN')}</b> impressions<br>
+    🤖 <b>${d.auto_replied}</b> comment auto-replies sent<br>
+    🔗 <b>${(await api('/api/accounts')).length}</b> social channels connected`;
+  const prompts = [
+    "Behind-the-scenes reel of your process — 80% higher retention 🎬",
+    "Answer the top question from your comments in a short video 💬",
+    "Listicle: '5 mistakes beginners make with ___' — saves well 🔥",
+    "Festive/weekend post with a discount hook and a clear CTA 🎉",
+    "Customer testimonial / result post — builds trust ⭐",
+  ];
+  window._quickIdea = prompts[Math.floor(Math.random()*prompts.length)];
+  document.getElementById('ideaPrompt').textContent = '💡 ' + window._quickIdea;
+}
+async function saveQuickIdea(){
+  await api('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:window._quickIdea,status:'unassigned'})});
+  toast('Saved to Ideas board ✅');
+}
+
+/* ================= ideas kanban ================= */
+const KCOLS = [['unassigned','📥 Unassigned'],['todo','📋 To Do'],['inprogress','🚀 In Progress'],['done','✅ Done']];
+async function loadIdeas(){
+  const data = await api('/api/ideas');
+  document.getElementById('kanban').innerHTML = KCOLS.map(([key,label])=>`
+    <div class="kcol">
+      <h3>${label} <span class="cnt">${(data[key]||[]).length}</span></h3>
+      <div>${(data[key]||[]).map(i=>`
+        <div class="kcard">
+          <button class="del" onclick="delIdea(${i.id})">✕</button>
+          ${esc(i.text)}
+          <div class="moves">
+            ${key!=='unassigned'?`<button onclick="moveIdea(${i.id},'unassigned')">←</button>`:''}
+            ${key==='unassigned'?`<button onclick="moveIdea(${i.id},'todo')">To Do →</button>`:''}
+            ${key==='todo'?`<button onclick="moveIdea(${i.id},'inprogress')">Start →</button>`:''}
+            ${key==='inprogress'?`<button onclick="moveIdea(${i.id},'done')">✓ Done</button>`:''}
+            ${key==='done'?`<button onclick="ideaToPost('${esc(i.text).replace(/'/g,"\\'")}')">Create Post ✏️</button>`:''}
+          </div>
+        </div>`).join('')}
+      <button class="add-idea" onclick="quickAdd('${key}')">+ New idea</button>
+    </div>`).join('');
+}
+async function addIdea(){
+  const t = document.getElementById('newIdeaText').value.trim();
+  if(!t) return;
+  await api('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+  document.getElementById('newIdeaText').value='';
+  loadIdeas();
+}
+async function quickAdd(status){
+  const t = prompt('Idea text:');
+  if(!t) return;
+  await api('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,status})});
+  loadIdeas();
+}
+async function moveIdea(id,status){
+  await api(`/api/ideas/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  loadIdeas();
+}
+async function delIdea(id){
+  await api('/api/ideas/'+id,{method:'DELETE'}); loadIdeas();
+}
+function ideaToPost(text){
+  openComposer();
+  document.getElementById('capText').value = text;
+  renderPreviews();
+}
+async function runIdeaAI(){
+  const topic = prompt('What is your niche/topic? (e.g. Hyderabad food, fitness tips)');
+  if(!topic) return;
+  toast('✨ Generating ideas…');
+  const r = await api('/api/ai/suggest',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({caption:`content ideas for ${topic}`,platforms:['instagram','youtube']})});
+  const ideas = [
+    `Top 10 ${topic} listicle post 🔥`,
+    `Behind the scenes: a day in my ${topic} journey`,
+    `Common ${topic} mistakes beginners make`,
+    `Q&A — answer top audience questions about ${topic}`,
+    `Before/after result post (${topic})`,
+  ];
+  for(const t of ideas){
+    await api('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+  }
+  loadIdeas(); toast('5 ideas generated ✨');
+}
+
+/* ================= YouTube growth (VidIQ-style) ================= */
+async function runGrowth(){
+  const title = document.getElementById('grTitle').value.trim();
+  if(!title) return toast('Enter a video title', false);
+  const desc = document.getElementById('grDesc').value;
+  const r = await api('/api/ai/growth',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({title,description:desc})});
+  const ts = r.title_score;
+  const col = ts.score>=80?'#22a06b':ts.score>=60?'#5b6cff':ts.score>=40?'#f5a524':'#e5484d';
+  document.getElementById('growthOut').innerHTML = `
+    <div style="text-align:center;margin:14px 0">
+      <div class="score-ring" style="background:${col}">${ts.score}</div>
+      <div style="font-weight:800;font-size:16px">Grade ${ts.grade} · ${ts.length} chars</div>
+      <div class="muted" style="font-size:12.5px">VidIQ-style SEO score</div>
+    </div>
+    <div>${ts.checks.map(c=>`<div class="check-row"><span class="${c[1]?'ok':'bad'}">${c[1]?'✔':'✘'}</span><span>${esc(c[0])}</span></div>`).join('')}</div>
+    <label class="f" style="margin-top:12px">🔖 Suggested SEO tags (copy into YouTube tags)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${r.seo_tags.map(t=>`<span style="background:#e8f0fe;color:#1a56db;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer" onclick="navigator.clipboard.writeText('${t}')">${t}</span>`).join('')}</div>
+    <label class="f" style="margin-top:12px">⏰ Best upload times</label>
+    <div style="font-size:13px;color:var(--muted);line-height:1.8">${Object.entries(r.best_upload_times).map(([k,v])=>`• <b>${PLAT_META[k]?PLAT_META[k].label:k}</b>: ${v}`).join('<br>')}</div>
+    <label class="f" style="margin-top:12px">💰 Monetization checklist (grow subs → monetization)</label>
+    <div>${r.monetization_checklist.map((m,i)=>`<details style="border-bottom:1px solid var(--border);padding:7px 0"><summary style="cursor:pointer;font-size:13.5px;font-weight:600">☐ ${esc(m.task)}</summary><div class="muted" style="font-size:12.5px;padding-top:4px">${esc(m.why)}</div></details>`).join('')}</div>
+    <label class="f" style="margin-top:12px">📈 Growth tips</label>
+    <div style="font-size:13px;color:var(--muted);line-height:1.8">${r.growth_tips.map(t=>`• ${esc(t)}`).join('<br>')}</div>`;
+}
+
+/* ================= image crop ================= */
+let cropState = {img:null, ratio:[4,5], w:0, h:0};
+function openCrop(){
+  if(!comp.mediaUrl) return toast('Attach an image first', false);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = ()=>{
+    cropState.img = img;
+    const plats = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
+    const ratios = [...new Set((plats.length?plats:Object.keys(PLAT_META)).map(p=>PLAT_META[p].ratio))];
+    const labelFor = r => Object.values(PLAT_META).find(m=>m.ratio===r)?.ratioNote || r;
+    document.getElementById('ratioRow').innerHTML = [
+      ['1/1','1:1 Square (IG feed/FB)'],['4/5','4:5 Portrait (IG feed best)'],
+      ['9/16','9:16 Reels/Shorts/Moj'],['16/9','16:9 YouTube/FB'],['1.91/1','1.91:1 FB/LinkedIn']
+    ].map(([r,l])=>`<button class="ratio-btn ${r===cropState.ratio.join('/')?'sel':''}" onclick="setRatio('${r}','${l}')">${l}</button>`).join('');
+    drawCrop();
+    document.getElementById('cropOverlay').classList.add('open');
+  };
+  img.onerror = ()=> toast('Cannot load image for crop', false);
+  img.src = comp.mediaUrl;
+}
+function setRatio(r, label){
+  const [w,h] = r.split('/').map(Number);
+  cropState.ratio = [w,h];
+  openCrop(); document.querySelectorAll('.ratio-btn').forEach(b=>{ b.classList.toggle('sel', b.textContent===label); });
+}
+function drawCrop(){
+  const [rw,rh] = cropState.ratio;
+  const img = cropState.img; if(!img) return;
+  const target = rw/rh;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  let cw=iw, ch=ih, sx=0, sy=0;
+  const ir = iw/ih;
+  if(ir > target){ cw = ih*target; sx = (iw-cw)/2; }   // too wide -> crop sides
+  else { ch = iw/target; sy = (ih-ch)/2; }              // too tall -> crop top/bottom
+  const cv = document.getElementById('cropCanvas');
+  const maxW = 680;
+  const scale = Math.min(1, maxW/cw);
+  cv.width = cw*scale; cv.height = ch*scale;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(img, sx, sy, cw, ch, 0, 0, cv.width, cv.height);
+  cropState.crop = {sx,sy,cw,ch,ow:cv.width,oh:cv.height};
+}
+function applyCrop(){
+  const cv = document.getElementById('cropCanvas');
+  // re-draw at full res for quality
+  const [rw,rh]=cropState.ratio; const img=cropState.img; const c=cropState.crop;
+  const out = document.createElement('canvas');
+  out.width = c.cw; out.height = c.ch;
+  out.getContext('2d').drawImage(img, c.sx, c.sy, c.cw, c.ch, 0,0, c.cw, c.ch);
+  out.toBlob(blob=>{
+    const fd = new FormData();
+    fd.append('file', new File([blob],'cropped.jpg',{type:'image/jpeg'}));
+    api('/api/media',{method:'POST',body:fd}).then(m=>{
+      comp.mediaUrl = m.url; showSelMedia(); renderPreviews();
+      document.getElementById('cropOverlay').classList.remove('open');
+      toast('Image cropped & applied ✂️');
+    }).catch(e=>toast(e.message,false));
+  },'image/jpeg',0.92);
+}
+
 /* ================= nav ================= */
 const TITLES = {
+  home:['Home','Your growth dashboard'],
+  ideas:['Ideas','Plan content before you post — Kanban board'],
   calendar:['Calendar','Plan, schedule and auto-publish across all your social accounts'],
   posts:['Posts','Every scheduled and published post in one place'],
   bulk:['Bulk / CSV','Upload hundreds of posts at once'],
@@ -723,6 +1067,8 @@ document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => {
   document.getElementById('view-'+b.dataset.view).style.display='block';
   document.getElementById('viewTitle').textContent = TITLES[b.dataset.view][0];
   document.getElementById('viewSub').textContent = TITLES[b.dataset.view][1];
+  if (b.dataset.view==='home') loadHome();
+  if (b.dataset.view==='ideas') loadIdeas();
   if (b.dataset.view==='calendar') renderCalendar();
   if (b.dataset.view==='posts') renderPosts();
   if (b.dataset.view==='inbox') loadInbox();

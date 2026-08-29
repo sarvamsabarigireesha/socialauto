@@ -289,6 +289,12 @@ _CLIENTS = {
     Platform.x: _XClient,
     Platform.linkedin: _LinkedInClient,
     Platform.youtube: _YouTubeClient,
+    # Threads has an official Meta API (developers.facebook.com/docs/threads) —
+    # wire via _MetaClient-style OAuth in real mode; Moj / ShareChat have no
+    # public posting API, so they run on the mock client (manual-post reminders).
+    Platform.threads: _MockClient,
+    Platform.moj: _MockClient,
+    Platform.sharechat: _MockClient,
 }
 
 
