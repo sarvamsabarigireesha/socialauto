@@ -13,13 +13,15 @@ def _aware(dt: datetime) -> datetime:
 
 
 # ------------------------------------------------------------------ publishing
-async def publish_due_posts(db: Session) -> dict:
-    """Publish every scheduled post whose time has come."""
+async def publish_due_posts(db: Session, user_id: int | None = None) -> dict:
+    """Publish every scheduled post whose time has come (optionally one user)."""
     now = datetime.now(timezone.utc)
-    due = (db.query(Post)
-           .filter(Post.status == PostStatus.scheduled)
-           .filter(Post.scheduled_at <= now)
-           .all())
+    q = (db.query(Post)
+         .filter(Post.status == PostStatus.scheduled)
+         .filter(Post.scheduled_at <= now))
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    due = q.all()
     published, failed = 0, 0
     for post in due:
         post.status = PostStatus.publishing
@@ -55,14 +57,16 @@ async def publish_one(db: Session, post_id: int) -> Post:
 
 
 # ------------------------------------------------------- comments + auto-reply
-async def sync_comments(db: Session) -> dict:
+async def sync_comments(db: Session, user_id: int | None = None) -> dict:
     """Fetch new comments on published posts and auto-reply to each once."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.COMMENT_WATCH_WINDOW_HOURS)
-    posts = (db.query(Post)
-             .filter(Post.status == PostStatus.published)
-             .filter(Post.platform_post_id != "")
-             .filter(Post.published_at >= cutoff)
-             .all())
+    q = (db.query(Post)
+         .filter(Post.status == PostStatus.published)
+         .filter(Post.platform_post_id != "")
+         .filter(Post.published_at >= cutoff))
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    posts = q.all()
     ingested, replied = 0, 0
     for post in posts:
         result = await platforms.fetch_post(post.account, post.platform_post_id)
@@ -115,12 +119,14 @@ def simulate_incoming_comment(db: Session, post_id: int, author: str, text: str)
 
 
 # ------------------------------------------------------------------ analytics
-async def sync_metrics(db: Session) -> dict:
+async def sync_metrics(db: Session, user_id: int | None = None) -> dict:
     """Pull latest metrics for published posts and store a snapshot row."""
-    posts = (db.query(Post)
-             .filter(Post.status == PostStatus.published)
-             .filter(Post.platform_post_id != "")
-             .all())
+    q = (db.query(Post)
+         .filter(Post.status == PostStatus.published)
+         .filter(Post.platform_post_id != ""))
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    posts = q.all()
     updated = 0
     for post in posts:
         result = await platforms.fetch_post(post.account, post.platform_post_id)
@@ -142,9 +148,12 @@ async def sync_metrics(db: Session) -> dict:
     return {"posts_scanned": len(posts), "snapshots": updated}
 
 
-def analytics_summary(db: Session) -> dict:
-    """Aggregate dashboard numbers."""
-    posts = db.query(Post).filter(Post.status == PostStatus.published).all()
+def analytics_summary(db: Session, user_id: int | None = None) -> dict:
+    """Aggregate dashboard numbers for one user."""
+    q = db.query(Post).filter(Post.status == PostStatus.published)
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    posts = q.all()
     totals = {"likes": 0, "comments": 0, "shares": 0, "impressions": 0, "reach": 0}
     by_platform: dict[str, dict] = {}
     per_post = []
@@ -171,8 +180,17 @@ def analytics_summary(db: Session) -> dict:
         bp["likes"] += row["likes"]; bp["comments"] += row["comments"]
         bp["shares"] += row["shares"]; bp["posts"] += 1
 
-    auto_replied = db.query(Comment).filter(Comment.replied == True).count()
-    total_comments = db.query(Comment).count()
+    post_ids = [p.id for p in posts]
+    cq = db.query(Comment)
+    if post_ids:
+        cq = cq.filter(Comment.post_id.in_(post_ids))
+    else:
+        cq = cq.filter(Comment.id == -1)
+    auto_replied = cq.filter(Comment.replied == True).count()
+    total_comments = cq.count()
+    sq = db.query(Post).filter(Post.status == PostStatus.scheduled)
+    if user_id is not None:
+        sq = sq.filter(Post.user_id == user_id)
     return {
         "totals": totals,
         "by_platform": by_platform,
@@ -180,5 +198,5 @@ def analytics_summary(db: Session) -> dict:
         "comments_total": total_comments,
         "auto_replied": auto_replied,
         "posts_published": len(posts),
-        "posts_scheduled": db.query(Post).filter(Post.status == PostStatus.scheduled).count(),
+        "posts_scheduled": sq.count(),
     }

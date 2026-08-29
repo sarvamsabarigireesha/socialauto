@@ -29,6 +29,15 @@ class Settings:
 
     # LinkedIn
     LINKEDIN_ACCESS_TOKEN: str = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
+    LINKEDIN_CLIENT_ID: str = os.getenv("LINKEDIN_CLIENT_ID", "")
+    LINKEDIN_CLIENT_SECRET: str = os.getenv("LINKEDIN_CLIENT_SECRET", "")
+
+    # X (Twitter) OAuth2
+    X_CLIENT_ID: str = os.getenv("X_CLIENT_ID", "")
+    X_CLIENT_SECRET: str = os.getenv("X_CLIENT_SECRET", "")
+
+    # Public URL of this app (OAuth redirect base) — set in production
+    APP_PUBLIC_URL: str = os.getenv("APP_PUBLIC_URL", "")
 
     # Auto-comment behaviour
     AUTO_COMMENT_ENABLED: bool = os.getenv("AUTO_COMMENT_ENABLED", "true").lower() == "true"

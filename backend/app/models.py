@@ -14,6 +14,19 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    """App user with login (email + password). All data is scoped per user."""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(200), default="")
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
+
+
 class Platform(str, enum.Enum):
     instagram = "instagram"
     facebook = "facebook"
@@ -34,6 +47,7 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = Column(Enum(Platform), nullable=False)
     display_name = Column(String(200), nullable=False)          # e.g. "@mybrand"
     external_id = Column(String(200), default="")              # page/ig/user id from the platform
@@ -42,6 +56,7 @@ class Account(Base):
     comment_template = Column(Text, default="")                # optional fixed reply; "" = AI pool
     created_at = Column(DateTime, default=utcnow)
 
+    user = relationship("User", back_populates="accounts")
     posts = relationship("Post", back_populates="account", cascade="all, delete-orphan")
 
 
@@ -49,6 +64,7 @@ class Post(Base):
     __tablename__ = "posts"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     platform_post_id = Column(String(200), default="")        # id returned after publishing
     caption = Column(Text, nullable=False)

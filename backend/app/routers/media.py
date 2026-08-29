@@ -1,4 +1,4 @@
-"""Media library: upload images once, reuse them in posts (Publer-style)."""
+"""Media library: shared sample images (read-only) + per-user uploads."""
 import os
 import uuid
 
@@ -7,10 +7,12 @@ from sqlalchemy.orm import Session
 
 from ..config import DATA_DIR
 from ..database import get_db
-from ..models import Post
+from ..models import Post, User
+from ..security import get_current_user
 
 MEDIA_DIR = DATA_DIR / "media"
-MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+SAMPLES_DIR = MEDIA_DIR / "samples"
+SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
 
@@ -18,8 +20,8 @@ router = APIRouter(prefix="/api/media", tags=["media"])
 
 
 def _seed_samples():
-    """Drop a few demo SVG images so the library isn't empty on first run."""
-    if any(MEDIA_DIR.glob("*")):
+    """Shared demo images available to every user."""
+    if any(SAMPLES_DIR.glob("*")):
         return
     samples = [
         ("sample-biryani.svg", "#ff7a59", "🍛", "Biryani shoot"),
@@ -35,42 +37,55 @@ def _seed_samples():
             f'<text x="300" y="430" font-size="42" fill="#ffffff" text-anchor="middle" '
             f'font-family="sans-serif" font-weight="bold">{label}</text></svg>'
         )
-        (MEDIA_DIR / name).write_text(svg, encoding="utf-8")
+        (SAMPLES_DIR / name).write_text(svg, encoding="utf-8")
 
 
 _seed_samples()
 
 
-@router.get("")
-def list_media():
-    files = []
-    for f in sorted(MEDIA_DIR.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True):
+def _list_dir(d, url_prefix):
+    out = []
+    for f in sorted(d.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True):
         if f.suffix.lower() in ALLOWED:
-            files.append({"name": f.name, "url": f"/media/{f.name}", "size": f.stat().st_size})
-    return files
+            out.append({"name": f.name, "url": f"{url_prefix}/{f.name}",
+                        "size": f.stat().st_size})
+    return out
+
+
+@router.get("")
+def list_media(user: User = Depends(get_current_user)):
+    user_dir = MEDIA_DIR / f"u{user.id}"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    uploads = _list_dir(user_dir, f"/media/u{user.id}")
+    samples = _list_dir(SAMPLES_DIR, "/media/samples")
+    return uploads + samples
 
 
 @router.post("", status_code=201)
-async def upload_media(file: UploadFile = File(...)):
+async def upload_media(file: UploadFile = File(...),
+                       user: User = Depends(get_current_user)):
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED:
         raise HTTPException(400, "Only image files (jpg/png/gif/webp/svg) are allowed")
+    user_dir = MEDIA_DIR / f"u{user.id}"
+    user_dir.mkdir(parents=True, exist_ok=True)
     name = f"{uuid.uuid4().hex[:12]}{ext}"
     content = await file.read()
     if len(content) > 8 * 1024 * 1024:
         raise HTTPException(400, "File too large (max 8MB)")
-    (MEDIA_DIR / name).write_bytes(content)
-    return {"name": name, "url": f"/media/{name}", "size": len(content)}
+    (user_dir / name).write_bytes(content)
+    return {"name": name, "url": f"/media/u{user.id}/{name}", "size": len(content)}
 
 
 @router.delete("/{name}", status_code=204)
-def delete_media(name: str, db: Session = Depends(get_db)):
-    # prevent path traversal
+def delete_media(name: str, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
     safe = os.path.basename(name)
-    path = MEDIA_DIR / safe
+    path = MEDIA_DIR / f"u{user.id}" / safe
     if not path.exists():
-        raise HTTPException(404, "not found")
-    in_use = db.query(Post).filter(Post.media_url.like(f"%{safe}")).first()
+        raise HTTPException(404, "not found (or not your upload)")
+    in_use = (db.query(Post).filter(Post.user_id == user.id)
+              .filter(Post.media_url.like(f"%{safe}")).first())
     if in_use:
         raise HTTPException(409, "Media is used by a post; delete the post first")
     path.unlink()

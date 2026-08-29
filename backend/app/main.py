@@ -14,7 +14,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import Base, engine, SessionLocal
-from .models import Account, Post, PostStatus, Platform
+from .models import Account, Post, PostStatus, Platform, User
+from .security import hash_password
+from .routers import auth as auth_router, oauth as oauth_router
 from .routers import accounts, posts, comments, analytics, cron, media
 from .routers.media import MEDIA_DIR
 
@@ -25,6 +27,8 @@ app.add_middleware(
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
+app.include_router(auth_router.router)
+app.include_router(oauth_router.router)
 app.include_router(accounts.router)
 app.include_router(posts.router)
 app.include_router(comments.router)
@@ -38,15 +42,56 @@ app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
 @app.on_event("startup")
 async def on_startup():
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        _run_migrations(db)
+        demo_user = _ensure_demo_user(db)
     if settings.MOCK_MODE:
-        await _seed_demo_data()
+        await _seed_demo_data(demo_user)
 
 
-async def _seed_demo_data():
+def _run_migrations(db):
+    """Lightweight additive migration for existing DBs (SQLite + Postgres):
+    adds new NOT NULL owner columns and back-fills a demo owner for old rows."""
+    from sqlalchemy import text, inspect
+    insp = inspect(engine)
+    cols = {t: {c["name"] for c in insp.get_columns(t)} for t in insp.get_table_names()}
+
+    with engine.begin() as conn:
+        if "accounts" in cols and "user_id" not in cols["accounts"]:
+            conn.execute(text("ALTER TABLE accounts ADD COLUMN user_id INTEGER"))
+        if "posts" in cols and "user_id" not in cols["posts"]:
+            conn.execute(text("ALTER TABLE posts ADD COLUMN user_id INTEGER"))
+
+    demo = db.query(User).filter(User.email == "demo@socialauto.app").first()
+    if not demo:
+        demo = User(email="demo@socialauto.app", name="Demo User",
+                    password_hash=hash_password("demo1234"))
+        db.add(demo)
+        db.commit()
+        db.refresh(demo)
+
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE accounts SET user_id=:u WHERE user_id IS NULL"), {"u": demo.id})
+        conn.execute(text("UPDATE posts SET user_id=:u WHERE user_id IS NULL"), {"u": demo.id})
+
+
+def _ensure_demo_user(db) -> User:
+    demo = db.query(User).filter(User.email == "demo@socialauto.app").first()
+    if not demo:
+        demo = User(email="demo@socialauto.app", name="Demo User",
+                    password_hash=hash_password("demo1234"))
+        db.add(demo)
+        db.commit()
+        db.refresh(demo)
+    return demo
+
+
+async def _seed_demo_data(demo_user: User):
     from .services import engine as eng
     db = SessionLocal()
     try:
-        if db.query(Account).count() > 0:
+        uid = demo_user.id
+        if db.query(Account).filter(Account.user_id == uid).count() > 0:
             return
         demo = [
             (Platform.instagram, "@hyderabad.foodie", "ig_demo_1001", True, ""),
@@ -57,24 +102,23 @@ async def _seed_demo_data():
         ]
         accs = []
         for plat, name, ext, ac, tmpl in demo:
-            a = Account(platform=plat, display_name=name, external_id=ext,
+            a = Account(user_id=uid, platform=plat, display_name=name, external_id=ext,
                         access_token="MOCK_TOKEN", auto_comment=ac, comment_template=tmpl)
             db.add(a)
             accs.append(a)
         db.commit()
 
         now = datetime.now(timezone.utc)
-        # a couple of already-published posts (so analytics/comments have data)
         pub_captions = [
             "Best biryani in Hyderabad? Drop your pick 🍗 #Hyderabad #Biryani",
             "New menu drop this Friday! Save the date 🎉",
         ]
         for caption in pub_captions:
-            p = Post(account_id=accs[0].id, caption=caption, scheduled_at=now - timedelta(hours=2),
+            p = Post(user_id=uid, account_id=accs[0].id, caption=caption,
+                     scheduled_at=now - timedelta(hours=2),
                      status=PostStatus.published, platform_post_id=f"mock_seed_{caption[:6]}",
                      published_at=now - timedelta(hours=2))
             db.add(p)
-        # upcoming scheduled posts
         sched = [
             ("Morning chai + osmania biscuit vibes ☕", now + timedelta(hours=2)),
             ("Weekend special: Haleem night 🌙", now + timedelta(hours=6)),
@@ -82,15 +126,14 @@ async def _seed_demo_data():
             ("Poll: Irani chai vs filter coffee? ☕", now + timedelta(days=2)),
         ]
         for caption, dt in sched:
-            db.add(Post(account_id=accs[0].id, caption=caption, scheduled_at=dt,
+            db.add(Post(user_id=uid, account_id=accs[0].id, caption=caption, scheduled_at=dt,
                         status=PostStatus.scheduled))
-            db.add(Post(account_id=accs[1].id, caption=caption, scheduled_at=dt,
+            db.add(Post(user_id=uid, account_id=accs[1].id, caption=caption, scheduled_at=dt,
                         status=PostStatus.scheduled))
         db.commit()
 
-        # generate metrics + comments for the published ones
-        await eng.sync_metrics(db)
-        await eng.sync_comments(db)
+        await eng.sync_metrics(db, uid)
+        await eng.sync_comments(db, uid)
     finally:
         db.close()
 
