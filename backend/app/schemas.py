@@ -80,7 +80,7 @@ class AccountOut(BaseModel):
     external_id: str
     auto_comment: bool
     comment_template: str
-    posting_slots: list = []
+    posting_slots: Optional[list] = []
     posting_goal: int = 7
     created_at: datetime
 

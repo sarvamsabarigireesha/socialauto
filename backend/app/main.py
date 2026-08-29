@@ -121,6 +121,13 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE accounts ADD COLUMN posting_slots JSON"))
         if "accounts" in cols and "posting_goal" not in cols["accounts"]:
             conn.execute(text("ALTER TABLE accounts ADD COLUMN posting_goal INTEGER NOT NULL DEFAULT 7"))
+        # Backfill NULL posting_slots (rows created before the column existed) —
+        # otherwise AccountOut serialization 500s on production databases.
+        if "accounts" in cols and "posting_slots" in cols["accounts"]:
+            if engine.dialect.name == "postgresql":
+                conn.execute(text("UPDATE accounts SET posting_slots = '[]'::json WHERE posting_slots IS NULL"))
+            else:
+                conn.execute(text("UPDATE accounts SET posting_slots = '[]' WHERE posting_slots IS NULL"))
         pg = engine.dialect.name == "postgresql"
         if "comments" in cols and "resolved" not in cols["comments"]:
             conn.execute(text("ALTER TABLE comments ADD COLUMN resolved BOOLEAN NOT NULL DEFAULT false"))
