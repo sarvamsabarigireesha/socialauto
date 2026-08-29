@@ -3,7 +3,7 @@
 ## What was changed
 
 ### Version
-- Current local code version: `1.4.0`
+- Current local code version: `1.5.0`
 
 ### UI / UX
 - Mobile top header + hamburger sidebar drawer
@@ -77,6 +77,8 @@ Then test manually:
 - Community search + unresolved-only filter
 - Mobile sidebar on a small screen
 - Connect-account duplicate protection
+- Login redesign and dashboard/calendar premium UI review
+- QA smoke report: `QA_SMOKE_REPORT.md`
 
 ## If deploy does not reflect changes
 - Ensure the latest GitHub commit actually contains the changed files
