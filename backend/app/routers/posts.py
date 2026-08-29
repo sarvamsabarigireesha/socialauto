@@ -154,6 +154,25 @@ async def publish_now(post_id: int, db: Session = Depends(get_db),
     return _to_out(p)
 
 
+@router.post("/{post_id}/mark-done", response_model=PostOut)
+def mark_done(post_id: int, db: Session = Depends(get_db),
+              user: User = Depends(get_current_user)):
+    """User finished a MANUAL platform step (e.g. YouTube Community post,
+    Moj/ShareChat) — mark it published here too."""
+    from datetime import datetime, timezone
+    p = db.get(Post, post_id)
+    if not p or p.user_id != user.id:
+        raise HTTPException(404, "post not found")
+    p.status = PostStatus.published
+    p.error = ""
+    p.published_at = datetime.now(timezone.utc)
+    if not p.platform_post_id:
+        p.platform_post_id = f"manual_{p.id}"
+    db.commit()
+    db.refresh(p)
+    return _to_out(p)
+
+
 @router.delete("/{post_id}", status_code=204)
 def delete_post(post_id: int, db: Session = Depends(get_db),
                 user: User = Depends(get_current_user)):

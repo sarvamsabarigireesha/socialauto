@@ -1533,6 +1533,7 @@ function renderPosts(){
              <div style="margin-top:5px;display:flex;gap:6px">
                <button class="btn ghost sm" style="padding:3px 9px" onclick="copyText(${JSON.stringify(p.caption).replace(/"/g,'&quot;')})">📋 Copy caption</button>
                ${p.account.platform==='youtube'?'<a class="btn ghost sm" style="padding:3px 9px;text-decoration:none" href="https://studio.youtube.com" target="_blank">▶️ Open YouTube</a>':''}
+               <button class="btn green sm" style="padding:3px 9px" onclick="markDone(${p.id})">✅ I posted it</button>
              </div></div>`
           : `<div style="color:var(--red);font-size:12px;margin-top:3px">⚠ ${esc(p.error)}</div>`):''}</td>
       <td><span class="plat-tag"><span class="av ${p.account.platform}" style="width:24px;height:24px;font-size:12px">${PLAT_META[p.account.platform].ic}</span>${esc(p.account.display_name)}${p.post_type&&p.post_type!=='feed'?` <small style="color:var(--muted)">· ${p.post_type}</small>`:''}</span></td>
@@ -1550,6 +1551,11 @@ function renderPosts(){
 async function publishNow(id){
   await api(`/api/posts/${id}/publish-now`,{method:'POST'});
   toast('Published 🚀'); refreshData();
+}
+async function markDone(id){
+  await api(`/api/posts/${id}/mark-done`,{method:'POST'});
+  toast('✅ Marked as posted — it now appears in Published/calendar');
+  refreshData();
 }
 async function delPost(id){
   await api('/api/posts/'+id,{method:'DELETE'}); toast('Post deleted'); refreshData();
