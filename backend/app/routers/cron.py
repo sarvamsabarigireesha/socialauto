@@ -12,8 +12,14 @@ from ..services import engine
 
 router = APIRouter(prefix="/api/cron", tags=["cron"])
 
+DEV_DEFAULT_SECRET = "dev-cron-secret-change-me"
+
 
 def _check(secret: str | None):
+    if not settings.MOCK_MODE and settings.CRON_SECRET == DEV_DEFAULT_SECRET:
+        # Defense in depth: never accept the well-known dev default in production.
+        raise HTTPException(503, "CRON_SECRET is still the dev default — "
+                                 "set a strong CRON_SECRET environment variable")
     if secret != settings.CRON_SECRET:
         raise HTTPException(401, "invalid cron secret")
 

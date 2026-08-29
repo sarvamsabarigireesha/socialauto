@@ -16,6 +16,11 @@ JWT_SECRET = os.getenv("JWT_SECRET", "dev-jwt-secret-change-me-in-production")
 JWT_ALG = "HS256"
 TOKEN_TTL_HOURS = 24 * 7
 
+if JWT_SECRET == "dev-jwt-secret-change-me-in-production" and \
+        os.getenv("MOCK_MODE", "true").lower() != "true":
+    print("WARNING: JWT_SECRET is the dev default — auth tokens are forgeable. "
+          "Set a strong JWT_SECRET environment variable in production.", flush=True)
+
 
 def hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
