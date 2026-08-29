@@ -262,7 +262,7 @@ async def _seed_demo_data(demo_user: User):
 @app.get("/api/health")
 def health():
     # `version` doubles as a deploy marker — bump it to verify new code is live.
-    return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.5.1"}
+    return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.5.2"}
 
 
 # ---- serve the dashboard (static) ----
