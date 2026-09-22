@@ -1,5 +1,7 @@
 """Platform clients - FINAL FIXED for Render."""
+import os
 import random
+import tempfile
 from datetime import datetime, timezone
 import httpx
 from..config import settings
@@ -237,8 +239,100 @@ async def _google_refresh_token(account) -> str:
 class _YouTubeClient(Client):
     BASE = "https://www.googleapis.com/youtube/v3"
     UPLOAD = "https://www.googleapis.com/upload/youtube/v3"
+
     async def publish(self, account, caption: str, media_url: str, post_type: str = "feed") -> PublishResult:
-        return PublishResult(False, manual=True, error="MANUAL: YouTube needs video file")
+        """YouTube has no "publish this URL" endpoint — an upload means POSTing
+        the actual video bytes. That is opt-in (YOUTUBE_AUTO_UPLOAD=true) so a
+        scheduled post never silently uploads a file the user didn't expect.
+        """
+        media_url = (media_url or "").strip()
+        if settings.YOUTUBE_AUTO_UPLOAD and media_url.startswith("http"):
+            return await self._resumable_upload(account, caption, media_url)
+        if not settings.YOUTUBE_AUTO_UPLOAD:
+            reason = "set YOUTUBE_AUTO_UPLOAD=true to upload the file directly"
+        else:
+            reason = "media_url must be a public https video link"
+        return PublishResult(False, manual=True, error=f"MANUAL: YouTube — {reason}")
+
+    async def _resumable_upload(self, account, caption: str, media_url: str) -> PublishResult:
+        """Download `media_url`, then push it with YouTube's resumable upload.
+
+        Free tier allows 10,000 quota units/day and one upload costs 1,600, so
+        ~6 uploads a day on a fresh project.
+        """
+        title = (caption or "").strip().splitlines()[0][:100] or "Untitled"
+        body = {
+            "snippet": {"title": title, "description": (caption or "")[:5000],
+                        "categoryId": "22"},   # 22 = People & Blogs
+            "status": {"privacyStatus": settings.YOUTUBE_PRIVACY_STATUS,
+                       "selfDeclaredMadeForKids": False},
+        }
+        path = ""
+        try:
+            async with httpx.AsyncClient(timeout=600, follow_redirects=True) as c:
+                # 1) pull the source video down to a temp file
+                with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as fh:
+                    path = fh.name
+                    async with c.stream("GET", media_url) as r:
+                        if r.status_code != 200:
+                            return PublishResult(
+                                False, error=f"could not download media ({r.status_code})")
+                        async for chunk in r.aiter_bytes(1 << 20):
+                            fh.write(chunk)
+                size = os.path.getsize(path)
+                if size == 0:
+                    return PublishResult(False, error="downloaded media is empty")
+
+                async def _init(token):
+                    return await c.post(
+                        f"{self.UPLOAD}/videos",
+                        params={"uploadType": "resumable", "part": "snippet,status"},
+                        json=body,
+                        headers={"Authorization": f"Bearer {token}",
+                                 "X-Upload-Content-Type": "video/*",
+                                 "X-Upload-Content-Length": str(size)})
+
+                r = await _init(account.access_token)
+                if r.status_code == 401:
+                    r = await _init(await _google_refresh_token(account))
+                if r.status_code not in (200, 201):
+                    return PublishResult(
+                        False, error=f"YouTube upload init {r.status_code}: {r.text[:500]}")
+
+                location = r.headers.get("Location")
+                if not location:
+                    return PublishResult(False, error="YouTube did not return an upload URL")
+
+                # 2) PUT the bytes to the session URL.
+                # An open file object makes httpx treat this as a *sync*
+                # request and raise on an AsyncClient, so stream it with an
+                # async generator instead (also keeps big videos off the heap).
+                async def _chunks(src, chunk_size=1 << 20):
+                    with open(src, "rb") as fh:
+                        while True:
+                            block = fh.read(chunk_size)
+                            if not block:
+                                break
+                            yield block
+
+                r2 = await c.put(location, content=_chunks(path), headers={
+                    "Content-Type": "video/*", "Content-Length": str(size)})
+                print(f"YT UPLOAD {r2.status_code}: {r2.text[:800]}", flush=True)
+                if r2.status_code not in (200, 201):
+                    return PublishResult(
+                        False, error=f"YouTube upload {r2.status_code}: {r2.text[:500]}")
+
+                return PublishResult(True, platform_post_id=r2.json().get("id", ""))
+        except Exception as exc:
+            import traceback
+            print(traceback.format_exc(), flush=True)
+            return PublishResult(False, error=f"YouTube upload error: {exc}")
+        finally:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
     async def fetch(self, account, platform_post_id: str) -> FetchResult:
         """Video statistics + comment threads for one video."""
         try:
