@@ -20,7 +20,7 @@ from .routers import auth as auth_router, oauth as oauth_router, webhooks as web
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.4")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.5")
 
 app.add_middleware(
     CORSMiddleware,
@@ -348,7 +348,7 @@ def health():
     return {
         "ok": True,
         "mock_mode": settings.MOCK_MODE,
-        "version": "1.9.4",
+        "version": "1.9.5",
         "meta_configured": meta_store.meta_configured(),
     }
 

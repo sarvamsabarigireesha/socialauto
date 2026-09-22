@@ -73,47 +73,73 @@ class _MetaClient(Client):
                         media_url = base_url + "/" + media_url
 
                 if account.platform == Platform.instagram:
+                    import asyncio
                     if not media_url.startswith("http"):
                         return PublishResult(False, error="Instagram needs public https URL")
-                    is_video = post_type.lower() in ("video", "reel", "short")
-                    if media_url.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
-                        is_video = True
+                    # YouTube "community" is not an IG type — treat it as a normal photo/reel.
+                    pt = (post_type or "feed").lower()
+                    if pt == "community":
+                        pt = "feed"
+                    is_video = pt in ("video", "reel", "short") or media_url.lower().split("?")[0].endswith(
+                        (".mp4", ".mov", ".m4v", ".webm"))
                     if is_video:
                         payload = {
-                            "media_type": "REELS" if post_type in ("reel", "short") else "VIDEO",
+                            "media_type": "REELS",
                             "video_url": media_url,
                             "caption": caption,
-                            "access_token": token
+                            "share_to_feed": "true",
+                            "access_token": token,
                         }
-                        if post_type in ("reel", "short"):
-                            payload["share_to_feed"] = "true"
-                        r1 = await c.post(f"{v}/{account.external_id}/media", data=payload)
                     else:
                         payload = {
                             "image_url": media_url,
                             "caption": caption,
-                            "access_token": token
+                            "access_token": token,
                         }
-                        r1 = await c.post(f"{v}/{account.external_id}/media", data=payload)
+                    r1 = await c.post(f"{v}/{account.external_id}/media", data=payload)
                     print(f"IG CREATE {r1.status_code}: {r1.text[:2000]}", flush=True)
-                    if r1.status_code!= 200:
+                    if r1.status_code != 200:
                         return PublishResult(False, error=f"IG create {r1.status_code}: {r1.text[:800]}")
                     creation_id = r1.json().get("id")
-                    if is_video:
-                        import asyncio
-                        for _ in range(24):
-                            rs = await c.get(f"{v}/{creation_id}", params={"fields": "status_code", "access_token": token})
-                            sc = rs.json().get("status_code")
-                            if sc == "FINISHED":
-                                break
-                            if sc in ("ERROR", "EXPIRED"):
-                                return PublishResult(False, error=f"IG video {sc}")
+                    if not creation_id:
+                        return PublishResult(False, error="IG create: no container id")
+                    # Photos AND videos must be FINISHED before media_publish.
+                    # Publishing early is Graph error 9007 / 2207027 ("Media ID is not available").
+                    last_status = ""
+                    ready = False
+                    for _ in range(36):
+                        rs = await c.get(f"{v}/{creation_id}", params={
+                            "fields": "status_code,status", "access_token": token})
+                        body = rs.json() if rs.status_code == 200 else {}
+                        last_status = body.get("status_code") or ""
+                        if last_status == "FINISHED":
+                            ready = True
+                            break
+                        if last_status in ("ERROR", "EXPIRED"):
+                            return PublishResult(False, error=(
+                                f"IG container {last_status}: {body.get('status') or body}"))
+                        await asyncio.sleep(5)
+                    if not ready:
+                        return PublishResult(False, error=(
+                            f"Instagram still processing ({last_status or 'IN_PROGRESS'}). "
+                            "Wait a minute and tap Publish again."))
+                    r2 = None
+                    for attempt in range(6):
+                        r2 = await c.post(f"{v}/{account.external_id}/media_publish", data={
+                            "creation_id": creation_id, "access_token": token})
+                        print(f"IG PUBLISH try {attempt+1} {r2.status_code}: {r2.text[:2000]}", flush=True)
+                        if r2.status_code == 200:
+                            return PublishResult(True, platform_post_id=str(r2.json().get("id", "")))
+                        err = {}
+                        try:
+                            err = (r2.json() or {}).get("error") or {}
+                        except Exception:
+                            err = {}
+                        if err.get("code") == 9007 or err.get("error_subcode") == 2207027:
                             await asyncio.sleep(5)
-                    r2 = await c.post(f"{v}/{account.external_id}/media_publish", data={"creation_id": creation_id, "access_token": token})
-                    print(f"IG PUBLISH {r2.status_code}: {r2.text[:2000]}", flush=True)
-                    if r2.status_code!= 200:
-                        return PublishResult(False, error=f"IG publish {r2.status_code}: {r2.text[:800]}")
-                    return PublishResult(True, platform_post_id=r2.json().get("id", ""))
+                            continue
+                        break
+                    return PublishResult(False, error=f"IG publish {r2.status_code}: {r2.text[:800]}")
                 else:
                     if media_url and media_url.startswith("http"):
                         r = await c.post(f"{v}/{account.external_id}/photos", data={"url": media_url, "caption": caption, "access_token": token})
