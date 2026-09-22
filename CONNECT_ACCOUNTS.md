@@ -1,11 +1,18 @@
 # Connecting accounts — step by step
 
+> **Comment syncing:** the app only pulls the **last 7 days** of comments
+> (`COMMENT_SYNC_WINDOW_DAYS`, default 7). Older comments are neither stored nor
+> replied to, and rows that age out are pruned, so the Community inbox stays
+> small and current. Auto-replies are limited to `COMMENT_WATCH_WINDOW_HOURS`
+> (default 24) — set it to `168` if you want the app to answer everything inside
+> the whole 7-day window.
+
 Two kinds of connections live in this app:
 
 | Type | Platforms | Who posts |
 |------|-----------|-----------|
 | **OAuth** (the app posts for you) | Instagram, Facebook Page, YouTube, Threads\* | the app calls the platform API |
-| **Manual / helper** (you post, the app prepares it) | Moj, ShareChat, **Snapchat** | you, in the platform's own app |
+| **Manual / helper** (you post, the app prepares it) | Moj, ShareChat, Snapchat, **Bilibili** | you, in the platform's own app |
 
 \* Threads is OAuth on Meta's side, but this build marks it manual until the
 Threads publishing permissions are approved for your Meta app.
@@ -33,7 +40,7 @@ the account silently stops working with
 > **Publish app** (or add yourself as a test user and reconnect every week).
 > Then disconnect and reconnect YouTube in the app.
 
-## 2. Manual / helper platforms — Moj, ShareChat, Snapchat
+## 2. Manual / helper platforms — Moj, ShareChat, Snapchat, Bilibili
 
 These platforms either have no posting API (Moj, ShareChat) or gate it behind a
 partner approval (Snapchat, see §3), so the app prepares the post and you finish
@@ -63,6 +70,24 @@ The post is **not** published silently. In **Posts** it shows up with a
 
 Nothing is claimed to be published that wasn't, so your posting streaks and
 analytics stay truthful.
+
+## 2b. Bilibili
+
+Bilibili has an official **开放平台 (Open Platform)** with real server-side video
+submission (`member.bilibili.com/arcopen/fn/...`: upload pre-processing →
+chunked upload → merge → cover → submit, signed with HMAC-SHA256), plus data
+APIs for video and account stats. It is **application/approval gated** — you
+apply as a developer and are given an access key id + secret — so it also runs
+as a manual/helper platform until that approval lands.
+
+Steps to make it automatic: apply on the Bilibili 开放平台, get
+`access_key_id` / `access_key_secret` / `access_token`, then send them over and
+the client gets wired the same way Instagram and YouTube are. Video uploads are
+chunked (no practical size limit) and a cover image is uploaded separately.
+
+Related: `biliup` is a well-known open-source CLI that uploads with a browser
+cookie instead of API keys — useful for a one-off bulk upload of your back
+catalogue, but not something to put on a server with your account cookie.
 
 ## 3. Snapchat — why it is manual, and how to make it automatic later
 
@@ -112,3 +137,4 @@ aggregator that already holds the allowlist (paid, per post).
 | Moj | manual connect | ✋ manual | ✋ |
 | ShareChat | manual connect | ✋ manual | ✋ |
 | **Snapchat** | manual connect | ✋ manual (Public Profile API needs Snap approval) | ✋ |
+| **Bilibili** | manual connect | ✋ manual (开放平台 needs developer approval) | ✋ |

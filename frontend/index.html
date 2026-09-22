@@ -358,14 +358,14 @@
   .connect-btn small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
   .cico.ig{background:linear-gradient(45deg,#f09433,#dc2743,#cc2366)}
   .cico.fb{background:#1877f2}
-  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981} .cico.snap{background:#FFFC00;color:#111}
-  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}.av.snapchat{background:#FFFC00;color:#111}
+  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981} .cico.snap{background:#FFFC00;color:#111} .cico.bili{background:#00a1d6}
+  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}.av.snapchat{background:#FFFC00;color:#111}.av.bilibili{background:#00a1d6}
   .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}
-  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}.pv-plat.snap{background:#fffde6;color:#8a7d00}
+  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}.pv-plat.snap{background:#fffde6;color:#8a7d00}.pv-plat.bili{background:#e6f7fc;color:#0086b3}
   .ptype{display:flex;align-items:center;gap:7px;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
   .ptype:has(input:checked){border-color:var(--purple);background:#f3efff;color:var(--purple)}
   .ptype input{accent-color:var(--purple)}
-  .plat.threads{color:#000}.plat.moj{color:#ff4d00}.plat.sharechat{color:#10b981}.plat.snapchat{color:#c9b900}
+  .plat.threads{color:#000}.plat.moj{color:#ff4d00}.plat.sharechat{color:#10b981}.plat.snapchat{color:#c9b900}.plat.bilibili{color:#00a1d6}
 
   /* ---------- home greeting ---------- */
   .greet{display:flex;align-items:center;gap:16px;margin-bottom:22px}
@@ -975,6 +975,7 @@
         <option value="moj">🎬 Moj</option>
         <option value="sharechat">💬 ShareChat</option>
         <option value="snapchat">👻 Snapchat</option>
+        <option value="bilibili">📺 Bilibili</option>
       </select>
       <select id="calStatusFilter" class="select-input" onchange="calendarStatusFilter=this.value;renderCalendar()">
         <option value="all">All statuses</option>
@@ -1029,6 +1030,7 @@
         <option value="moj">🎬 Moj</option>
         <option value="sharechat">💬 ShareChat</option>
         <option value="snapchat">👻 Snapchat</option>
+        <option value="bilibili">📺 Bilibili</option>
       </select>
     </div>
     <div class="queue-wrap" id="queueWrap"></div>
@@ -1101,6 +1103,7 @@
           <option value="moj">🎬 Moj</option>
           <option value="sharechat">💬 ShareChat</option>
         <option value="snapchat">👻 Snapchat</option>
+        <option value="bilibili">📺 Bilibili</option>
         </select>
         <label class="checkline"><input type="checkbox" id="commOpenOnly" onchange="communityOpenOnly=this.checked;loadCommunity()"> Unresolved</label>
       </div>
@@ -1222,8 +1225,9 @@
             <button class="connect-btn" onclick="prepareManualAccount('moj')"><span class="cico moj">🎬</span><span>Moj<small>manual-post helper</small></span></button>
             <button class="connect-btn" onclick="prepareManualAccount('sharechat')"><span class="cico sc">💬</span><span>ShareChat<small>regional social helper</small></span></button>
             <button class="connect-btn" onclick="prepareManualAccount('snapchat')"><span class="cico snap">👻</span><span>Snapchat<small>no public posting API</small></span></button>
+            <button class="connect-btn" onclick="prepareManualAccount('bilibili')"><span class="cico bili">📺</span><span>Bilibili<small>manual helper · open platform pending</small></span></button>
           </div>
-          <div class="helper-note" style="margin-top:10px">Moj, ShareChat and Snapchat use a manual/helper connection flow (their APIs cannot post for you — Snapchat has no open organic posting API, only a partner-gated Public Profile API), while Instagram, Facebook, YouTube and Threads use OAuth.</div>
+          <div class="helper-note" style="margin-top:10px">Moj, ShareChat, Snapchat and Bilibili use a manual/helper connection flow (their APIs cannot post for you — Snapchat has no open organic posting API, only a partner-gated Public Profile API), while Instagram, Facebook, YouTube and Threads use OAuth.</div>
           <details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-weight:700">Advanced manual connect</summary>
             <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
               <div><label class="f">Platform</label>
@@ -1235,6 +1239,7 @@
                   <option value="moj">🎬 Moj</option>
                   <option value="sharechat">💬 ShareChat</option>
         <option value="snapchat">👻 Snapchat</option>
+        <option value="bilibili">📺 Bilibili</option>
                 </select></div>
               <div><label class="f">Display name</label><input id="aName" placeholder="@yourbrand" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
               <div><label class="f">Account / Page ID</label><input id="aExt" placeholder="IG user id / page id" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
@@ -1572,6 +1577,7 @@ const PLAT_META = {
   moj:{ic:'🎬',cls:'moj',limit:150,label:'Moj', ratio:'9/16', ratioNote:'9:16 vertical short'},
   sharechat:{ic:'💬',cls:'sc',limit:500,label:'ShareChat', ratio:'9/16', ratioNote:'9:16 vertical short'},
   snapchat:{ic:'👻',cls:'snap',limit:160,label:'Snapchat', ratio:'9/16', ratioNote:'9:16 vertical (Story / Spotlight)'},
+  bilibili:{ic:'📺',cls:'bili',limit:2000,label:'Bilibili', ratio:'16/9', ratioNote:'16:9 landscape video'},
 };
 let TOKEN = localStorage.getItem('sa_token') || null;
 let ME = null;
@@ -2326,6 +2332,7 @@ const MANUAL_OPEN = {
   moj:{url:'https://mojapp.in/',                          label:'🎬 Open Moj'},
   sharechat:{url:'https://sharechat.com/',                label:'💬 Open ShareChat'},
   snapchat:{url:'https://web.snapchat.com/',              label:'👻 Open Snapchat'},
+  bilibili:{url:'https://member.bilibili.com/platform/upload/video/frame', label:'📺 Open Bilibili uploader'},
 };
 function prepareManualAccount(platform){
   switchView('accounts');

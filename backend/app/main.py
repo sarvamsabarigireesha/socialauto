@@ -20,7 +20,7 @@ from .routers import auth as auth_router, oauth as oauth_router, webhooks as web
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.0")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -88,7 +88,14 @@ async def on_startup():
     _warn_about_ephemeral_storage()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
-        _run_migrations(db)
+        # A migration bug once crashed startup, so the whole deploy failed and
+        # the service stayed on the previous version. Optional migrations log
+        # loudly instead of preventing boot.
+        try:
+            _run_migrations(db)
+        except Exception as exc:
+            print(f"ERROR: migrations failed ({type(exc).__name__}: {exc}) — "
+                  f"continuing with the existing schema", flush=True)
         demo_user = _ensure_demo_user(db)
     if settings.MOCK_MODE:
         await _seed_demo_data(demo_user)
@@ -109,6 +116,25 @@ def _warn_about_ephemeral_storage():
     public = settings.APP_PUBLIC_URL or "unset (platforms cannot fetch your media)"
     print(f"INFO: uploaded media is stored in {DATA_DIR / 'media'} "
           f"(APP_PUBLIC_URL={public})", flush=True)
+
+
+def _media_url_needs_widening(insp, tables) -> bool:
+    """True when posts.media_url is still a narrow VARCHAR (Postgres only).
+
+    Kept as its own function because the first version of this check indexed
+    `cols["posts"]["media_url"]` — `cols` actually holds *sets of column names*,
+    so startup raised `TypeError: 'set' object is not subscriptable` and every
+    deploy of 1.9.0 failed to boot. There is a smoke test for it now.
+    """
+    if "posts" not in tables:
+        return False
+    try:
+        col = next((c for c in insp.get_columns("posts") if c["name"] == "media_url"), None)
+    except Exception:
+        return False
+    if col is None:
+        return False
+    return "TEXT" not in str(col.get("type") or "").upper()
 
 
 def _run_migrations(db):
@@ -186,8 +212,7 @@ def _run_migrations(db):
         # enough to make this statement queue — which then blocks every read and
         # write on posts behind it. Failing fast (and retrying next boot) is far
         # better than wedging the whole app.
-        if ("posts" in cols and engine.dialect.name == "postgresql"
-                and str(cols["posts"]["media_url"].get("type")).upper() != "TEXT"):
+        if engine.dialect.name == "postgresql" and _media_url_needs_widening(insp, cols):
             try:
                 conn.execute(text("SET lock_timeout = '5s'"))
                 conn.execute(text("ALTER TABLE posts ALTER COLUMN media_url TYPE TEXT"))
@@ -204,7 +229,7 @@ def _run_migrations(db):
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
-        wanted = ["youtube", "threads", "moj", "sharechat", "snapchat"]
+        wanted = ["youtube", "threads", "moj", "sharechat", "snapchat", "bilibili"]
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             for e in insp.get_enums():
                 labels = e.get("labels") or []
@@ -318,7 +343,7 @@ async def _seed_demo_data(demo_user: User):
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     # `version` doubles as a deploy marker — bump it to verify new code is live.
-    return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.9.0"}
+    return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.9.1"}
 
 
 # ---- serve the dashboard (static) ----

@@ -388,10 +388,36 @@ with TestClient(app) as client:
     r = client.post("/api/media", files={"file": ("empty.png", b"", "image/png")}, headers=H)
     check("media rejects an empty file", r.status_code == 400)
 
+    # --------------------------- the migration bug that broke the 1.9.0 deploy
+    print("\n[startup migrations — the check that crashed the service]")
+    from sqlalchemy import String as SaString, Text as SaTextCol  # noqa: E402
+    from app.main import _media_url_needs_widening  # noqa: E402
+
+    class _Insp:
+        def __init__(self, columns):
+            self.columns = columns
+
+        def get_columns(self, table):
+            return self.columns
+
+    narrow = _Insp([{"name": "media_url", "type": SaString(500)}])
+    wide = _Insp([{"name": "media_url", "type": SaTextCol()}])
+    check("a narrow media_url is detected for widening",
+          _media_url_needs_widening(narrow, {"posts"}) is True)
+    check("a TEXT media_url is left alone (no lock taken on every boot)",
+          _media_url_needs_widening(wide, {"posts"}) is False)
+    check("no posts table / no column doesn't raise",
+          _media_url_needs_widening(narrow, {"users"}) is False
+          and _media_url_needs_widening(_Insp([]), {"posts"}) is False)
+    check("an inspector that throws is survivable",
+          _media_url_needs_widening(type("B", (), {"get_columns": lambda self, t: 1 / 0})(),
+                                    {"posts"}) is False)
+
     # ------------------------------------------------ manual / helper platforms
     print("\n[manual platforms — Moj / ShareChat / Snapchat]")
     html = client.get("/").text
     check("the connect screen offers Snapchat", "prepareManualAccount('snapchat')" in html)
+    check("the connect screen offers Bilibili", "prepareManualAccount('bilibili')" in html)
     check("Snapchat shows up in the platform filters too",
           html.count('<option value="snapchat">') >= 4, str(html.count('<option value="snapchat">')))
     check("manual platforms get a real hand-off (open app + download media)",
@@ -403,6 +429,12 @@ with TestClient(app) as client:
     check("Snapchat can be connected through the manual flow",
           r.status_code == 201, r.text[:200])
     snap_id = r.json()["id"]
+
+    r = client.post("/api/accounts", json={
+        "platform": "bilibili", "display_name": "@sarvam_bili", "external_id": "bili_1",
+        "auto_comment": False}, headers=H)
+    check("Bilibili can be connected through the manual flow",
+          r.status_code == 201, r.text[:200])
 
     r = client.post("/api/posts", json={
         "account_ids": [snap_id], "caption": "Sabarimala 9:16 clip", "media_url": "",
@@ -486,7 +518,7 @@ with TestClient(app) as client:
         {"id": "cmt_recent", "author": "priya", "text": "Rate enti?",
          "created_at": (_now - _td(hours=2)).isoformat()},
         {"id": "cmt_ancient", "author": "ravi", "text": "Chala bagundi",
-         "created_at": (_now - _td(hours=600)).isoformat()},
+         "created_at": (_now - _td(days=60)).isoformat()},
     ]
 
     class _Stub:
@@ -517,6 +549,8 @@ with TestClient(app) as client:
                         platform_post_id=pid, scheduled_at=_now - _td(hours=3),
                         published_at=_now - _td(hours=3)))
         db.commit()
+        recent_post_id = (db.query(Post).filter(Post.platform_post_id == "ig_post_A")
+                          .first().id)
         first = asyncio.run(engine_mod.sync_comments(db, user_id=UID, limit=10))
         seen = [(c.external_comment_id, c.post_id, bool(c.replied), c.created_at)
                 for c in db.query(Comment)
@@ -532,7 +566,7 @@ with TestClient(app) as client:
         by_id.setdefault(ext_id, []).append((post_id, replied, created))
 
     check("a comment reached through two post rows is stored exactly once",
-          len(by_id.get("cmt_recent", [])) == 1 and first["new_comments"] == 2,
+          len(by_id.get("cmt_recent", [])) == 1 and first["new_comments"] == 1,
           f"rows={ {k: len(v) for k, v in by_id.items()} } new_comments={first['new_comments']}")
     check("the recent comment was auto-replied exactly once",
           by_id.get("cmt_recent", [(None, False, None)])[0][1] and
@@ -543,12 +577,30 @@ with TestClient(app) as client:
           _created is not None and abs((_created.replace(tzinfo=_tz.utc)
                                         - (_now - _td(hours=2))).total_seconds()) < 90,
           str(_created))
-    check("a comment older than the watch window is kept but not auto-answered",
-          by_id.get("cmt_ancient", [(None, True, None)])[0][1] is False,
-          str(by_id.get("cmt_ancient")))
+    check("a comment older than the 7-day sync window is never even stored",
+          "cmt_ancient" not in by_id and first.get("skipped_old", 0) >= 1,
+          f"skipped_old={first.get('skipped_old')} rows={list(by_id)}")
     check("re-syncing the same comments changes nothing (no double replies)",
           second["new_comments"] == 0 and second["auto_replies"] == 0
           and len(stub.replies) == 1, json.dumps(second))
+
+    db = SessionLocal()
+    stale = Comment(post_id=recent_post_id, external_comment_id="cmt_stale",
+                    author="old_user", author_avatar="O", text="from last month",
+                    created_at=_now - _td(days=30))
+    db.add(stale)
+    db.commit()
+    platforms_mod.get_client = lambda platform: stub
+    cfg.MOCK_MODE = False
+    try:
+        third = asyncio.run(engine_mod.sync_comments(db, user_id=UID, limit=10))
+    finally:
+        platforms_mod.get_client = real_get_client
+        cfg.MOCK_MODE = saved_mock_mode
+    left = db.query(Comment).filter(Comment.external_comment_id == "cmt_stale").count()
+    db.close()
+    check("comments older than the 7-day window get pruned, not archived",
+          left == 0 and third.get("pruned", 0) >= 1, json.dumps(third))
 
     print("\n[health check compatibility]")
     r = client.head("/api/health")

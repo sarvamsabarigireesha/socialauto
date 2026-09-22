@@ -66,6 +66,7 @@ class Platform(str, enum.Enum):
     moj = "moj"
     sharechat = "sharechat"
     snapchat = "snapchat"
+    bilibili = "bilibili"
 
 
 class IdeaStatus(str, enum.Enum):

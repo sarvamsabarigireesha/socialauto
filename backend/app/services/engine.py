@@ -341,7 +341,7 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
         q = q.filter(Post.user_id == user_id)
     posts = q.limit(limit).all()
 
-    new_comments = auto_replies = 0
+    new_comments = auto_replies = skipped_old = pruned = 0
     replied_seen: set[str] = set()
     for post in posts:
         account = post.account
@@ -376,6 +376,14 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
 
             author = str(item.get("author") or item.get("from") or "someone")[:200]
             posted_at = _comment_time(item)
+
+            # Only recent comments matter in a daily-cleared inbox. Anything
+            # older than the sync window is skipped entirely: not stored, not
+            # replied to, and it never inflates the dashboard counts.
+            sync_days = settings.COMMENT_SYNC_WINDOW_DAYS
+            if sync_days > 0 and (_now() - posted_at) > timedelta(days=sync_days):
+                skipped_old += 1
+                continue
             comment = Comment(
                 post_id=post.id, external_comment_id=external_id,
                 author=author, author_avatar=author[:1].upper(),
@@ -417,8 +425,20 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
                 auto_replies += 1
         db.commit()
 
+    # Keep the table matching the window: rows that aged out are removed, so the
+    # Community inbox shows what is alive now instead of an ever-growing archive.
+    sync_days = settings.COMMENT_SYNC_WINDOW_DAYS
+    if sync_days > 0:
+        cutoff = _now() - timedelta(days=sync_days)
+        for row in db.query(Comment).filter(Comment.created_at < cutoff).all():
+            db.delete(row)
+            pruned += 1
+        if pruned:
+            db.commit()
+
     return {"new_comments": new_comments, "auto_replies": auto_replies,
-            "posts_scanned": len(posts)}
+            "posts_scanned": len(posts), "skipped_old": skipped_old,
+            "pruned": pruned}
 
 
 # ------------------------------------------------------------------- metrics

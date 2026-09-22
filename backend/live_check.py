@@ -149,7 +149,8 @@ def check_accounts():
                 issues.append("no external_id")
             if a.platform == Platform.youtube and not a.refresh_token:
                 issues.append("no refresh_token → access token dies after 1h")
-            if a.platform in (Platform.moj, Platform.sharechat, Platform.snapchat):
+            if a.platform in (Platform.moj, Platform.sharechat, Platform.snapchat,
+                              Platform.bilibili):
                 issues.append("no public API — manual posting only")
             mark = OK if not issues else WARN
             say(mark, f"#{a.id} {a.platform.value:10s} {a.display_name}"
@@ -189,7 +190,7 @@ async def check_online(accounts):
                 problems.append("APP_PUBLIC_URL unreachable")
 
         for a in accounts:
-            if a.platform.value in ("moj", "sharechat", "snapchat"):
+            if a.platform.value in ("moj", "sharechat", "snapchat", "bilibili"):
                 continue
             if a.platform == Platform.youtube:
                 if not a.refresh_token:

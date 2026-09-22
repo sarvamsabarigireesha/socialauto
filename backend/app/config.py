@@ -78,6 +78,11 @@ class Settings:
     AUTO_COMMENT_ENABLED: bool = os.getenv("AUTO_COMMENT_ENABLED", "true").lower() == "true"
     # How long after publishing a post we start watching for new comments (seconds)
     COMMENT_WATCH_WINDOW_HOURS: int = int(os.getenv("COMMENT_WATCH_WINDOW_HOURS", "24"))
+    # How far back to pull comments at all. The first sync after connecting an
+    # account used to drag in months of history: slow, and useless in an inbox
+    # you clear daily. Older comments are neither stored nor replied to, and
+    # rows that age out are pruned so the inbox stays "recent only".
+    COMMENT_SYNC_WINDOW_DAYS: int = int(os.getenv("COMMENT_SYNC_WINDOW_DAYS", "7"))
 
     # Shared secret GitHub Actions / cron uses to call the protected publish endpoint
     CRON_SECRET: str = os.getenv("CRON_SECRET", "dev-cron-secret-change-me")

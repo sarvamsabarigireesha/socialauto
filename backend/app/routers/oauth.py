@@ -121,7 +121,7 @@ async def callback(request: Request, code: str | None = None, state: str | None 
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
                  "youtube": "Your YouTube Channel", "threads": "@your.threads",
                  "moj": "Your Moj account", "sharechat": "Your ShareChat",
-                 "snapchat": "Your Snapchat"}
+                 "snapchat": "Your Snapchat", "bilibili": "Your Bilibili"}
         acc = _upsert_account(db, user, plat, external_id=f"mock_{plat.value}_{user.id}",
                               token="MOCK_OAUTH_TOKEN", display_name=names[plat.value])
         return await _finish(acc, ajax, db)

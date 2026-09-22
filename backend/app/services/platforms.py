@@ -443,7 +443,7 @@ class _YouTubeClient(Client):
             return []
 
 _MANUAL_NAMES = {"moj": "Moj", "sharechat": "ShareChat", "snapchat": "Snapchat",
-                 "threads": "Threads"}
+                 "threads": "Threads", "bilibili": "Bilibili"}
 
 
 class _ManualHelperClient(Client):
@@ -469,7 +469,8 @@ _CLIENTS = {
     Platform.threads: _ManualHelperClient,
     Platform.moj: _ManualHelperClient,
     Platform.sharechat: _ManualHelperClient,
-    Platform.snapchat: _ManualHelperClient
+    Platform.snapchat: _ManualHelperClient,
+    Platform.bilibili: _ManualHelperClient
 }
 
 def get_client(platform: Platform):
