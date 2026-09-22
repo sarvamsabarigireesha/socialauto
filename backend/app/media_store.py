@@ -32,6 +32,10 @@ MEDIA_URL_PREFIX = "/media"
 MEDIA_DIR = DATA_DIR / "media"
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
+# Photos (and small clips) are also stored in Postgres so a Render redeploy
+# cannot 404 Instagram. Bigger videos stay disk-only — Neon free is ~0.5GB.
+DB_KEEP_BYTES = 12 * 1024 * 1024
+
 # NOTE: deliberately no "any host containing /media/" regex here. Any host can
 # have a /media/ path (https://my-cdn.com/media/pic.jpg), and treating those as
 # ours made the publisher refuse perfectly valid external URLs.
@@ -68,7 +72,9 @@ def save(user_id: int, original_name: str, content: bytes) -> tuple[str, str]:
     """Write already-read bytes and return `(rel_path, public_url)`."""
     name = new_filename(original_name)
     (user_dir(user_id) / name).write_bytes(content)
-    return rel_path(user_id, name), url_for(rel_path(user_id, name))
+    rel = rel_path(user_id, name)
+    persist_blob(user_id, rel, name, content)
+    return rel, url_for(rel)
 
 
 def size_error(size: int, name: str = "") -> str:
@@ -79,6 +85,65 @@ def size_error(size: int, name: str = "") -> str:
             f"{limit:.0f}MB. Compress it, or paste a public https:// link "
             f"instead (videos hosted on Drive/Cloudinary work fine and skip "
             f"this host entirely).")
+
+
+def persist_blob(user_id: int, rel: str, filename: str, content: bytes,
+                 content_type: str = "") -> None:
+    """Copy a small upload into Postgres. No-op if it's too big or DB is down."""
+    if not content or len(content) > DB_KEEP_BYTES:
+        return
+    from .database import SessionLocal
+    from .models import MediaBlob
+    rel = (rel or "").strip().lstrip("/")
+    db = SessionLocal()
+    try:
+        row = db.query(MediaBlob).filter(MediaBlob.rel == rel).first()
+        if row:
+            row.data = content
+            row.size = len(content)
+            row.content_type = content_type or row.content_type
+        else:
+            db.add(MediaBlob(
+                user_id=user_id, rel=rel, filename=filename or Path(rel).name,
+                content_type=content_type or "application/octet-stream",
+                size=len(content), data=content,
+            ))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        print(f"media blob persist failed: {exc}", flush=True)
+    finally:
+        db.close()
+
+
+def hydrate_from_db(rel: str) -> Path | None:
+    """Write a blob back to disk after a wipe. None if we never stored it."""
+    from .database import SessionLocal
+    from .models import MediaBlob
+    rel = (rel or "").strip().lstrip("/")
+    if not rel:
+        return None
+    db = SessionLocal()
+    try:
+        row = db.query(MediaBlob).filter(MediaBlob.rel == rel).first()
+        if row is None:
+            name = Path(rel).name
+            if name:
+                row = (db.query(MediaBlob)
+                       .filter(MediaBlob.filename == name)
+                       .order_by(MediaBlob.id.desc()).first())
+        if row is None:
+            return None
+        dest = MEDIA_DIR / row.rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.is_file() or dest.stat().st_size != (row.size or 0):
+            dest.write_bytes(bytes(row.data))
+        return dest if dest.is_file() else None
+    except Exception as exc:
+        print(f"media blob hydrate failed: {exc}", flush=True)
+        return None
+    finally:
+        db.close()
 
 
 def resolve(rel: str) -> Path | None:
@@ -108,7 +173,7 @@ def resolve(rel: str) -> Path | None:
     for found in root.rglob(name):
         if found.is_file():
             return found
-    return None
+    return hydrate_from_db(rel)
 
 
 def missing_local_media(url: str) -> str:
@@ -142,27 +207,53 @@ def missing_local_media(url: str) -> str:
                 "so the platform has nothing it can fetch. Set APP_PUBLIC_URL to "
                 "this app's public https URL.")
     return (f"the media file {MEDIA_URL_PREFIX}/{rel.lstrip('/')} is missing on this "
-            f"server. Free hosts wipe the disk on every deploy, so uploads do not "
-            f"survive a redeploy — re-upload the file, or paste an external https:// "
-            f"URL as the media, or mount a persistent disk (see DEPLOY.md).")
+            f"server (it was uploaded before photos were saved in the database). "
+            f"Open the post → ✏️ Re-attach the image → Retry. New uploads survive deploys.")
 
 
 def list_user_media(user_id: int) -> list[dict]:
     """Newest-first listing for the dashboard's Media library."""
-    d = MEDIA_DIR / f"u{user_id}"
-    if not d.is_dir():
-        return []
     rows = []
-    for p in d.iterdir():
-        if not p.is_file():
-            continue
-        st = p.stat()
-        rows.append({
-            "name": p.name,
-            "filename": p.name,
-            "url": url_for(rel_path(user_id, p.name)),
-            "size": st.st_size,
-            "uploaded_at": st.st_mtime,
-        })
+    seen = set()
+    d = MEDIA_DIR / f"u{user_id}"
+    if d.is_dir():
+        for p in d.iterdir():
+            if not p.is_file():
+                continue
+            st = p.stat()
+            seen.add(p.name)
+            rows.append({
+                "name": p.name,
+                "filename": p.name,
+                "url": url_for(rel_path(user_id, p.name)),
+                "size": st.st_size,
+                "uploaded_at": st.st_mtime,
+            })
+    try:
+        from .database import SessionLocal
+        from .models import MediaBlob
+        db = SessionLocal()
+        try:
+            for rel, filename, size, created in (
+                db.query(MediaBlob.rel, MediaBlob.filename, MediaBlob.size,
+                         MediaBlob.created_at)
+                .filter(MediaBlob.user_id == user_id)
+                .all()
+            ):
+                if filename in seen:
+                    continue
+                seen.add(filename)
+                ts = created.timestamp() if created and hasattr(created, "timestamp") else 0
+                rows.append({
+                    "name": filename,
+                    "filename": filename,
+                    "url": url_for(rel),
+                    "size": size or 0,
+                    "uploaded_at": ts,
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        print(f"list_user_media db: {exc}", flush=True)
     rows.sort(key=lambda r: r["uploaded_at"], reverse=True)
     return rows

@@ -3,8 +3,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 from ..media_store import (
-    ALLOWED_EXT, MAX_UPLOAD_BYTES, MEDIA_DIR, list_user_media, new_filename,
-    rel_path, size_error, url_for, user_dir,
+    ALLOWED_EXT, DB_KEEP_BYTES, MAX_UPLOAD_BYTES, MEDIA_DIR, list_user_media,
+    new_filename, persist_blob, rel_path, size_error, url_for, user_dir,
 )
 from ..security import get_current_user
 
@@ -59,4 +59,10 @@ async def upload_media(file: UploadFile = File(...), user=Depends(get_current_us
         raise HTTPException(400, "Uploaded file is empty")
 
     rel = rel_path(user.id, name)
-    return {"url": url_for(rel), "filename": name, "path": rel, "size": written}
+    if written <= DB_KEEP_BYTES:
+        try:
+            persist_blob(user.id, rel, name, dest.read_bytes(), file.content_type or "")
+        except Exception as exc:
+            print(f"upload persist_blob: {exc}", flush=True)
+    return {"url": url_for(rel), "filename": name, "path": rel, "size": written,
+            "kept": written <= DB_KEEP_BYTES}

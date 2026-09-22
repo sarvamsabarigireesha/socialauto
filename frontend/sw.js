@@ -1,5 +1,5 @@
 /* SocialAuto service worker — cache the shell so the phone app opens offline. */
-const CACHE = "socialauto-shell-v1.9.6";
+const CACHE = "socialauto-shell-v1.9.7";
 const PRECACHE = [
   "/",
   "/offline",

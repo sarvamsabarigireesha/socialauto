@@ -16,13 +16,13 @@ from ..services.engine import _aware
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
-VALID_POST_TYPES = {"feed", "video", "short", "community"}
+VALID_POST_TYPES = {"feed", "video", "short", "community", "channel", "broadcast"}
 
 
 def _normalize_post_type(value: str | None, *, default: str = "feed") -> str:
     ptype = (value or default or "feed").strip().lower()
     if ptype not in VALID_POST_TYPES:
-        raise HTTPException(400, "post_type must be one of: feed, video, short, community")
+        raise HTTPException(400, "post_type must be one of: feed, video, short, community, channel, broadcast")
     return ptype
 
 

@@ -3,7 +3,8 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, Boolean, Enum, JSON, ForeignKey, Table
+    Column, Integer, String, Text, DateTime, Boolean, Enum, JSON, ForeignKey, Table,
+    LargeBinary,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import TypeDecorator
@@ -194,6 +195,25 @@ class Comment(Base):
     created_at = Column(UTCDateTime, default=utcnow)
 
     post = relationship("Post", back_populates="comments")
+
+
+class MediaBlob(Base):
+    """Upload bytes kept in Postgres so Render's ephemeral disk can wipe safely.
+
+    Instagram fetches `/media/...` from this app. Disk-only files vanish on every
+    deploy; rows here are restored onto disk the next time the file is requested.
+    Videos larger than the persist cap stay disk-only (see media_store).
+    """
+    __tablename__ = "media_blobs"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    rel = Column(String(240), unique=True, nullable=False, index=True)  # u3/abc.jpg
+    filename = Column(String(200), nullable=False)
+    content_type = Column(String(80), default="application/octet-stream")
+    size = Column(Integer, default=0)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(UTCDateTime, default=utcnow)
 
 
 class Template(Base):

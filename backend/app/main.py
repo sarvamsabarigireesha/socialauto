@@ -15,13 +15,13 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import Base, engine, SessionLocal
-from .models import Account, Post, PostStatus, Platform, ShortLink, Tag, User
+from .models import Account, MediaBlob, Post, PostStatus, Platform, ShortLink, Tag, User  # noqa: F401
 from .security import hash_password
 from .routers import auth as auth_router, oauth as oauth_router, webhooks as webhooks_router
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.6")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.7")
 
 app.add_middleware(GZipMiddleware, minimum_size=400)
 app.add_middleware(
@@ -350,7 +350,7 @@ def health():
     return {
         "ok": True,
         "mock_mode": settings.MOCK_MODE,
-        "version": "1.9.6",
+        "version": "1.9.7",
         "meta_configured": meta_store.meta_configured(),
     }
 

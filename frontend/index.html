@@ -1403,6 +1403,8 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
           <label class="ptype"><input type="radio" name="ptype" value="video" onchange="onPostType()"><span>🎬 Video (long-form)</span></label>
           <label class="ptype"><input type="radio" name="ptype" value="short" onchange="onPostType()"><span>⚡ Short / Reel (9:16)</span></label>
           <label class="ptype yt-only" style="display:none"><input type="radio" name="ptype" value="community" onchange="onPostType()"><span>📢 YouTube Community post</span></label>
+          <label class="ptype wa-only" style="display:none"><input type="radio" name="ptype" value="channel" onchange="onPostType()"><span>💬 WhatsApp Channel</span></label>
+          <label class="ptype wa-only" style="display:none"><input type="radio" name="ptype" value="broadcast" onchange="onPostType()"><span>📢 WhatsApp Broadcast</span></label>
         </div>
         <div id="ptypeHint" class="hint" style="margin-bottom:8px"></div>
 
@@ -3057,11 +3059,19 @@ async function savePost(asDraft){
   try{
     if(comp.editingId){
       const applyAll = document.getElementById('applyAll').checked ? 1 : 0;
+      const was = POSTS.find(x=>x.id===comp.editingId);
       await api(`/api/posts/${comp.editingId}?apply_all=${applyAll}`,
         {method:'PATCH',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({caption, media_url:comp.mediaUrl, post_type, tag_ids,
           scheduled_at: (mode==='schedule' ? new Date(document.getElementById('schedWhen').value) : new Date()).toISOString()})});
-      toast(applyAll ? 'Updated on ALL linked accounts ✅' : 'Post updated ✅');
+      if(was && was.status==='failed'){
+        toast('Photo saved — publishing to Instagram…');
+        const pub = await api(`/api/posts/${comp.editingId}/publish-now`,{method:'POST'});
+        if(pub.status==='published') toast('Published to Instagram 🚀');
+        else toast(pub.error || 'Publish failed', false);
+      } else {
+        toast(applyAll ? 'Updated on ALL linked accounts ✅' : 'Post updated ✅');
+      }
     } else if(asDraft){
       const when = mode==='schedule' && document.getElementById('schedWhen').value
         ? new Date(document.getElementById('schedWhen').value) : new Date();
@@ -3270,6 +3280,28 @@ async function editPost(id){
   if(p.status==='published') return toast('Published posts can’t be edited', false);
   openComposer(null, p);
 }
+async function retryFailed(id){
+  try{
+    const r = await api(`/api/posts/${id}/publish-now`,{method:'POST'});
+    if(r.status==='published'){ toast('Published 🚀'); await refreshData(); return; }
+    if(/missing|media file|media problem/i.test(r.error||'')){
+      toast('Photo was wiped on deploy — re-attach it, then Save', false);
+      return reattachAndRetry(id);
+    }
+    toast(r.error || 'Still failed', false);
+    await refreshData();
+  }catch(e){
+    if(/missing|media file|media problem/i.test(e.message||'')){
+      toast('Photo was wiped on deploy — re-attach it', false);
+      return reattachAndRetry(id);
+    }
+    toast(e.message, false);
+  }
+}
+async function reattachAndRetry(id){
+  await editPost(id);
+  toast('Attach the same photo again, then Save — it will publish to Instagram');
+}
 
 /* ================= queue + posts list (Buffer-style) ================= */
 let postFilter = 'queue';
@@ -3321,6 +3353,9 @@ function renderPosts(){
       <td style="white-space:nowrap">
         ${p.status==='scheduled'?`<button class="btn green sm" onclick="publishNow(${p.id})">🚀 Publish</button>
           <button class="btn ghost sm" onclick="editPost(${p.id})">✏️</button>
+          <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
+        ${p.status==='failed'?`<button class="btn green sm" onclick="retryFailed(${p.id})">🔁 Retry</button>
+          <button class="btn ghost sm" onclick="reattachAndRetry(${p.id})">🖼 Re-attach photo</button>
           <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
         ${p.status==='draft'?`<button class="btn green sm" onclick="useDraft(${p.id})">✏️ Open</button>
           <button class="btn red sm" onclick="delPost(${p.id})">🗑</button>`:''}
@@ -3677,11 +3712,12 @@ async function autoSyncWorkspace(force=false){
   sessionStorage.setItem(key, '1');
   autoSyncWorkspace._running = true;
   try{
-    toast('🔄 Syncing existing posts, comments, and analytics…');
-    const result = await api('/api/community/bootstrap-sync',{method:'POST'});
-    showSyncFeedback(result, 'Workspace sync complete ✅');
-    const c = result.comments_sync || {new_comments:0, auto_replies:0};
-    toast(`Workspace synced ✅ — ${result.imported||0} imported, ${c.new_comments||0} comments, ${c.auto_replies||0} auto-replies`);
+    toast('🔄 Fetching latest comments + auto-replies…');
+    const comments = await api('/api/community/sync',{method:'POST'});
+    const result = {comments_sync: comments, imported: 0, per_account: [], errors: []};
+    showSyncFeedback(result, 'Inbox synced ✅');
+    const c = comments || {new_comments:0, auto_replies:0};
+    toast(`Inbox synced ✅ — ${c.new_comments||0} new comments, ${c.auto_replies||0} auto-replies`);
     await refreshData();
     if(document.getElementById('view-community')?.style.display !== 'none') await loadCommunity();
     if(document.getElementById('view-home')?.style.display !== 'none') await loadHome();
@@ -3816,23 +3852,6 @@ if(isIos() && !isStandalone()){
   }
   // else: auth overlay stays visible until login
 })();
-</script>
-</body>
-</html>calAnchor = now;
-
-  if(TOKEN){
-    try{
-      ME = await api('/api/auth/me');
-      enterApp();
-    }catch(e){
-      localStorage.removeItem('sa_token'); TOKEN = null;
-    }
-  }
-  // else: auth overlay stays visible until login
-})();
-</script>
-</body>
-</html>})();
 </script>
 </body>
 </html>
