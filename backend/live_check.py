@@ -14,17 +14,26 @@ Nothing here is destructive in --online mode: it only reads.
 import argparse
 import asyncio
 import os
+import shutil
 import sys
 import pathlib
+import uuid
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-import httpx  # noqa: E402
+try:
+    import httpx  # noqa: E402
 
-from app.config import ENV_FILE, settings  # noqa: E402
-from app.database import SessionLocal  # noqa: E402
-from app.models import Account, Platform, Post, PostStatus  # noqa: E402
-from app.services import platforms  # noqa: E402
+    from app.config import ENV_FILE, settings  # noqa: E402
+    from app.database import SessionLocal  # noqa: E402
+    from app.models import Account, Platform, Post, PostStatus  # noqa: E402
+    from app.routers.media import ALLOWED as MEDIA_ALLOWED, MEDIA_DIR  # noqa: E402
+    from app.services import platforms  # noqa: E402
+except ModuleNotFoundError as exc:
+    print(f"❌ missing dependency '{exc.name}'\n"
+          f"   install them first:\n"
+          f"     pip install -r backend/requirements.txt")
+    sys.exit(2)
 
 OK, WARN, BAD = "✅", "⚠️ ", "❌"
 problems: list[str] = []
@@ -215,6 +224,7 @@ async def do_post(account_id, caption, media_url):
         if not account:
             print(f"❌ no account with id {account_id}")
             return 1
+        force_live_mode("live test")
         print(f"\nPublishing ONE real post to #{account.id} {account.platform.value} "
               f"{account.display_name} …")
         post = Post(user_id=account.user_id, account_id=account.id, caption=caption,
@@ -233,6 +243,9 @@ async def do_post(account_id, caption, media_url):
         print(f"  id     : {result.platform_post_id or '—'}")
         if result.error:
             print(f"  error  : {result.error}")
+        if looks_mocked(result.platform_post_id):
+            print(f"\n{BAD} that was a MOCK publish — nothing was really posted")
+            return 1
         if result.status == PostStatus.published:
             print(f"\n{OK} real post is live — check your account / dashboard")
             return 0
@@ -240,6 +253,52 @@ async def do_post(account_id, caption, media_url):
         return 1
     finally:
         db.close()
+
+
+def force_live_mode(what: str):
+    """Guarantee a *real* API call.
+
+    MOCK_MODE defaults to true, and in mock mode the platform clients return a
+    fake id like "mock_instagram_123" that looks like a success. For a live test
+    that is worse than useless: it reports "REAL POST SUCCEEDED" while nothing
+    was posted. So we flip it off for the duration of the test — explicitly.
+    """
+    if settings.MOCK_MODE:
+        print(f"⚠️  MOCK_MODE was true — forcing LIVE mode for this {what} "
+              f"(a mock run would fake a success)")
+        settings.MOCK_MODE = False
+
+
+def looks_mocked(id_value: str) -> bool:
+    return bool(id_value) and str(id_value).startswith("mock_")
+
+
+def stage_upload(local_path: str) -> str:
+    """Copy a local file into the app's media folder and return its public URL.
+
+    This is exactly what the dashboard's uploader does, so a test post uses the
+    same URL shape a real scheduled post would.
+    """
+    src = pathlib.Path(local_path).expanduser()
+    if not src.is_file():
+        raise FileNotFoundError(f"no such file: {local_path}")
+    ext = src.suffix.lower()
+    if ext not in MEDIA_ALLOWED:
+        raise ValueError(f"{ext or '(no extension)'} not allowed — "
+                         f"use {'/'.join(sorted(MEDIA_ALLOWED))}")
+    size_mb = src.stat().st_size / (1024 * 1024)
+    if size_mb > 50:
+        raise ValueError(f"{size_mb:.1f} MB is over the 50 MB upload limit")
+    if not settings.APP_PUBLIC_URL:
+        raise ValueError("APP_PUBLIC_URL is empty — Instagram must fetch the file "
+                         "from a public https URL, so deploy first and set it in .env")
+    if not settings.APP_PUBLIC_URL.startswith("https://"):
+        raise ValueError(f"APP_PUBLIC_URL must be https (got {settings.APP_PUBLIC_URL})")
+
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"{uuid.uuid4().hex[:12]}{ext}"
+    shutil.copyfile(src, MEDIA_DIR / name)
+    return f"{settings.APP_PUBLIC_URL.rstrip('/')}/media/{name}"
 
 
 async def direct_publish(args):
@@ -291,6 +350,7 @@ async def direct_publish(args):
     if platform == Platform.youtube:
         settings.YOUTUBE_AUTO_UPLOAD = True
 
+    force_live_mode("live test")
     print(f"platform : {platform.value}")
     print(f"target   : {target}")
     print(f"media    : {args.media}")
@@ -313,6 +373,10 @@ async def direct_publish(args):
     print(f"  id     : {result.platform_post_id or '—'}")
     if result.error:
         print(f"  error  : {result.error}")
+    if result.ok and looks_mocked(result.platform_post_id):
+        print(f"\n{BAD} got a MOCK id ({result.platform_post_id}) — nothing was "
+              f"really posted. MOCK_MODE is still on somewhere.")
+        return 1
     if result.ok:
         print(f"\n{OK} REAL POST SUCCEEDED — live id {result.platform_post_id}")
         return 0
@@ -334,7 +398,19 @@ def main():
                     help="publish without OAuth/DB — uses META_ACCESS_TOKEN (instagram/"
                          "facebook) or GOOGLE_ACCESS_TOKEN (youtube) from .env. "
                          "Example: --direct instagram:17841400000000000")
+    ap.add_argument("--upload", metavar="LOCAL_FILE",
+                    help="copy a local image/video into the app's media folder and use "
+                         "APP_PUBLIC_URL/media/<file> as the media URL — so you don't "
+                         "have to host a test file yourself (requires APP_PUBLIC_URL)")
     args = ap.parse_args()
+
+    if args.upload:
+        try:
+            args.media = stage_upload(args.upload)
+        except Exception as exc:
+            print(f"❌ --upload failed: {exc}")
+            return 2
+        print(f"staged: {args.media}")
 
     if args.direct:
         return asyncio.run(direct_publish(args))

@@ -73,12 +73,18 @@ Free. You need a **Business/Creator** Instagram account linked to a Facebook Pag
 
 ### Run the real post
 
+You don't need to host a test image anywhere — `--upload` copies a local file
+into the app's own media folder and uses `APP_PUBLIC_URL/media/<file>`, the same
+URL shape a real scheduled post uses:
+
 ```bash
 cd backend
 python3 live_check.py --direct instagram:17841400000000000 \
-  --media https://your-cdn.com/test.jpg \
+  --upload ~/Pictures/test.jpg \
   --caption "SocialAuto live test 🧪" --yes
 ```
+
+(or point at any public file yourself with `--media https://cdn.example/test.jpg`)
 
 Success looks like:
 
@@ -94,6 +100,12 @@ Facebook Pages are the same but easier (no media required):
 python3 live_check.py --direct facebook:YOUR_PAGE_ID --media https://x/y.jpg --yes
 # text-only also works for FB: the client automatically uses /feed
 ```
+
+`--direct` always forces **live mode**. `MOCK_MODE` defaults to `true`, and in
+mock mode the client returns a fake id (`mock_instagram_…`) that looks like a
+success — so the tool switches it off for the test and refuses to report success
+if it ever sees a mock id come back. You can't accidentally "pass" a test that
+posted nothing.
 
 > **Limits:** Instagram allows **50 published posts per 24 h** per account, and
 > a brand-new app is in *Development mode* — posting works for accounts with a
@@ -126,8 +138,10 @@ would cost 100 — that's why the importer doesn't use it.)
    exchange for tokens → put the access token in `.env` as `GOOGLE_ACCESS_TOKEN`.
 
 ```bash
+# --upload works for video too (it must resolve to a public https URL, so
+# APP_PUBLIC_URL has to be set); --media with any public mp4 works as well.
 python3 live_check.py --direct youtube:UC_your_channel_id \
-  --media https://your-cdn.com/test.mp4 --yes
+  --upload ~/Videos/test.mp4 --yes
 ```
 
 `YOUTUBE_PRIVACY_STATUS` defaults to `private` on purpose — flip it to `public`
