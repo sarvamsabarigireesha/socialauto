@@ -17,7 +17,6 @@ basename anywhere under the media root (so legacy URLs keep resolving), and
 `missing_local_media()` lets a publisher fail fast with a clear message instead
 of handing Meta a dead URL.
 """
-import re
 import uuid
 from pathlib import Path
 
@@ -30,8 +29,9 @@ MEDIA_URL_PREFIX = "/media"
 MEDIA_DIR = DATA_DIR / "media"
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-# matches one of our own absolute media URLs and captures the stored path
-_OWN_URL = re.compile(r"^https?://[^/]+/media/(?P<rel>.*)$", re.I)
+# NOTE: deliberately no "any host containing /media/" regex here. Any host can
+# have a /media/ path (https://my-cdn.com/media/pic.jpg), and treating those as
+# ours made the publisher refuse perfectly valid external URLs.
 
 
 def user_dir(user_id: int) -> Path:
@@ -107,18 +107,23 @@ def missing_local_media(url: str) -> str:
     """
     if not url:
         return ""
+    base = (settings.APP_PUBLIC_URL or "").rstrip("/")
     if url.startswith(("http://", "https://")):
-        own = _OWN_URL.match(url)
-        if not own:
-            return ""  # hosted elsewhere — not ours to check
-        rel = own.group("rel")
+        if not base:
+            # An absolute URL with no configured public host: we cannot tell
+            # whether we serve it, and guessing "missing" would block a good
+            # publish. Hand it to the platform.
+            return ""
+        prefix = f"{base}{MEDIA_URL_PREFIX}/"
+        if not url.startswith(prefix):
+            return ""  # some other host — none of our business
+        rel = url[len(prefix):]
     elif url.startswith(MEDIA_URL_PREFIX):
         rel = url[len(MEDIA_URL_PREFIX):]
     else:
         return ""
     if resolve(rel):
         return ""
-    base = (settings.APP_PUBLIC_URL or "").rstrip("/")
     if not base:
         return ("media is stored at a relative path and APP_PUBLIC_URL is not set, "
                 "so the platform has nothing it can fetch. Set APP_PUBLIC_URL to "

@@ -296,6 +296,18 @@ async def run():
         ig, "external", "https://cdn.example/real.jpg")
     check("an external media URL is not blocked by the local check", res.ok, res.error)
 
+    res = await platforms.get_client(Platform.instagram).publish(
+        ig, "external", "https://my-cdn.example/media/pic.jpg")
+    check("an external URL whose PATH contains /media/ is not mistaken for ours",
+          res.ok, res.error)
+
+    settings.APP_PUBLIC_URL = ""
+    res = await platforms.get_client(Platform.instagram).publish(
+        ig, "remote", "https://socialauto-k5ou.onrender.com/media/u6/x.jpg")
+    check("absolute URL + no APP_PUBLIC_URL is passed through, not blocked",
+          res.ok, res.error)
+    settings.APP_PUBLIC_URL = saved_public
+
     print("\n[Threads / manual platforms]")
     install(graph_handler)
     th = acc(Platform.threads, "TH1")
