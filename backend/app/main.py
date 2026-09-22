@@ -7,9 +7,9 @@ on first open — no API keys needed.
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
@@ -20,7 +20,7 @@ from .routers import auth as auth_router, oauth as oauth_router, webhooks as web
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.3")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.4")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +44,28 @@ app.include_router(media.router)
 app.include_router(tags.router)
 app.include_router(links.router)
 
-app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+# ---- uploaded media -------------------------------------------------------
+# Served by a handler rather than StaticFiles so that:
+#   * legacy rows pointing at "/media/u3/x.mp4" still resolve (basename fallback)
+#   * a missing file returns a *useful* error instead of a bare 404 — Meta's
+#     crawler logging a 404 is how a wiped disk silently breaks Instagram posts
+#   * HEAD is allowed (Render's health check uses it)
+from .media_store import resolve as _resolve_media  # noqa: E402
+
+
+@app.api_route("/media/{rel_path:path}", methods=["GET", "HEAD"])
+def serve_media(rel_path: str):
+    found = _resolve_media(rel_path)
+    if not found:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": f"media file '{rel_path}' is not on this server. "
+                               f"Free hosts wipe the disk on every deploy, so "
+                               f"uploads do not survive a redeploy — re-upload the "
+                               f"file or use an external https:// URL.",
+                     "media_dir": str(MEDIA_DIR)},
+        )
+    return FileResponse(found, headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ---- public short-link redirect (Buffer-style /l/abc123) ----
@@ -65,17 +86,56 @@ def redirect_short_link(code: str):
 
 @app.on_event("startup")
 async def on_startup():
+    _warn_about_ephemeral_storage()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
+        # A migration bug once crashed startup, so the whole deploy failed and
+        # the service stayed on the previous version. Optional migrations log
+        # loudly instead of preventing boot.
         try:
             _run_migrations(db)
         except Exception as exc:
-            # An optional column/enum tweak must never take the whole service down
-            # (this is what made Render deploys fail after 1.9.0).
-            print(f"MIGRATION WARNING (boot continues): {type(exc).__name__}: {exc}", flush=True)
+            print(f"ERROR: migrations failed ({type(exc).__name__}: {exc}) — "
+                  f"continuing with the existing schema", flush=True)
         demo_user = _ensure_demo_user(db)
     if settings.MOCK_MODE:
         await _seed_demo_data(demo_user)
+
+
+def _warn_about_ephemeral_storage():
+    """Shout at startup about the things a free host silently gets wrong."""
+    from .config import DATA_DIR, config_problems
+
+    for problem in config_problems():
+        print(f"WARNING: {problem}", flush=True)
+
+    if engine.dialect.name == "sqlite":
+        print(f"WARNING: using SQLite at {settings.DATABASE_URL!r}. On a host with "
+              f"an ephemeral disk (Render/Railway free tiers) every deploy wipes "
+              f"your users, posts and comments. Set DATABASE_URL to a Postgres "
+              f"instance (Neon free tier) to keep data.", flush=True)
+    public = settings.APP_PUBLIC_URL or "unset (platforms cannot fetch your media)"
+    print(f"INFO: uploaded media is stored in {DATA_DIR / 'media'} "
+          f"(APP_PUBLIC_URL={public})", flush=True)
+
+
+def _media_url_needs_widening(insp, tables) -> bool:
+    """True when posts.media_url is still a narrow VARCHAR (Postgres only).
+
+    Kept as its own function because the first version of this check indexed
+    `cols["posts"]["media_url"]` — `cols` actually holds *sets of column names*,
+    so startup raised `TypeError: 'set' object is not subscriptable` and every
+    deploy of 1.9.0 failed to boot. There is a smoke test for it now.
+    """
+    if "posts" not in tables:
+        return False
+    try:
+        col = next((c for c in insp.get_columns("posts") if c["name"] == "media_url"), None)
+    except Exception:
+        return False
+    if col is None:
+        return False
+    return "TEXT" not in str(col.get("type") or "").upper()
 
 
 def _run_migrations(db):
@@ -145,29 +205,28 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE comments ADD COLUMN author_avatar VARCHAR(20) NOT NULL DEFAULT ''"))
         if "accounts" in cols and "refresh_token" not in cols["accounts"]:
             conn.execute(text("ALTER TABLE accounts ADD COLUMN refresh_token VARCHAR(500) NOT NULL DEFAULT ''"))
+        # posts.media_url was VARCHAR(500) — real CDN URLs are longer and made
+        # every import fail. Postgres needs an explicit widening.
+        #
+        # Only when it is still narrow, and with a lock timeout: ALTER TABLE needs
+        # an ACCESS EXCLUSIVE lock on posts, and a single stale transaction is
+        # enough to make this statement queue — which then blocks every read and
+        # write on posts behind it. Failing fast (and retrying next boot) is far
+        # better than wedging the whole app.
+        if engine.dialect.name == "postgresql" and _media_url_needs_widening(insp, cols):
+            try:
+                conn.execute(text("SET lock_timeout = '5s'"))
+                conn.execute(text("ALTER TABLE posts ALTER COLUMN media_url TYPE TEXT"))
+                print("[migrate] posts.media_url widened to TEXT", flush=True)
+            except Exception as exc:
+                print(f"[migrate] media_url widening skipped ({type(exc).__name__}); "
+                      f"will retry on next start", flush=True)
         if "posts" in cols and "post_type" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN post_type VARCHAR(12) NOT NULL DEFAULT 'feed'"))
         if "users" in cols and "reset_token" not in cols["users"]:
             conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(120) NOT NULL DEFAULT ''"))
         if "users" in cols and "reset_token_expires" not in cols["users"]:
             conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP"))
-        # CDN media URLs (signed Facebook/IG query strings) exceed VARCHAR(500).
-        # `cols` is {table: SET of names} — never do cols["posts"]["media_url"]["type"].
-        if "posts" in cols and "media_url" in cols["posts"] and engine.dialect.name == "postgresql":
-            try:
-                conn.execute(text("ALTER TABLE posts ALTER COLUMN media_url TYPE TEXT"))
-            except Exception:
-                pass
-        # Meta long-lived page tokens can exceed the original 1000-char column.
-        if "accounts" in cols and "access_token" in cols["accounts"]:
-            try:
-                if engine.dialect.name == "postgresql":
-                    conn.execute(text("ALTER TABLE accounts ALTER COLUMN access_token TYPE VARCHAR(2048)"))
-                    conn.execute(text("ALTER TABLE accounts ALTER COLUMN refresh_token TYPE VARCHAR(1024)"))
-                elif engine.dialect.name == "sqlite":
-                    pass  # SQLite ignores VARCHAR length
-            except Exception:
-                pass
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
@@ -282,14 +341,14 @@ async def _seed_demo_data(demo_user: User):
         db.close()
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     # `version` doubles as a deploy marker — bump it to verify new code is live.
     from . import meta_store
     return {
         "ok": True,
         "mock_mode": settings.MOCK_MODE,
-        "version": "1.9.3",
+        "version": "1.9.4",
         "meta_configured": meta_store.meta_configured(),
     }
 
@@ -302,7 +361,9 @@ if FRONTEND.exists():
     if icons_dir.exists():
         app.mount("/icons", StaticFiles(directory=str(icons_dir)), name="pwa-icons")
 
-    @app.get("/")
+    # Render's health check issues a HEAD request; a GET-only route answers 405,
+    # which makes the service look unhealthy (and restarts wipe the disk).
+    @app.api_route("/", methods=["GET", "HEAD"])
     def index():
         return FileResponse(FRONTEND / "index.html")
 

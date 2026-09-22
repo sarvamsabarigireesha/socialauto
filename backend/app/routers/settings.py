@@ -115,6 +115,8 @@ def save_meta(data: MetaSaveIn, request: Request, user: User = Depends(get_curre
         kwargs["mock_mode"] = data.mock_mode
     if data.app_public_url is not None:
         kwargs["app_public_url"] = data.app_public_url.rstrip("/")
+    if data.config_id is not None:
+        kwargs["config_id"] = data.config_id
     if not kwargs:
         raise HTTPException(400, "Nothing to save")
     meta_store.save_overlay(**kwargs)
