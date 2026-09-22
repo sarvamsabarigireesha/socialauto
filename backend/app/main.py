@@ -95,8 +95,11 @@ async def on_startup():
 
 
 def _warn_about_ephemeral_storage():
-    """Shout at startup about the two things a free host silently loses."""
-    from .config import DATA_DIR
+    """Shout at startup about the things a free host silently gets wrong."""
+    from .config import DATA_DIR, config_problems
+
+    for problem in config_problems():
+        print(f"WARNING: {problem}", flush=True)
 
     if engine.dialect.name == "sqlite":
         print(f"WARNING: using SQLite at {settings.DATABASE_URL!r}. On a host with "

@@ -20,7 +20,9 @@ gcloud run deploy socialauto \
   --region asia-south1 \
   --allow-unauthenticated \
   --port 8000 \
-  --set-env-vars MOCK_MODE=false,CRON_SECRET=put-a-long-random-secret-here,DATABASE_URL='postgresql://neondb_owner:PASSWORD@ep-xxxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+  --set-env-vars MOCK_MODE=false,APP_PUBLIC_URL=https://socialauto-xxxxx-el.a.run.app \
+  --set-env-vars CRON_SECRET="$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')" \
+  --set-env-vars DATABASE_URL="$(pbpaste)"   # <- paste YOUR Neon string, not the example
 
 # 3. Done — you get a free HTTPS URL instantly:
 #    https://socialauto-xxxxx-el.a.run.app
@@ -43,9 +45,21 @@ gcloud run deploy socialauto \
    | Key | Value | Why |
    |-----|-------|-----|
    | `MOCK_MODE` | `false` | otherwise every "publish" is simulated |
-   | `DATABASE_URL` | Neon Postgres string | **Render's disk is wiped on every deploy**, so SQLite loses all users/posts/comments. Without this you get a blank app after each push. |
-   | `APP_PUBLIC_URL` | `https://socialauto.onrender.com` | Instagram fetches your media from a public https URL; without this, media stays relative and IG publishing always fails |
-   | `CRON_SECRET` | long random string | the app refuses cron calls with the dev default in live mode |
+   | `DATABASE_URL` | your own Neon string | **Render's disk is wiped on every deploy**, so SQLite loses all users/posts/comments. Without this you get a blank app after each push. |
+   | `APP_PUBLIC_URL` | `https://<your-service>.onrender.com` | Instagram fetches your media from a public https URL; without this, media stays relative and IG publishing always fails |
+   | `CRON_SECRET` | output of the command below | the app refuses cron calls with the dev default in live mode |
+   | `JWT_SECRET` | output of the command below | signs logins; if it's guessable, anyone can log in as you |
+
+   Generate the two secrets with:
+   ```bash
+   python3 -c "import secrets;print(secrets.token_urlsafe(48))"   # run twice
+   ```
+
+   > **Do not paste the *shape* of a value.** `postgresql://...?sslmode=require`
+   > and `long random string` are examples, not values. Pasting them is easy to
+   > miss because they look filled in. The app now catches this: a bad
+   > `DATABASE_URL` stops the boot with a message naming the problem, and
+   > placeholder secrets are printed as `WARNING:` lines at start-up.
 5. Health check path: `/api/health` (Settings → Health Checks). Render sends **HEAD**; this app answers HEAD on `/` and `/api/health` — before, a HEAD returned `405`, which made the service look unhealthy and trigger restarts.
 6. Free URL: `https://socialauto.onrender.com` (sleeps after inactivity on free plan)
 

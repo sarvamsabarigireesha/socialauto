@@ -82,6 +82,15 @@ class Settings:
     # Shared secret GitHub Actions / cron uses to call the protected publish endpoint
     CRON_SECRET: str = os.getenv("CRON_SECRET", "dev-cron-secret-change-me")
 
+    # Raw JWT_SECRET (security.py owns the signing key) - kept here so the
+    # startup checks can flag placeholder/weak values.
+    JWT_SECRET_RAW: str = os.getenv("JWT_SECRET", "")
+
+    # Optional explicit OAuth callback URL for Meta (Instagram/Facebook/Threads),
+    # for when the callback differs from APP_PUBLIC_URL + /api/oauth/callback.
+    # Must match the redirect URI registered in the Meta app dashboard exactly.
+    META_OAUTH_REDIRECT_URI: str = os.getenv("META_OAUTH_REDIRECT_URI", "")
+
     # YouTube: the Data API has no "publish from URL" — an upload means POSTing
     # the actual video bytes. Opt in explicitly (default off = manual step),
     # and keep uploads private unless you really want them public.
@@ -90,3 +99,94 @@ class Settings:
 
 
 settings = Settings()
+
+
+# ---------------------------------------------------------------- validation
+# Placeholder text that looks filled-in but isn't. This bit us in production:
+# DEPLOY.md shows the *shape* of a Neon URL, it got pasted verbatim, and the app
+# died deep inside psycopg2 with `could not translate host name "..."`.
+PLACEHOLDER_HINTS = ("...", "change-me", "changeme", "change_me", "put-a-long",
+                     "long random string", "your-", "your_", "xxx", "todo",
+                     "<", ">", "example.com", "ep-xxxx")
+
+
+def looks_like_placeholder(value: str) -> bool:
+    v = (value or "").strip().lower()
+    return bool(v) and any(h in v for h in PLACEHOLDER_HINTS)
+
+
+def database_url_problem(url: str) -> str:
+    """Return a human explanation if DATABASE_URL cannot possibly work."""
+    url = (url or "").strip()
+    if not url or url.startswith("sqlite"):
+        return ""
+    if "..." in url:
+        return ("it still contains '...', which is the placeholder from the docs, "
+                "not your own connection string")
+    try:
+        from sqlalchemy.engine.url import make_url
+
+        parsed = make_url(url)
+    except Exception as exc:
+        return f"it is not a valid database URL ({exc})"
+    host = parsed.host or ""
+    if not host:
+        return "it has no host name"
+    if "." not in host:
+        return f"the host name {host!r} is not a real server address"
+    if not parsed.username:
+        return "it has no username"
+    if "example" in host or host.startswith("ep-xxxx"):
+        return f"the host {host!r} is still a documentation example"
+    return ""
+
+
+def secret_problem(value: str, name: str, min_length: int = 16) -> str:
+    """Return a message if a secret is missing, guessable, or example text."""
+    v = (value or "").strip()
+    if not v:
+        return f"{name} is empty"
+    if looks_like_placeholder(v):
+        return f"{name} is still example text ({v[:40]!r}) - anyone can guess it"
+    if len(v) < min_length:
+        return (f"{name} is only {len(v)} characters - use at least {min_length}: "
+                f"python3 -c \"import secrets;print(secrets.token_urlsafe(48))\"")
+    return ""
+
+
+def oauth_redirect_problem() -> str:
+    """Warn when the Meta redirect URI and APP_PUBLIC_URL disagree."""
+    override = (settings.META_OAUTH_REDIRECT_URI or "").strip()
+    if not override:
+        return ""
+    if not override.startswith("https://"):
+        return f"META_OAUTH_REDIRECT_URI must be https (got {override!r})"
+    public = (settings.APP_PUBLIC_URL or "").strip().rstrip("/")
+    if public and not override.startswith(public):
+        return (f"META_OAUTH_REDIRECT_URI ({override}) does not start with "
+                f"APP_PUBLIC_URL ({public}) - Meta rejects the connect flow with "
+                f"'URL Blocked' unless both are registered on the app")
+    return ""
+
+
+def config_problems() -> list[str]:
+    """Everything that will bite in live mode, in one list."""
+    out = []
+    db = database_url_problem(settings.DATABASE_URL)
+    if db:
+        out.append(f"DATABASE_URL: {db}")
+    if not settings.MOCK_MODE:
+        for value, name in ((settings.JWT_SECRET_RAW, "JWT_SECRET"),
+                            (settings.CRON_SECRET, "CRON_SECRET")):
+            problem = secret_problem(value, name)
+            if problem:
+                out.append(problem)
+        if not settings.APP_PUBLIC_URL:
+            out.append("APP_PUBLIC_URL is empty - Instagram cannot fetch your "
+                       "media and OAuth redirects point at the wrong host")
+        elif not settings.APP_PUBLIC_URL.startswith("https://"):
+            out.append("APP_PUBLIC_URL must be https in production")
+    oauth = oauth_redirect_problem()
+    if oauth:
+        out.append(oauth)
+    return out

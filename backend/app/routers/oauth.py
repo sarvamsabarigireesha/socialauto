@@ -1,5 +1,4 @@
 """Social account OAuth connect - FIXED for Pages + IG Business linking."""
-import os
 from urllib.parse import urlencode, quote as _ue
 
 import httpx
@@ -29,13 +28,29 @@ router = APIRouter(prefix="/api/oauth", tags=["oauth"])
 REDIRECT_PATH = "/api/oauth/callback"
 
 def _base_url(request: Request) -> str:
-    return os.getenv("APP_PUBLIC_URL", str(request.base_url).rstrip("/"))
+    """Public base URL of this app (settings first, request second)."""
+    return (settings.APP_PUBLIC_URL or "").rstrip("/") or str(request.base_url).rstrip("/")
+
+
+def _redirect_uri(request: Request, plat: Platform | None = None) -> str:
+    """OAuth callback URL for this platform.
+
+    Meta and Google register the callback separately, so an explicit
+    META_OAUTH_REDIRECT_URI wins for Instagram/Facebook/Threads (otherwise
+    APP_PUBLIC_URL + /api/oauth/callback is used). It must match the URI in the
+    provider's dashboard *exactly*, including the scheme and trailing path.
+    """
+    override = (settings.META_OAUTH_REDIRECT_URI or "").strip()
+    meta_platforms = (Platform.instagram, Platform.facebook, Platform.threads)
+    if override and (plat is None or plat in meta_platforms):
+        return override
+    return _base_url(request) + REDIRECT_PATH
 
 @router.get("/connect/{platform}")
 async def connect(platform: str, request: Request, user: User = Depends(get_current_user)):
     plat = _require_platform(platform)
     state = _make_state(user.id, platform)
-    redirect_uri = _base_url(request) + REDIRECT_PATH
+    redirect_uri = _redirect_uri(request, plat)
 
     if settings.MOCK_MODE:
         cb = f"{redirect_uri}?mock=1&platform={platform}&state={state}"
@@ -101,8 +116,6 @@ async def callback(request: Request, code: str | None = None, state: str | None 
     if not user:
         raise HTTPException(401, "Unknown user")
 
-    redirect_uri = _base_url(request) + REDIRECT_PATH
-
     if mock == "1":
         plat = _require_platform(platform or plat_str)
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
@@ -117,6 +130,7 @@ async def callback(request: Request, code: str | None = None, state: str | None 
 
     try:
         plat = _require_platform(plat_str)
+        redirect_uri = _redirect_uri(request, plat)
         return await _real_exchange(plat, code, redirect_uri, db, user, ajax, state)
     except Exception as e:
         import traceback

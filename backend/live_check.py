@@ -24,10 +24,16 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 try:
     import httpx  # noqa: E402
 
-    from app.config import ENV_FILE, settings  # noqa: E402
-    from app.database import SessionLocal  # noqa: E402
+    from app.config import ENV_FILE, config_problems, settings  # noqa: E402
+    try:
+        from app.database import SessionLocal  # noqa: E402
+    except RuntimeError as db_exc:
+        # database.py refuses to load on an impossible DATABASE_URL; show its
+        # (already formatted) explanation instead of a traceback.
+        print(f"\n❌ the app cannot start:\n{db_exc}")
+        sys.exit(2)
     from app.models import Account, Platform, Post, PostStatus  # noqa: E402
-    from app.routers.media import ALLOWED as MEDIA_ALLOWED, MEDIA_DIR  # noqa: E402
+    from app.media_store import ALLOWED_EXT as MEDIA_ALLOWED, MEDIA_DIR  # noqa: E402
     from app.services import platforms  # noqa: E402
 except ModuleNotFoundError as exc:
     print(f"❌ missing dependency '{exc.name}'\n"
@@ -37,6 +43,7 @@ except ModuleNotFoundError as exc:
 
 OK, WARN, BAD = "✅", "⚠️ ", "❌"
 problems: list[str] = []
+problems_found: list[str] = []
 
 
 def say(mark, msg, fix=""):
@@ -52,6 +59,18 @@ def need(cond, label, fix=""):
 
 
 # --------------------------------------------------------------- offline part
+def check_config_guards():
+    """Run the same guards the server runs at start-up."""
+    print("\n[0] config guards (server refuses to boot on these)")
+    problems = config_problems()
+    if not problems:
+        say(OK, "no show-stopping config problems")
+        return
+    for problem in problems:
+        say(BAD, problem)
+        problems_found.append(problem)
+
+
 def check_env():
     print("\n[1] environment")
     say(OK if ENV_FILE else WARN,
@@ -417,6 +436,7 @@ def main():
 
     print("SocialAuto live-preflight")
     print("=" * 62)
+    check_config_guards()
     check_env()
     check_meta()
     check_google()
@@ -441,6 +461,7 @@ def main():
                 return 0
         return asyncio.run(do_post(args.post, args.caption, args.media))
 
+    problems.extend(p for p in problems_found if p not in problems)
     print("\n" + "=" * 62)
     if problems:
         print(f"{BAD} {len(problems)} thing(s) to fix before real posting:")

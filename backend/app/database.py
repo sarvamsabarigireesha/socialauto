@@ -1,7 +1,22 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from .config import settings
+from .config import database_url_problem, settings
+
+# Refuse to start on a DATABASE_URL that cannot work. Before this, a pasted
+# placeholder (e.g. "postgresql://...?sslmode=require") died deep inside
+# psycopg2 with `could not translate host name "..."`, or silently fell back to
+# an empty local SQLite file - both very confusing in production.
+_db_problem = database_url_problem(settings.DATABASE_URL)
+if _db_problem:
+    raise RuntimeError(
+        f"\n{'=' * 70}\nDATABASE_URL is set but cannot work: {_db_problem}\n"
+        f"Value: {settings.DATABASE_URL[:60]}{'...' if len(settings.DATABASE_URL) > 60 else ''}\n\n"
+        f"Fix: open your Postgres provider's dashboard (Neon -> Connect) and copy\n"
+        f"the real connection string, it looks like:\n"
+        f"  postgresql://USER:PASSWORD@ep-something-123456.REGION.aws.neon.tech/DBNAME?sslmode=require\n"
+        f"Then update the DATABASE_URL environment variable and redeploy.\n"
+        f"{'=' * 70}\n")
 
 # FIX: Render free Postgres sleeps -> SSL closed error fix
 connect_args = {}

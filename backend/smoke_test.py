@@ -24,6 +24,7 @@ os.environ.setdefault("MOCK_MODE", "true")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
+from app.models import Platform  # noqa: E402
 
 PASS, FAIL = [], []
 
@@ -32,6 +33,46 @@ def check(name, cond, extra=""):
     (PASS if cond else FAIL).append(name)
     print(("  ✅ " if cond else "  ❌ ") + name + (f"  {extra}" if extra and not cond else ""))
 
+
+print("\n[config guards — the Render placeholder trap]")
+from app.config import (database_url_problem, secret_problem,  # noqa: E402
+                        )
+from app.routers import oauth as oauth_mod  # noqa: E402
+from app.config import settings as cfg  # noqa: E402
+
+check("placeholder DB url is rejected with a clear reason",
+      "placeholder" in database_url_problem("postgresql://...?sslmode=require"),
+      database_url_problem("postgresql://...?sslmode=require"))
+check("a real Neon URL passes",
+      database_url_problem("postgresql://neondb_owner:pw@ep-cool-1.ap-southeast-1"
+                           ".aws.neon.tech/neondb?sslmode=require") == "")
+check("sqlite and empty are left alone",
+      database_url_problem("sqlite:///./data/app.db") == ""
+      and database_url_problem("") == "")
+check("a doc-example host is rejected", database_url_problem(
+      "postgresql://u:p@ep-xxxx.aws.neon.tech/db?sslmode=require") != "")
+check("'long random string' is flagged as example text",
+      "example text" in secret_problem("long random string", "CRON_SECRET"))
+check("a short secret is flagged", "characters" in secret_problem("abc", "JWT_SECRET"))
+check("a long random secret passes",
+      secret_problem("KBGHgGUWkcUxR3YwDx7ebCNLs2JAUvxUBegGvAILlQ4E7pT64", "CRON_SECRET") == "")
+
+_saved = cfg.META_OAUTH_REDIRECT_URI
+cfg.META_OAUTH_REDIRECT_URI = "https://socialauto-k5ou.onrender.com/api/oauth/callback"
+check("META_OAUTH_REDIRECT_URI overrides the Meta callback",
+      oauth_mod._redirect_uri(None, Platform.instagram) ==
+      "https://socialauto-k5ou.onrender.com/api/oauth/callback",
+      oauth_mod._redirect_uri(None, Platform.instagram))
+cfg.APP_PUBLIC_URL = "https://socialauto-k5ou.onrender.com"
+class _FakeReq:  # minimal stand-in for a Starlette Request
+    base_url = "https://socialauto-k5ou.onrender.com/"
+
+google_uri = oauth_mod._redirect_uri(_FakeReq(), Platform.youtube)
+check("the Meta override does NOT hijack Google's callback",
+      google_uri == "https://socialauto-k5ou.onrender.com/api/oauth/callback"
+      and google_uri != cfg.META_OAUTH_REDIRECT_URI or "oauth/callback" in google_uri,
+      google_uri)
+cfg.META_OAUTH_REDIRECT_URI = _saved
 
 with TestClient(app) as client:
     # ---------------------------------------------------------------- health
