@@ -87,6 +87,20 @@ def _letters(text: str) -> str:
     return re.sub(r"[\W_]+", " ", text or "", flags=re.UNICODE).strip()
 
 
+def _compact_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+def is_self_author(account, author: str) -> bool:
+    """True when this comment was written by the connected page/channel itself."""
+    got = _compact_name(author)
+    if not got:
+        return False
+    raw = (getattr(account, "display_name", None) or "").strip().lstrip("@")
+    names = {raw, raw.replace(" ", ""), raw.replace(" ", "."), raw.replace(".", " ")}
+    return got in {_compact_name(n) for n in names if n}
+
+
 def _intent(text: str) -> str:
     t = text.lower()
     if any(w in t for w in SUPPORT_WORDS):

@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from ..config import settings
 from ..models import Account, Comment, Metric, Post, PostStatus
 from . import platforms
-from .autocomment import generate_reply, post_reply
+from .autocomment import generate_reply, is_self_author, post_reply
 
 UTC = timezone.utc
 
@@ -359,32 +359,46 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
             incoming = _mock_incoming(post)
 
         for item in incoming:
-            external_id = str(item.get("id") or item.get("external_comment_id") or "")
+            external_id = str(item.get("id") or item.get("external_comment_id") or "").strip()
+            # No stable id → every sync would insert a new row and reply again.
+            if not external_id:
+                continue
+            if item.get("parent_id"):
+                continue
+
+            author = str(item.get("author") or item.get("from") or "someone")[:200]
+            self_comment = bool(item.get("is_self")) or is_self_author(account, author)
+            already_on_platform = bool(item.get("already_replied"))
+            our_text = str(item.get("our_reply_text") or "")
 
             # Dedupe per ACCOUNT, not per post: the same video/post can be
             # reached through more than one post row (an import plus a manual
             # post), and deduping per post meant the same comment was stored —
             # and auto-replied to — twice.
-            if external_id:
-                existing = (db.query(Comment)
-                            .join(Post, Comment.post_id == Post.id)
-                            .filter(Post.account_id == account.id,
-                                    Comment.external_comment_id == external_id)
-                            .first())
-                if existing:
-                    # Rows written by older builds carry the *fetch* time as
-                    # created_at, so they would never age out of the 7-day
-                    # window. Re-syncing corrects them to the platform's own
-                    # timestamp, and the prune below then drops the truly old
-                    # ones instead of archiving them forever.
-                    real_time = _comment_time(item)
-                    if abs((_aware(existing.created_at) - real_time).total_seconds()) > 300:
-                        existing.created_at = real_time
-                    continue
-            if external_id and external_id in replied_seen:
+            existing = (db.query(Comment)
+                        .join(Post, Comment.post_id == Post.id)
+                        .filter(Post.account_id == account.id,
+                                Comment.external_comment_id == external_id)
+                        .first())
+            if existing:
+                # Rows written by older builds carry the *fetch* time as
+                # created_at, so they would never age out of the 7-day
+                # window. Re-syncing corrects them to the platform's own
+                # timestamp, and the prune below then drops the truly old
+                # ones instead of archiving them forever.
+                real_time = _comment_time(item)
+                if abs((_aware(existing.created_at) - real_time).total_seconds()) > 300:
+                    existing.created_at = real_time
+                if self_comment or already_on_platform:
+                    if not existing.replied:
+                        existing.replied = True
+                        existing.reply_type = existing.reply_type or "auto"
+                        if our_text and not existing.our_reply:
+                            existing.our_reply = our_text[:2000]
+                continue
+            if external_id in replied_seen:
                 continue
 
-            author = str(item.get("author") or item.get("from") or "someone")[:200]
             posted_at = _comment_time(item)
 
             # Only recent comments matter in a daily-cleared inbox. Anything
@@ -401,10 +415,18 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
                 # the platform's real timestamp, so age-based rules work
                 created_at=posted_at,
             )
+            if self_comment or already_on_platform:
+                comment.replied = True
+                comment.resolved = bool(self_comment)
+                comment.reply_type = "auto"
+                comment.our_reply = our_text[:2000]
             db.add(comment)
             db.flush()
             new_comments += 1
 
+            if self_comment or already_on_platform:
+                replied_seen.add(external_id)
+                continue
             if not (settings.AUTO_COMMENT_ENABLED and account.auto_comment):
                 continue
             if not comment.text.strip():
@@ -415,9 +437,8 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
             age_hours = (_now() - posted_at).total_seconds() / 3600
             if watch > 0 and age_hours > watch:
                 continue
-            if external_id:
-                replied_seen.add(external_id)
-            if await _send_auto_reply(client, account, post, comment):
+            replied_seen.add(external_id)
+            if await _send_auto_reply(db, client, account, post, comment):
                 auto_replies += 1
         db.commit()
 
@@ -440,10 +461,30 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
             "pruned": pruned, "pending_replies": pending.get("sent", 0)}
 
 
-async def _send_auto_reply(client, account: Account, post: Post, comment: Comment) -> bool:
-    """Generate a human reply and post it. True only if the platform accepted it."""
-    if comment.replied or not (comment.text or "").strip():
+async def _send_auto_reply(db, client, account: Account, post: Post, comment: Comment) -> bool:
+    """Generate a human reply and post it. True only if the platform accepted it.
+
+    Claims the row first (`replied=True`) so cron + inbox sync + the pending
+    button cannot send 5 replies to the same comment. If the platform call
+    fails and we did not already reply there, the claim is rolled back.
+    """
+    if not comment.id:
         return False
+    if not (comment.text or "").strip():
+        return False
+    if is_self_author(account, comment.author):
+        comment.replied = True
+        comment.resolved = True
+        return False
+
+    claimed = (db.query(Comment)
+               .filter(Comment.id == comment.id, Comment.replied.is_(False))
+               .update({Comment.replied: True}, synchronize_session=False))
+    db.commit()
+    if not claimed:
+        return False
+    comment.replied = True
+
     reply = generate_reply(comment.text, account)
     try:
         ok = await client.reply_to_comment(
@@ -453,9 +494,14 @@ async def _send_auto_reply(client, account: Account, post: Post, comment: Commen
         ok = False
     if ok:
         comment.our_reply = reply
-        comment.replied = True
         comment.reply_type = "auto"
-    return bool(ok)
+        db.commit()
+        return True
+    db.query(Comment).filter(Comment.id == comment.id).update(
+        {Comment.replied: False}, synchronize_session=False)
+    comment.replied = False
+    db.commit()
+    return False
 
 
 async def auto_reply_pending(db, user_id: int | None = None, limit: int = 80) -> dict:
@@ -487,7 +533,7 @@ async def auto_reply_pending(db, user_id: int | None = None, limit: int = 80) ->
             skipped += 1
             continue
         client = platforms.get_client(account.platform)
-        if await _send_auto_reply(client, account, post, comment):
+        if await _send_auto_reply(db, client, account, post, comment):
             sent += 1
         else:
             failed += 1

@@ -1992,12 +1992,6 @@ async function loadCommunity(){
     items = items.filter(c=>[c.author,c.text,c.our_reply,c.account_name,c.caption,c.platform].join(' ').toLowerCase().includes(needle));
   }
   items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  if(!window._pendingKick && (d.totals.unresolved||0) > 0){
-    window._pendingKick = true;
-    api('/api/community/auto-reply-pending',{method:'POST'}).then(r=>{
-      if(r && r.sent){ toast(`Auto-replied ${r.sent} pending comment${r.sent===1?'':'s'} 🤖`); loadCommunity(); }
-    }).catch(()=>{});
-  }
   document.getElementById('commCount').textContent = Math.min(99, d.totals.comments) + (d.totals.comments>99?'+':'');
   document.getElementById('commSummary').innerHTML =
     `💬 <b>${d.totals.comments}</b> comments · ✅ <b>${d.totals.replied}</b> replied · ⏳ <b>${d.totals.unresolved}</b> to handle${(filter!=='all' || needle || communityOpenOnly)?`<br><span class="muted">Showing <b>${items.length}</b> comment(s) after filters.</span>`:''}`;

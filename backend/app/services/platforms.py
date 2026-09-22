@@ -7,6 +7,7 @@ import httpx
 from..config import settings
 from..media_store import missing_local_media
 from..models import Platform
+from .autocomment import is_self_author
 
 class PublishResult:
     def __init__(self, ok: bool, platform_post_id: str = "", error: str = "", manual: bool = False):
@@ -19,6 +20,55 @@ class FetchResult:
     def __init__(self, comments: list[dict], metrics: dict):
         self.comments = comments
         self.metrics = metrics
+
+
+def _comment_author(item: dict) -> str:
+    if item.get("username"):
+        return str(item.get("username") or "someone")
+    frm = item.get("from") or {}
+    return str(frm.get("username") or frm.get("name") or "someone")
+
+
+def _parse_ig_comment(account, item: dict) -> dict | None:
+    """Top-level IG comments only. Replies (ours or others) are not new inbox rows."""
+    if not item:
+        return None
+    if item.get("parent_id"):
+        return None
+    cid = str(item.get("id") or "").strip()
+    if not cid:
+        return None
+    author = _comment_author(item)
+    replies = ((item.get("replies") or {}).get("data") or [])
+    our_reply = ""
+    already = False
+    for reply in replies:
+        if is_self_author(account, _comment_author(reply)):
+            already = True
+            our_reply = our_reply or str(reply.get("text") or "")
+    return {
+        "id": cid,
+        "author": author,
+        "text": item.get("text") or item.get("message") or "",
+        "created_at": item.get("timestamp") or item.get("created_time") or "",
+        "parent_id": "",
+        "already_replied": already,
+        "is_self": is_self_author(account, author),
+        "our_reply_text": our_reply,
+    }
+
+
+async def _meta_already_replied(client, base: str, account, comment_id: str, edge: str) -> bool:
+    r = await client.get(f"{base}/{comment_id}/{edge}", params={
+        "fields": "id,username,text,from", "limit": 25,
+        "access_token": account.access_token,
+    })
+    if r.status_code != 200:
+        return False
+    for row in (r.json() or {}).get("data") or []:
+        if is_self_author(account, _comment_author(row)):
+            return True
+    return False
 
 class Client:
     async def publish(self, account, caption: str, media_url: str, post_type: str = "feed") -> PublishResult:
@@ -207,11 +257,31 @@ class _MetaClient(Client):
             return FetchResult([], {})
 
     async def reply_to_comment(self, account, platform_post_id: str, external_comment_id: str, text: str) -> bool:
+        """Post exactly one reply. If we already replied on-platform, no-op success."""
+        cid = (external_comment_id or "").strip()
+        if not cid:
+            print("reply skipped: empty comment id", flush=True)
+            return False
+        ig = account.platform == Platform.instagram
+        edge = "replies" if ig else "comments"
         try:
             async with httpx.AsyncClient(timeout=30) as c:
-                r = await c.post(f"{self._v()}/{external_comment_id}/replies", data={"message": text, "access_token": account.access_token})
-                return r.status_code == 200
-        except Exception:
+                if await _meta_already_replied(c, self._v(), account, cid, edge):
+                    return True
+                r = await c.post(
+                    f"{self._v()}/{cid}/{edge}",
+                    data={"message": text, "access_token": account.access_token},
+                )
+                if 200 <= r.status_code < 300:
+                    return True
+                body = (r.text or "")[:500]
+                print(f"comment reply {r.status_code}: {body}", flush=True)
+                low = body.lower()
+                if any(s in low for s in ("already", "duplicate", "exists")):
+                    return True
+                return False
+        except Exception as exc:
+            print(f"reply_to_comment: {exc}", flush=True)
             return False
     async def list_recent_videos(self, account):
         """Recent Page posts / IG media, so existing content can be imported."""
