@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -20,8 +21,9 @@ from .routers import auth as auth_router, oauth as oauth_router, webhooks as web
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.5")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.6")
 
+app.add_middleware(GZipMiddleware, minimum_size=400)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
@@ -230,7 +232,7 @@ def _run_migrations(db):
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
-        wanted = ["youtube", "threads", "moj", "sharechat", "snapchat", "bilibili"]
+        wanted = ["youtube", "threads", "moj", "sharechat", "snapchat", "bilibili", "whatsapp"]
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             for e in insp.get_enums():
                 labels = e.get("labels") or []
@@ -348,7 +350,7 @@ def health():
     return {
         "ok": True,
         "mock_mode": settings.MOCK_MODE,
-        "version": "1.9.5",
+        "version": "1.9.6",
         "meta_configured": meta_store.meta_configured(),
     }
 
@@ -365,7 +367,7 @@ if FRONTEND.exists():
     # which makes the service look unhealthy (and restarts wipe the disk).
     @app.api_route("/", methods=["GET", "HEAD"])
     def index():
-        return FileResponse(FRONTEND / "index.html")
+        return FileResponse(FRONTEND / "index.html", headers={"Cache-Control": "no-cache"})
 
     @app.get("/manifest.webmanifest")
     def pwa_manifest():

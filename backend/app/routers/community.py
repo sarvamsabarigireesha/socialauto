@@ -6,12 +6,13 @@ official comment-reply APIs (plus auto-reply already running on cron/webhooks).
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..database import get_db
 from ..models import Comment, Post, User, PostStatus
 from ..security import get_current_user
 from ..services import platforms, engine
+from ..services.autocomment import generate_reply
 
 router = APIRouter(prefix="/api/community", tags=["community"])
 
@@ -23,23 +24,28 @@ class ReplyIn(BaseModel):
 @router.get("/summary")
 def summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Per-post thread list: channel, caption, media, replied, total, unresolved."""
-    posts = (db.query(Post).filter(Post.user_id == user.id)
-             .filter(Post.status == PostStatus.published)
-             .order_by(Post.published_at.desc()).all())
+    posts = (db.query(Post)
+             .options(joinedload(Post.account), selectinload(Post.comments))
+             .filter(Post.user_id == user.id, Post.status == PostStatus.published)
+             .order_by(Post.published_at.desc())
+             .limit(80)
+             .all())
     threads = []
     total_comments = total_replied = total_unresolved = 0
     for p in posts:
-        comments = db.query(Comment).filter(Comment.post_id == p.id).all()
+        comments = list(p.comments or [])
+        if not comments:
+            continue
         replied = sum(1 for c in comments if c.replied)
-        # a comment needs attention if it has no reply and hasn't been dismissed
         unresolved = sum(1 for c in comments if not c.replied and not c.resolved)
         total_comments += len(comments)
         total_replied += replied
         total_unresolved += unresolved
+        account = p.account
         threads.append({
             "post_id": p.id,
-            "platform": p.account.platform.value,
-            "account_name": p.account.display_name,
+            "platform": account.platform.value if account else "",
+            "account_name": account.display_name if account else "",
             "caption": p.caption,
             "media_url": p.media_url,
             "published_at": p.published_at,
@@ -47,11 +53,15 @@ def summary(db: Session = Depends(get_db), user: User = Depends(get_current_user
             "replied": replied,
             "unresolved": unresolved,
             "comments": [{
-                "id": c.id, "author": c.author, "avatar": c.author_avatar or c.author[:1].upper(),
+                "id": c.id, "author": c.author,
+                "avatar": c.author_avatar or (c.author[:1].upper() if c.author else "?"),
                 "text": c.text, "our_reply": c.our_reply, "reply_type": c.reply_type,
                 "replied": c.replied, "resolved": c.resolved,
                 "created_at": c.created_at,
-            } for c in sorted(comments, key=lambda x: x.created_at)],
+                "suggested_reply": (
+                    generate_reply(c.text, account) if (account and not c.replied) else ""
+                ),
+            } for c in sorted(comments, key=lambda x: x.created_at or 0)],
         })
     return {
         "threads": threads,
@@ -64,6 +74,25 @@ def summary(db: Session = Depends(get_db), user: User = Depends(get_current_user
 async def pull_latest(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Fetch fresh comments from the real platforms for this user."""
     return await engine.sync_comments(db, user.id)
+
+
+@router.post("/auto-reply-pending")
+async def auto_reply_pending(db: Session = Depends(get_db),
+                             user: User = Depends(get_current_user)):
+    """Send auto-replies for unreplied inbox comments (last 7 days)."""
+    return await engine.auto_reply_pending(db, user.id)
+
+
+@router.get("/comments/{comment_id}/suggest")
+def suggest_reply(comment_id: int, db: Session = Depends(get_db),
+                  user: User = Depends(get_current_user)):
+    """Suggested reply for a manual send — same engine as auto-reply."""
+    c = db.get(Comment, comment_id)
+    if not c or c.post.user_id != user.id:
+        raise HTTPException(404, "comment not found")
+    account = c.post.account
+    text = generate_reply(c.text, account) if account else "🙏"
+    return {"suggestion": text}
 
 
 @router.post("/import/{account_id}")

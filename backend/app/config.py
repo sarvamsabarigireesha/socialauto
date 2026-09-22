@@ -97,7 +97,8 @@ class Settings:
     # Auto-comment behaviour
     AUTO_COMMENT_ENABLED: bool = os.getenv("AUTO_COMMENT_ENABLED", "true").lower() == "true"
     # How long after publishing a post we start watching for new comments (seconds)
-    COMMENT_WATCH_WINDOW_HOURS: int = int(os.getenv("COMMENT_WATCH_WINDOW_HOURS", "24"))
+    # Match the 7-day inbox: pending comments in the Community tab get auto-replies too.
+    COMMENT_WATCH_WINDOW_HOURS: int = int(os.getenv("COMMENT_WATCH_WINDOW_HOURS", "168"))
     # How far back to pull comments at all. The first sync after connecting an
     # account used to drag in months of history: slow, and useless in an inbox
     # you clear daily. Older comments are neither stored nor replied to, and

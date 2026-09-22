@@ -469,7 +469,7 @@ class _YouTubeClient(Client):
             return []
 
 _MANUAL_NAMES = {"moj": "Moj", "sharechat": "ShareChat", "snapchat": "Snapchat",
-                 "threads": "Threads", "bilibili": "Bilibili"}
+                 "threads": "Threads", "bilibili": "Bilibili", "whatsapp": "WhatsApp"}
 
 
 class _ManualHelperClient(Client):
@@ -483,6 +483,17 @@ class _ManualHelperClient(Client):
 
     async def publish(self, account, caption: str, media_url: str, post_type: str = "feed") -> PublishResult:
         name = _MANUAL_NAMES.get(account.platform.value, account.platform.value)
+        pt = (post_type or "feed").lower()
+        if account.platform == Platform.whatsapp:
+            if pt == "broadcast":
+                hint = ("MANUAL: WhatsApp Broadcast — copy the caption, open WhatsApp → "
+                        "Broadcast list (or community), paste, send, then tap 'I posted it'. "
+                        "Cloud API broadcast needs a WhatsApp Business phone-number id.")
+            else:
+                hint = ("MANUAL: WhatsApp Channel — copy the caption, open WhatsApp → "
+                        "your Channel → new update, paste, post, then tap 'I posted it'. "
+                        "Meta has no public Channel-post API yet.")
+            return PublishResult(False, manual=True, error=hint)
         return PublishResult(
             False, manual=True,
             error=(f"MANUAL: {name} has no posting API we can call — copy the caption, "
@@ -496,7 +507,8 @@ _CLIENTS = {
     Platform.moj: _ManualHelperClient,
     Platform.sharechat: _ManualHelperClient,
     Platform.snapchat: _ManualHelperClient,
-    Platform.bilibili: _ManualHelperClient
+    Platform.bilibili: _ManualHelperClient,
+    Platform.whatsapp: _ManualHelperClient,
 }
 
 def get_client(platform: Platform):

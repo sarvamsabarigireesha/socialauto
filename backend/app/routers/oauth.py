@@ -101,6 +101,8 @@ async def connect(platform: str, request: Request, user: User = Depends(get_curr
         return {"mode": "real",
                 "authorize_url": f"https://threads.net/oauth/authorize?{qs}"}
 
+    raise HTTPException(400, f"{plat.value} uses the manual helper on the Channels page")
+
 @router.get("/callback", response_model=AccountOut)
 async def callback(request: Request, code: str | None = None, state: str | None = None,
                    mock: str | None = None, platform: str | None = None,
@@ -121,7 +123,8 @@ async def callback(request: Request, code: str | None = None, state: str | None 
         names = {"instagram": "@your.instagram", "facebook": "Your Facebook Page",
                  "youtube": "Your YouTube Channel", "threads": "@your.threads",
                  "moj": "Your Moj account", "sharechat": "Your ShareChat",
-                 "snapchat": "Your Snapchat", "bilibili": "Your Bilibili"}
+                 "snapchat": "Your Snapchat", "bilibili": "Your Bilibili",
+                 "whatsapp": "Your WhatsApp Channel"}
         acc = _upsert_account(db, user, plat, external_id=f"mock_{plat.value}_{user.id}",
                               token="MOCK_OAUTH_TOKEN", display_name=names[plat.value])
         return await _finish(acc, ajax, db)

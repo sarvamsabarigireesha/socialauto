@@ -24,10 +24,15 @@
     --radius:14px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{max-width:100%;overflow-x:hidden}
+  html{max-width:100%;overflow-x:clip;overflow-y:auto;-webkit-text-size-adjust:100%}
   body{background:var(--bg);color:var(--txt);font:14px/1.55 -apple-system,'Segoe UI',Roboto,sans-serif;
+    max-width:100%;overflow-x:clip;overflow-y:auto;min-height:100%;min-height:100dvh;
+    -webkit-overflow-scrolling:touch;
     padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
-  @media(display-mode:standalone){body{overscroll-behavior:none}}
+  @media(display-mode:standalone){
+    html,body{height:auto;min-height:100dvh;overflow-y:auto;overscroll-behavior-y:auto}
+    .main{padding-bottom:calc(96px + env(safe-area-inset-bottom)) !important;min-height:auto}
+  }
   button{font-family:inherit;cursor:pointer}
   input,select,textarea{font-family:inherit;font-size:14px}
 
@@ -370,10 +375,11 @@
   .connect-btn small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
   .cico.ig{background:linear-gradient(45deg,#f09433,#dc2743,#cc2366)}
   .cico.fb{background:#1877f2}
-  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981} .cico.bl{background:#00a1d6}
-  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}.av.bilibili{background:#00a1d6}
-  .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}.chip.bilibili{background:#00a1d6}
-  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}.pv-plat.bilibili{background:#e6f7fb;color:#00a1d6}
+  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981} .cico.bl{background:#00a1d6} .cico.wa{background:#25D366}
+  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}.av.bilibili{background:#00a1d6}.av.whatsapp{background:#25D366}.av.wa{background:#25D366}
+  .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}.chip.bilibili{background:#00a1d6}.chip.whatsapp{background:#25D366}
+  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}.pv-plat.bilibili{background:#e6f7fb;color:#00a1d6}.pv-plat.whatsapp{background:#e8f8ee;color:#128C7E}
+  .side-social.wa{background:#25D366}
   .ptype{display:flex;align-items:center;gap:7px;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
   .ptype:has(input:checked){border-color:var(--purple);background:#f3efff;color:var(--purple)}
   .ptype input{accent-color:var(--purple)}
@@ -834,6 +840,7 @@
     <button class="side-social yt" onclick="connectOAuth('youtube')">▶</button>
     <button class="side-social ig" onclick="connectOAuth('instagram')">◎</button>
     <button class="side-social th" onclick="connectOAuth('threads')">@</button>
+    <button class="side-social wa" onclick="prepareManualAccount('whatsapp')">wa</button>
     <button class="side-social add" onclick="switchView('accounts')">＋</button>
   </div>
 
@@ -1015,6 +1022,7 @@
         <option value="moj">🎬 Moj</option>
         <option value="sharechat">💬 ShareChat</option>
         <option value="bilibili">📺 Bilibili</option>
+        <option value="whatsapp">💬 WhatsApp</option>
       </select>
       <select id="calStatusFilter" class="select-input" onchange="calendarStatusFilter=this.value;renderCalendar()">
         <option value="all">All statuses</option>
@@ -1069,6 +1077,7 @@
         <option value="moj">🎬 Moj</option>
         <option value="sharechat">💬 ShareChat</option>
         <option value="bilibili">📺 Bilibili</option>
+        <option value="whatsapp">💬 WhatsApp</option>
       </select>
     </div>
     <div class="queue-wrap" id="queueWrap"></div>
@@ -1141,6 +1150,7 @@
           <option value="moj">🎬 Moj</option>
           <option value="sharechat">💬 ShareChat</option>
         <option value="bilibili">📺 Bilibili</option>
+          <option value="whatsapp">💬 WhatsApp</option>
         </select>
         <label class="checkline"><input type="checkbox" id="commOpenOnly" onchange="communityOpenOnly=this.checked;loadCommunity()"> Unresolved</label>
       </div>
@@ -1150,6 +1160,7 @@
     <div class="toolbar-row">
       <input id="commSearch" class="search-input" placeholder="Search comment, author, reply, caption…" oninput="communitySearch=this.value.toLowerCase();loadCommunity()">
       <button class="btn ghost sm" onclick="syncCommunity()">🔄 Fetch latest comments</button>
+      <button class="btn green sm" onclick="autoReplyPending()">🤖 Auto-reply pending</button>
       <button class="btn ghost sm" onclick="importAllChannels()">📥 Sync all my content</button>
       <button class="btn ghost sm" onclick="openSim()">🧪 Simulate comment</button>
     </div>
@@ -1314,8 +1325,10 @@
             <button class="connect-btn" onclick="prepareManualAccount('moj')"><span class="cico moj">🎬</span><span>Moj<small>manual-post helper</small></span></button>
             <button class="connect-btn" onclick="prepareManualAccount('sharechat')"><span class="cico sc">💬</span><span>ShareChat<small>regional social helper</small></span></button>
             <button class="connect-btn" onclick="prepareManualAccount('bilibili')"><span class="cico bl">📺</span><span>Bilibili<small>manual helper · open platform pending</small></span></button>
+            <button class="connect-btn" onclick="prepareManualAccount('whatsapp')"><span class="cico wa">💬</span><span>WhatsApp Channel<small>channel updates · helper</small></span></button>
+            <button class="connect-btn" onclick="prepareManualAccount('whatsapp')"><span class="cico wa">📢</span><span>WhatsApp Broadcast<small>broadcast lists · helper</small></span></button>
           </div>
-          <div class="helper-note" style="margin-top:10px">Moj, ShareChat and Bilibili use a manual/helper flow (Bilibili auto-upload needs 开放平台 keys). Instagram, Facebook, YouTube and Threads use OAuth.</div>
+          <div class="helper-note" style="margin-top:10px">WhatsApp Channel + Broadcast, Moj, ShareChat and Bilibili use a helper flow (Meta has no public Channel-post API — copy caption, post in WhatsApp, tap I posted it). Instagram, Facebook, YouTube and Threads use OAuth.</div>
           <details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-weight:700">Advanced manual connect</summary>
             <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
               <div><label class="f">Platform</label>
@@ -1327,7 +1340,7 @@
                   <option value="moj">🎬 Moj</option>
                   <option value="sharechat">💬 ShareChat</option>
                   <option value="bilibili">📺 Bilibili</option>
-        <option value="bilibili">📺 Bilibili</option>
+                  <option value="whatsapp">💬 WhatsApp</option>
                 </select></div>
               <div><label class="f">Display name</label><input id="aName" placeholder="@yourbrand" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
               <div><label class="f">Account / Page ID</label><input id="aExt" placeholder="IG user id / page id" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
@@ -1673,6 +1686,7 @@ const PLAT_META = {
   moj:{ic:'🎬',cls:'moj',limit:150,label:'Moj', ratio:'9/16', ratioNote:'9:16 vertical short'},
   sharechat:{ic:'💬',cls:'sc',limit:500,label:'ShareChat', ratio:'9/16', ratioNote:'9:16 vertical short'},
   bilibili:{ic:'📺',cls:'bilibili',limit:2000,label:'Bilibili', ratio:'16/9', ratioNote:'16:9 video / 9:16 shorts'},
+  whatsapp:{ic:'💬',cls:'whatsapp',limit:1000,label:'WhatsApp', ratio:'1/1', ratioNote:'image / text for Channel & Broadcast'},
 };
 let TOKEN = localStorage.getItem('sa_token') || null;
 let ME = null;
@@ -1912,7 +1926,8 @@ async function enterApp(){
   if (circle) circle.textContent = initial;
   await refreshData();
   switchView('home');
-  await autoSyncWorkspace(Boolean(window._forceNextAutoSync));
+  // Don't block the first paint on a full platform sync — that's why the PWA felt frozen.
+  autoSyncWorkspace(Boolean(window._forceNextAutoSync));
   window._forceNextAutoSync = false;
 }
 
@@ -1975,6 +1990,12 @@ async function loadCommunity(){
     items = items.filter(c=>[c.author,c.text,c.our_reply,c.account_name,c.caption,c.platform].join(' ').toLowerCase().includes(needle));
   }
   items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if(!window._pendingKick && (d.totals.unresolved||0) > 0){
+    window._pendingKick = true;
+    api('/api/community/auto-reply-pending',{method:'POST'}).then(r=>{
+      if(r && r.sent){ toast(`Auto-replied ${r.sent} pending comment${r.sent===1?'':'s'} 🤖`); loadCommunity(); }
+    }).catch(()=>{});
+  }
   document.getElementById('commCount').textContent = Math.min(99, d.totals.comments) + (d.totals.comments>99?'+':'');
   document.getElementById('commSummary').innerHTML =
     `💬 <b>${d.totals.comments}</b> comments · ✅ <b>${d.totals.replied}</b> replied · ⏳ <b>${d.totals.unresolved}</b> to handle${(filter!=='all' || needle || communityOpenOnly)?`<br><span class="muted">Showing <b>${items.length}</b> comment(s) after filters.</span>`:''}`;
@@ -2000,9 +2021,13 @@ async function loadCommunity(){
           <div class="muted" style="font-size:12.5px;margin-top:6px">${esc((c.caption||'').slice(0,95))}${(c.caption||'').length>95?'…':''}</div>
           <div style="margin-top:10px;font-size:14px;line-height:1.6">${esc(c.text)}</div>
           ${c.our_reply?`<div class="reply" style="margin-top:10px">${esc(c.our_reply)} <span class="pill draft" style="margin-left:6px">${c.reply_type==='manual'?'✍️ manual':'🤖 auto'}</span></div>`:
-          `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-            <input id="reply-${c.id}" placeholder="Write a manual reply…" style="flex:1;min-width:220px;border:1px solid var(--border2);border-radius:12px;padding:10px 12px" onkeydown="if(event.key==='Enter')sendReply(${c.id})">
+          `<div style="margin-top:12px">
+            ${c.suggested_reply?`<div class="helper-note" style="margin-bottom:8px">✨ Suggestion — edit if you want to send it yourself, or leave it and tap Reply.
+              <button class="btn ghost sm" style="padding:2px 8px;margin-left:6px" onclick="useSuggestion(${c.id})">Use this</button></div>`:''}
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input id="reply-${c.id}" placeholder="Write a manual reply or use the suggestion…" style="flex:1;min-width:220px;border:1px solid var(--border2);border-radius:12px;padding:10px 12px" onkeydown="if(event.key==='Enter')sendReply(${c.id})">
             <button class="btn green sm" style="padding:9px 16px" onclick="sendReply(${c.id})">Reply</button>
+            </div>
           </div>`}
           ${c.our_reply?`<div style="margin-top:8px"><button class="btn ghost sm" style="padding:4px 10px" onclick="document.getElementById('rebox-${c.id}').style.display='flex'">✏️ Reply again</button>
             <div id="rebox-${c.id}" style="display:none;margin-top:8px;gap:8px;flex-wrap:wrap">
@@ -2013,6 +2038,30 @@ async function loadCommunity(){
       </div>
     </div>`;
   }).join('');
+  items.forEach(c=>{
+    const inp = document.getElementById('reply-'+c.id);
+    if(inp && c.suggested_reply){
+      inp.dataset.suggest = c.suggested_reply;
+      if(!inp.value) inp.value = c.suggested_reply;
+    }
+  });
+}
+function useSuggestion(id){
+  const inp = document.getElementById('reply-'+id);
+  if(!inp) return;
+  if(inp.dataset.suggest){ inp.value = inp.dataset.suggest; inp.focus(); return; }
+  api(`/api/community/comments/${id}/suggest`).then(r=>{
+    inp.value = r.suggestion || '';
+    inp.focus();
+  }).catch(()=>{});
+}
+async function autoReplyPending(){
+  toast('Sending auto-replies to pending comments…');
+  try{
+    const r = await api('/api/community/auto-reply-pending',{method:'POST'});
+    toast(`Auto-replied ${r.sent||0} pending comment${(r.sent||0)===1?'':'s'}${(r.failed||0)?` · ${r.failed} failed`:''} 🤖`);
+    loadCommunity();
+  }catch(e){ toast(e.message,false); }
 }
 async function sendReply(id){
   const inp = document.getElementById('reply-'+id);
@@ -2156,12 +2205,14 @@ async function loadHome(){
   document.getElementById('greetLine').textContent = `${greeting()}, ${name}! 👋`;
   document.getElementById('greetDate').textContent =
     new Date().toLocaleDateString('en-IN',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
-  const d = await api('/api/analytics');
-  const comm = await api('/api/community/summary');
+  const [d, comm] = await Promise.all([
+    api('/api/analytics?days=30'),
+    api('/api/community/summary'),
+  ]);
   window._communityTotals = comm?.totals || {comments:0,replied:0,unresolved:0};
   renderSidebarChannels(comm);
   const weekAgo = Date.now()-7*864e5;
-  const days = new Set((await api('/api/posts'))
+  const days = new Set((POSTS||[])
     .filter(p=>p.status!=='draft' && new Date(p.published_at||p.scheduled_at).getTime() > weekAgo)
     .map(p=>new Date(p.published_at||p.scheduled_at).toDateString()));
   const streak = days.size;
@@ -2909,9 +2960,14 @@ function onPostType(){
   const t = curPostType();
   const selPlats = ACCOUNTS.filter(a=>comp.sel.has(a.id)).map(a=>a.platform);
   const hasYT = selPlats.includes('youtube');
-  // YouTube community option only when YouTube selected
+  const hasWA = selPlats.includes('whatsapp');
   document.querySelectorAll('.ptype.yt-only').forEach(el=>el.style.display = hasYT ? 'flex' : 'none');
+  document.querySelectorAll('.ptype.wa-only').forEach(el=>el.style.display = hasWA ? 'flex' : 'none');
   if(t==='community' && !hasYT){
+    document.querySelector('input[name=ptype][value=feed]').checked = true;
+    return onPostType();
+  }
+  if((t==='channel' || t==='broadcast') && !hasWA){
     document.querySelector('input[name=ptype][value=feed]').checked = true;
     return onPostType();
   }
@@ -2920,6 +2976,8 @@ function onPostType(){
     video: '🎬 Long-form video: attach the video file (URL or upload). Published to YouTube videos / IG & FB as reels.',
     short: '⚡ Short/Reel: attach a vertical 9:16 video (≤60s works best). YouTube adds #Shorts automatically.',
     community: '📢 YouTube Community post (image/text). ⚠️ Google has NO API for Community posts — SocialAuto creates a ready-to-post reminder with your caption + image; one click opens YouTube to finish.',
+    channel: '💬 WhatsApp Channel update. Meta has no public Channel-post API — we queue a reminder; copy caption, post in WhatsApp, tap I posted it.',
+    broadcast: '📢 WhatsApp Broadcast. Same helper flow: copy caption, send to your broadcast list in WhatsApp, tap I posted it.',
   };
   document.getElementById('ptypeHint').innerHTML = hints[t] || '';
   // media label tweak
@@ -3758,6 +3816,23 @@ if(isIos() && !isStandalone()){
   }
   // else: auth overlay stays visible until login
 })();
+</script>
+</body>
+</html>calAnchor = now;
+
+  if(TOKEN){
+    try{
+      ME = await api('/api/auth/me');
+      enterApp();
+    }catch(e){
+      localStorage.removeItem('sa_token'); TOKEN = null;
+    }
+  }
+  // else: auth overlay stays visible until login
+})();
+</script>
+</body>
+</html>})();
 </script>
 </body>
 </html>

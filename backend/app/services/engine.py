@@ -409,31 +409,20 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
                 continue
             if not comment.text.strip():
                 continue
-            # COMMENT_WATCH_WINDOW_HOURS is the whole point of the setting: an
-            # account connecting for the first time pulls in months of old
-            # comments, and auto-replying to all of them looks like spam. Old
-            # ones still land in the Community inbox for a human to handle.
-            # Set COMMENT_WATCH_WINDOW_HOURS=0 to reply to everything,
-            # including the backlog a first-time connect pulls in.
+            # Watch window matches the 7-day inbox so pending comments get a
+            # reply. Older history is never stored (COMMENT_SYNC_WINDOW_DAYS).
             watch = settings.COMMENT_WATCH_WINDOW_HOURS
             age_hours = (_now() - posted_at).total_seconds() / 3600
             if watch > 0 and age_hours > watch:
                 continue
             if external_id:
                 replied_seen.add(external_id)
-            reply = generate_reply(comment.text, account)
-            try:
-                ok = await client.reply_to_comment(account, post.platform_post_id,
-                                                   external_id, reply)
-            except Exception as exc:
-                print(f"sync_comments: reply failed: {exc}", flush=True)
-                ok = False
-            if ok:
-                comment.our_reply = reply
-                comment.replied = True
-                comment.reply_type = "auto"
+            if await _send_auto_reply(client, account, post, comment):
                 auto_replies += 1
         db.commit()
+
+    pending = await auto_reply_pending(db, user_id)
+    auto_replies += pending.get("sent", 0)
 
     # Keep the table matching the window: rows that aged out are removed, so the
     # Community inbox shows what is alive now instead of an ever-growing archive.
@@ -448,7 +437,64 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
 
     return {"new_comments": new_comments, "auto_replies": auto_replies,
             "posts_scanned": len(posts), "skipped_old": skipped_old,
-            "pruned": pruned}
+            "pruned": pruned, "pending_replies": pending.get("sent", 0)}
+
+
+async def _send_auto_reply(client, account: Account, post: Post, comment: Comment) -> bool:
+    """Generate a human reply and post it. True only if the platform accepted it."""
+    if comment.replied or not (comment.text or "").strip():
+        return False
+    reply = generate_reply(comment.text, account)
+    try:
+        ok = await client.reply_to_comment(
+            account, post.platform_post_id, comment.external_comment_id, reply)
+    except Exception as exc:
+        print(f"auto-reply failed ({account.display_name}): {exc}", flush=True)
+        ok = False
+    if ok:
+        comment.our_reply = reply
+        comment.replied = True
+        comment.reply_type = "auto"
+    return bool(ok)
+
+
+async def auto_reply_pending(db, user_id: int | None = None, limit: int = 80) -> dict:
+    """Reply to unreplied inbox comments that auto-reply missed.
+
+    Used on cron/sync and from the Community “Auto-reply pending” button.
+    Skips comments the user already resolved or replied to by hand.
+    """
+    if not settings.AUTO_COMMENT_ENABLED:
+        return {"ok": True, "sent": 0, "failed": 0, "skipped": 0, "scanned": 0}
+
+    q = (db.query(Comment)
+         .join(Post, Comment.post_id == Post.id)
+         .join(Account, Post.account_id == Account.id)
+         .filter(Comment.replied.is_(False),
+                 Comment.resolved.is_(False),
+                 Account.auto_comment.is_(True)))
+    if user_id:
+        q = q.filter(Post.user_id == user_id)
+    rows = q.order_by(Comment.created_at.desc()).limit(limit).all()
+
+    sent = failed = skipped = 0
+    for comment in rows:
+        post = comment.post or db.get(Post, comment.post_id)
+        account = None
+        if post is not None:
+            account = post.account or db.get(Account, post.account_id)
+        if account is None or post is None:
+            skipped += 1
+            continue
+        client = platforms.get_client(account.platform)
+        if await _send_auto_reply(client, account, post, comment):
+            sent += 1
+        else:
+            failed += 1
+    if sent or failed:
+        db.commit()
+    return {"ok": True, "sent": sent, "failed": failed, "skipped": skipped,
+            "scanned": len(rows)}
 
 
 # ------------------------------------------------------------------- metrics
@@ -654,13 +700,21 @@ def analytics_summary(db, user_id: int, days: int | None = None) -> dict:
     by_tag: dict[str, dict] = {}
     per_post: list[dict] = []
 
+    # One metrics query instead of N+1 — home/insights used to feel frozen.
+    metric_rows = (db.query(Metric)
+                   .filter(Metric.post_id.in_([p.id for p in published] or [0]))
+                   .order_by(Metric.fetched_at.desc())
+                   .all()) if published else []
+    latest_metric: dict[int, Metric] = {}
+    for row in metric_rows:
+        latest_metric.setdefault(row.post_id, row)
+
     for post in published:
         published_at = _aware(post.published_at or post.scheduled_at)
         if since and published_at < since:
             continue
 
-        snapshot = (db.query(Metric).filter(Metric.post_id == post.id)
-                    .order_by(Metric.fetched_at.desc()).first())
+        snapshot = latest_metric.get(post.id)
         likes = snapshot.likes if snapshot else 0
         comments_count = snapshot.comments_count if snapshot else 0
         shares = snapshot.shares if snapshot else 0
