@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#5b6cff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SocialAuto">
+<meta name="application-name" content="SocialAuto">
+<meta name="description" content="Schedule posts and reply to comments from your phone. Instagram, Facebook, YouTube and more.">
 <title>SocialAuto — Social Media Scheduler</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <style>
   :root{
     --bg:#f3f5f9; --panel:#ffffff; --border:#e3e7ee; --border2:#d5dae3;
@@ -15,7 +25,9 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{max-width:100%;overflow-x:hidden}
-  body{background:var(--bg);color:var(--txt);font:14px/1.55 -apple-system,'Segoe UI',Roboto,sans-serif}
+  body{background:var(--bg);color:var(--txt);font:14px/1.55 -apple-system,'Segoe UI',Roboto,sans-serif;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  @media(display-mode:standalone){body{overscroll-behavior:none}}
   button{font-family:inherit;cursor:pointer}
   input,select,textarea{font-family:inherit;font-size:14px}
 
@@ -358,14 +370,14 @@
   .connect-btn small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:1px}
   .cico.ig{background:linear-gradient(45deg,#f09433,#dc2743,#cc2366)}
   .cico.fb{background:#1877f2}
-  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981} .cico.snap{background:#FFFC00;color:#111} .cico.bili{background:#00a1d6}
-  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}.av.snapchat{background:#FFFC00;color:#111}.av.bilibili{background:#00a1d6}
-  .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}
-  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}.pv-plat.snap{background:#fffde6;color:#8a7d00}.pv-plat.bili{background:#e6f7fc;color:#0086b3}
+  .cico.yt{background:#ff0000} .cico.th{background:#000000} .cico.moj{background:#ff4d00} .cico.sc{background:#10b981} .cico.bl{background:#00a1d6}
+  .av.th{background:#000}.av.moj{background:#ff4d00}.av.sc{background:#10b981}.av.bilibili{background:#00a1d6}
+  .chip.th{background:#000}.chip.moj{background:#ff4d00}.chip.sc{background:#10b981}.chip.bilibili{background:#00a1d6}
+  .pv-plat.th{background:#eee;color:#000}.pv-plat.moj{background:#fff0e8;color:#ff4d00}.pv-plat.sc{background:#e6f8f1;color:#10b981}.pv-plat.bilibili{background:#e6f7fb;color:#00a1d6}
   .ptype{display:flex;align-items:center;gap:7px;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
   .ptype:has(input:checked){border-color:var(--purple);background:#f3efff;color:var(--purple)}
   .ptype input{accent-color:var(--purple)}
-  .plat.threads{color:#000}.plat.moj{color:#ff4d00}.plat.sharechat{color:#10b981}.plat.snapchat{color:#c9b900}.plat.bilibili{color:#00a1d6}
+  .plat.threads{color:#000}.plat.moj{color:#ff4d00}.plat.sharechat{color:#10b981}.plat.bilibili{color:#00a1d6}
 
   /* ---------- home greeting ---------- */
   .greet{display:flex;align-items:center;gap:16px;margin-bottom:22px}
@@ -461,6 +473,17 @@
     font-size:30px;font-weight:800;color:#fff;margin:0 auto 10px}
   .check-row{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px}
   .check-row .ok{color:var(--green)} .check-row .bad{color:var(--red)}
+  .meta-wizard{border:1px solid #d9e2ff;background:linear-gradient(180deg,#f7f8ff 0%,#fff 42%);border-radius:18px;padding:20px 22px;margin-bottom:16px}
+  .meta-wizard h2{display:flex;align-items:center;gap:10px;font-size:17px;margin:0 0 6px}
+  .meta-status-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 14px}
+  .meta-steps{display:grid;gap:10px;margin:12px 0}
+  .meta-step{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff}
+  .meta-step .n{width:28px;height:28px;border-radius:50%;background:#eef2ff;color:var(--brand-d);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .meta-copy{display:flex;gap:8px;align-items:center;background:#f4f6fb;border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-top:6px}
+  .meta-copy code{flex:1;font-size:12px;word-break:break-all;background:none;padding:0}
+  .meta-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  @media(max-width:720px){.meta-form{grid-template-columns:1fr}}
+  .meta-form input{width:100%;border:1px solid var(--border2);border-radius:10px;padding:10px 12px}
   .connected-ok{background:#e3f6ee;color:var(--green);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700}
   .muted{color:var(--muted)}
   .section-title{font-size:16px;font-weight:800;margin:0 0 14px}
@@ -640,6 +663,22 @@
     .auth-form-card{padding:24px 18px;border-radius:24px}
     .auth-form-panel h2{font-size:28px}
   }
+
+  /* ---------- PWA install banner ---------- */
+  .pwa-banner{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:240;
+    display:none;align-items:center;gap:12px;background:#1c2430;color:#fff;border-radius:16px;padding:12px 14px;
+    box-shadow:0 12px 32px rgba(0,0,0,.28)}
+  .pwa-banner.show{display:flex}
+  .pwa-banner .ic{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#5b6cff,#8b5cf6);
+    display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .pwa-banner b{display:block;font-size:14px}
+  .pwa-banner small{display:block;opacity:.78;font-size:12px;margin-top:1px}
+  .pwa-banner .btn{padding:8px 12px;font-size:13px}
+  .pwa-banner .x{margin-left:auto;border:none;background:transparent;color:#fff;font-size:18px;padding:4px 6px}
+  @media(max-width:980px){
+    input,select,textarea{font-size:16px}
+    .mobile-topbar{height:calc(64px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top);padding-left:max(14px, env(safe-area-inset-left));padding-right:max(14px, env(safe-area-inset-right))}
+  }
 </style>
 </head>
 <body>
@@ -692,7 +731,7 @@
               <button class="auth-text-link" onclick="demoLogin()">Try demo workspace</button>
               <button class="auth-text-link" onclick="openAuthPanel('login')">Already have an account? Log in</button>
             </div>
-            <div class="auth-proof">Instagram · Facebook · YouTube · Threads · Moj · ShareChat</div>
+            <div class="auth-proof">Instagram · Facebook · YouTube · Threads · Moj · ShareChat · Bilibili</div>
           </div>
         </div>
       </div>
@@ -819,6 +858,7 @@
       <button class="av-menu-item" onclick="openProfile()">🌍 Profile &amp; timezone</button>
       <button class="av-menu-item" onclick="openChangePassword()">🔑 Change password</button>
       <button class="av-menu-item" onclick="openHelpSupport()">❓ Help &amp; support</button>
+      <button class="av-menu-item" onclick="promptPwaInstall(true)">📲 Install phone app</button>
       <div class="av-menu-sep"></div>
       <button class="av-menu-item" onclick="logout()">🚪 Log out</button>
     </div>
@@ -974,7 +1014,6 @@
         <option value="threads">🧵 Threads</option>
         <option value="moj">🎬 Moj</option>
         <option value="sharechat">💬 ShareChat</option>
-        <option value="snapchat">👻 Snapchat</option>
         <option value="bilibili">📺 Bilibili</option>
       </select>
       <select id="calStatusFilter" class="select-input" onchange="calendarStatusFilter=this.value;renderCalendar()">
@@ -1029,7 +1068,6 @@
         <option value="threads">🧵 Threads</option>
         <option value="moj">🎬 Moj</option>
         <option value="sharechat">💬 ShareChat</option>
-        <option value="snapchat">👻 Snapchat</option>
         <option value="bilibili">📺 Bilibili</option>
       </select>
     </div>
@@ -1084,7 +1122,7 @@
   <!-- COMMUNITY INBOX (Buffer-style) -->
   <section id="view-community" style="display:none">
     <div class="page-header-row">
-      <div class="page-title-wrap"><div class="page-icon">◫</div><div><h2>All Channels</h2><div class="muted">Comments and replies from connected channels</div></div></div>
+      <div class="page-title-wrap"><div class="page-icon">◫</div><div><h2>All Channels</h2><div class="muted">Last 7 days of comments only — older history is not synced</div></div></div>
       <div class="page-actions">
         <button class="soft-toggle">▥ By post</button>
         <button class="soft-toggle active">☰ List</button>
@@ -1102,7 +1140,6 @@
           <option value="threads">🧵 Threads</option>
           <option value="moj">🎬 Moj</option>
           <option value="sharechat">💬 ShareChat</option>
-        <option value="snapchat">👻 Snapchat</option>
         <option value="bilibili">📺 Bilibili</option>
         </select>
         <label class="checkline"><input type="checkbox" id="commOpenOnly" onchange="communityOpenOnly=this.checked;loadCommunity()"> Unresolved</label>
@@ -1186,8 +1223,8 @@
 
   <!-- MEDIA -->
   <section id="view-media" style="display:none">
-    <div class="upload-drop" id="mediaDrop">🖼 Upload images or videos — click or drag &amp; drop (JPG/PNG/WEBP/MP4/MOV, max 100MB)</div>
-    <input type="file" id="mediaFile" accept="image/*,video/*" multiple style="display:none">
+    <div class="upload-drop" id="mediaDrop">🖼 Upload images to your media library — click or drag &amp; drop (JPG/PNG/GIF, max 8MB)</div>
+    <input type="file" id="mediaFile" accept="image/*" multiple style="display:none">
     <div class="media-grid" id="mediaGrid"></div>
   </section>
 
@@ -1199,6 +1236,7 @@
         <div class="settings-group-label">Organization</div>
         <button class="settings-link">General</button>
         <button class="settings-link active">Channels <span class="side-count" id="sideChannelCount">0</span></button>
+        <button class="settings-link" onclick="document.getElementById('metaWizard')?.scrollIntoView({behavior:'smooth'})">📘 Meta App</button>
         <button class="settings-link">Billing</button>
         <div class="settings-group-label">Features</div>
         <button class="settings-link" onclick="openTagManager()">Tags</button>
@@ -1213,8 +1251,59 @@
         </div>
         <div class="page-card" style="padding:18px;margin-bottom:16px">
           <div style="font-weight:800;margin-bottom:4px">Get to know your plan</div>
-          <div class="muted">You are on the free plan and can connect up to 3 channels in demo mode.</div>
+          <div class="muted">You are on the free plan. Create the Meta app below, then connect Instagram + Facebook for real.</div>
         </div>
+
+        <div class="meta-wizard" id="metaWizard">
+          <h2>📘 Meta App setup <small class="muted" style="font-weight:600;font-size:13px">Instagram + Facebook · one app</small></h2>
+          <p class="muted" style="margin:0">developers.facebook.com lo app create chesi App ID + Secret ikkada paste cheyandi. Development mode lo mee Pages / IG Professional account ki App Review avasaram ledu.</p>
+          <div class="meta-status-row" id="metaStatusRow"></div>
+          <div class="meta-steps">
+            <div class="meta-step"><div class="n">1</div><div>
+              <b>Create the app</b>
+              <div class="muted" style="font-size:13px;margin-top:2px">Open <a href="https://developers.facebook.com/apps/creation/" target="_blank" rel="noopener">developers.facebook.com → Create App</a>. Use case: <b>Other</b> → App type: <b>Business</b>. Name: <b>SocialAuto</b>.</div>
+            </div></div>
+            <div class="meta-step"><div class="n">2</div><div>
+              <b>Add products</b>
+              <div class="muted" style="font-size:13px;margin-top:2px"><b>Facebook Login for Business</b>, <b>Instagram</b>, <b>Webhooks</b>. Login settings lo Valid OAuth Redirect URI paste cheyandi. Webhooks → Page + Instagram → callback URL + verify token.</div>
+            </div></div>
+            <div class="meta-step"><div class="n">3</div><div>
+              <b>Copy these URLs into the Meta dashboard</b>
+              <div class="meta-copy"><code id="metaRedirectUri">/api/oauth/callback</code><button class="btn ghost sm" type="button" onclick="copyMetaField('metaRedirectUri')">Copy</button></div>
+              <div class="meta-copy"><code id="metaWebhookUrl">/api/webhooks/meta</code><button class="btn ghost sm" type="button" onclick="copyMetaField('metaWebhookUrl')">Copy webhook</button></div>
+              <div class="meta-copy"><code id="metaVerifyToken">socialauto-verify-token</code><button class="btn ghost sm" type="button" onclick="copyMetaField('metaVerifyToken')">Copy verify token</button></div>
+            </div></div>
+            <div class="meta-step"><div class="n">4</div><div>
+              <b>Paste App ID + App Secret</b>
+              <div class="muted" style="font-size:13px;margin-top:2px">App settings → Basic. IG Professional account ni Facebook Page ki link cheyandi. App roles lo mee Facebook account ni Administrator ga add cheyandi.</div>
+              <div class="meta-form">
+                <div><label class="f">App ID</label><input id="metaAppId" placeholder="1642533414128906" autocomplete="off"></div>
+                <div><label class="f">App Secret</label>
+                  <div class="pw-wrap"><input id="metaAppSecret" type="password" placeholder="leave blank to keep existing" autocomplete="off">
+                    <button type="button" class="pw-toggle" onclick="togglePassword('metaAppSecret', this)">Show</button></div>
+                </div>
+                <div><label class="f">Verify token</label><input id="metaVerifyInp" placeholder="socialauto-verify-token"></div>
+                <div><label class="f">Public app URL (https)</label><input id="metaPublicUrl" placeholder="https://your-app.onrender.com"></div>
+                <div style="grid-column:1/-1"><label class="f">Login config ID (optional — Facebook Login for Business → Configurations)</label><input id="metaConfigId" placeholder="leave blank unless Meta shows a Configuration ID" autocomplete="off"></div>
+              </div>
+              <label class="checkline" style="margin-top:12px"><input type="checkbox" id="metaLiveToggle"> Turn MOCK MODE off — publish to real Instagram / Facebook</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                <button class="btn" type="button" onclick="saveMetaApp()">💾 Save Meta app</button>
+                <button class="btn ghost" type="button" onclick="testMetaApp()">🔎 Test credentials</button>
+              </div>
+              <div class="helper-note" id="metaSaveMsg" style="margin-top:8px"></div>
+            </div></div>
+            <div class="meta-step"><div class="n">5</div><div>
+              <b>Connect your channels</b>
+              <div class="muted" style="font-size:13px;margin-top:2px">Save ayyaka ikkada click cheste Facebook login vastundi. Mee Page + linked IG Professional account rendu channels avuthayi.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                <button class="btn" type="button" onclick="connectOAuth('instagram')">📸 Connect Instagram</button>
+                <button class="btn ghost" type="button" onclick="connectOAuth('facebook')">👍 Connect Facebook Page</button>
+              </div>
+            </div></div>
+          </div>
+        </div>
+
         <div class="card" style="padding:20px;margin-bottom:16px">
           <h2 class="section-title">🔗 Connect a social account</h2>
           <div class="connect-grid">
@@ -1224,10 +1313,9 @@
             <button class="connect-btn" onclick="connectOAuth('threads')"><span class="cico th">🧵</span><span>Threads<small>Meta API · text + images</small></span></button>
             <button class="connect-btn" onclick="prepareManualAccount('moj')"><span class="cico moj">🎬</span><span>Moj<small>manual-post helper</small></span></button>
             <button class="connect-btn" onclick="prepareManualAccount('sharechat')"><span class="cico sc">💬</span><span>ShareChat<small>regional social helper</small></span></button>
-            <button class="connect-btn" onclick="prepareManualAccount('snapchat')"><span class="cico snap">👻</span><span>Snapchat<small>no public posting API</small></span></button>
-            <button class="connect-btn" onclick="prepareManualAccount('bilibili')"><span class="cico bili">📺</span><span>Bilibili<small>manual helper · open platform pending</small></span></button>
+            <button class="connect-btn" onclick="prepareManualAccount('bilibili')"><span class="cico bl">📺</span><span>Bilibili<small>manual helper · open platform pending</small></span></button>
           </div>
-          <div class="helper-note" style="margin-top:10px">Moj, ShareChat, Snapchat and Bilibili use a manual/helper connection flow (their APIs cannot post for you — Snapchat has no open organic posting API, only a partner-gated Public Profile API), while Instagram, Facebook, YouTube and Threads use OAuth.</div>
+          <div class="helper-note" style="margin-top:10px">Moj, ShareChat and Bilibili use a manual/helper flow (Bilibili auto-upload needs 开放平台 keys). Instagram, Facebook, YouTube and Threads use OAuth.</div>
           <details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-weight:700">Advanced manual connect</summary>
             <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
               <div><label class="f">Platform</label>
@@ -1238,7 +1326,7 @@
                   <option value="threads">🧵 Threads</option>
                   <option value="moj">🎬 Moj</option>
                   <option value="sharechat">💬 ShareChat</option>
-        <option value="snapchat">👻 Snapchat</option>
+                  <option value="bilibili">📺 Bilibili</option>
         <option value="bilibili">📺 Bilibili</option>
                 </select></div>
               <div><label class="f">Display name</label><input id="aName" placeholder="@yourbrand" style="width:100%;border:1px solid var(--border2);border-radius:9px;padding:9px"></div>
@@ -1311,9 +1399,8 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
         </div>
 
         <div class="comp-actions">
-          <button class="tool-btn" onclick="document.getElementById('mediaPickerFile').click()">Upload</button>
+          <button class="tool-btn" onclick="document.getElementById('mediaPickerFile').click()">🖼 Media library</button>
           <input type="file" id="mediaPickerFile" accept="image/*,video/*" style="display:none">
-          <button class="tool-btn" onclick="useMediaUrl()">🔗 Paste media link</button>
           <button class="tool-btn" id="clearMediaBtn" style="display:none" onclick="clearMedia()">✕ Remove</button>
           <button class="tool-btn" style="background:#f0eafe;color:var(--purple);border-color:#d9cbfb" onclick="runAI()">
             ✨ AI suggest <small style="display:block;font-size:10.5px;color:#8b7fd0">caption · hashtags · SEO · disclaimers</small></button>
@@ -1491,6 +1578,15 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
   </div>
 </div>
 
+<div class="pwa-banner" id="pwaBanner">
+  <div class="ic">⚡</div>
+  <div style="flex:1;min-width:0">
+    <b>Install SocialAuto</b>
+    <small id="pwaBannerHint">Add to your phone home screen</small>
+  </div>
+  <button class="btn sm" id="pwaInstallBtn" type="button">Install</button>
+  <button class="x" id="pwaDismissBtn" type="button" aria-label="Dismiss">✕</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1576,8 +1672,7 @@ const PLAT_META = {
   threads:{ic:'🧵',cls:'th',limit:500,label:'Threads', ratio:'4/5', ratioNote:'4:5 portrait'},
   moj:{ic:'🎬',cls:'moj',limit:150,label:'Moj', ratio:'9/16', ratioNote:'9:16 vertical short'},
   sharechat:{ic:'💬',cls:'sc',limit:500,label:'ShareChat', ratio:'9/16', ratioNote:'9:16 vertical short'},
-  snapchat:{ic:'👻',cls:'snap',limit:160,label:'Snapchat', ratio:'9/16', ratioNote:'9:16 vertical (Story / Spotlight)'},
-  bilibili:{ic:'📺',cls:'bili',limit:2000,label:'Bilibili', ratio:'16/9', ratioNote:'16:9 landscape video'},
+  bilibili:{ic:'📺',cls:'bilibili',limit:2000,label:'Bilibili', ratio:'16/9', ratioNote:'16:9 video / 9:16 shorts'},
 };
 let TOKEN = localStorage.getItem('sa_token') || null;
 let ME = null;
@@ -1640,7 +1735,15 @@ const api = (p, opt) => {
       document.getElementById('authOverlay').style.display = 'flex';
       throw new Error('Session expired — please log in');
     }
-    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.statusText);
+    if (!r.ok){
+      const d = await r.json().catch(()=>({}));
+      const det = d.detail;
+      const msg = typeof det === 'string' ? det
+        : (det && (det.message || det.code)) || d.message || r.statusText;
+      const err = new Error(msg);
+      err.code = (det && det.code) || d.code || '';
+      throw err;
+    }
     return r.status === 204 ? null : r.json();
   });
 };
@@ -1816,17 +1919,29 @@ async function enterApp(){
 /* ---------- OAuth connect ---------- */
 async function connectOAuth(platform){
   try{
+    if(['instagram','facebook','threads'].includes(platform)){
+      const st = window._metaStatus;
+      if(st && !st.mock_mode && !st.configured){
+        switchView('accounts');
+        setTimeout(()=>{ document.getElementById('metaWizard')?.scrollIntoView({behavior:'smooth'}); }, 80);
+        return toast('First paste Meta App ID + Secret in the setup card', false);
+      }
+    }
     const r = await api(`/api/oauth/connect/${platform}`);
     if(r.mode === 'mock'){
-      // simulated round trip: hit the callback directly (AJAX -> JSON)
       await api(r.authorize_url.replace(location.origin, '') + '&ajax=1');
       flashConnected(platform);
       await refreshData();
     } else {
-      // real OAuth: full redirect to provider; it returns to /?oauth=connected
       window.location.href = r.authorize_url;
     }
-  }catch(e){ toast(e.message, false); }
+  }catch(e){
+    if(e.code === 'meta_not_configured' || /META_APP_ID|Meta App/i.test(e.message||'')){
+      switchView('accounts');
+      setTimeout(()=>document.getElementById('metaWizard')?.scrollIntoView({behavior:'smooth'}), 80);
+    }
+    toast(e.message, false);
+  }
 }
 function flashConnected(platform){
   const el = document.getElementById('oauthResult');
@@ -1917,7 +2032,7 @@ async function syncCommunity(){
   toast('Fetching latest comments from channels…');
   try{
     const r = await api('/api/community/sync',{method:'POST'});
-    toast(`Fetched ${r.new_comments} new comments, ${r.auto_replies} auto-replies`);
+    toast(`Fetched ${r.new_comments} new comments (last 7 days), ${r.auto_replies} auto-replies`);
     loadCommunity();
   }catch(e){ toast(e.message,false); }
 }
@@ -1941,7 +2056,7 @@ async function importChannel(acc){
 
 async function importAllChannels(){
   const real = ACCOUNTS.filter(a=>['youtube','instagram','facebook'].includes(a.platform));
-  if(!real.length) return toast('Connect YouTube / Instagram / Facebook first (Moj, ShareChat, Threads have no data API)', false);
+  if(!real.length) return toast('Connect YouTube / Instagram / Facebook first (Moj, ShareChat, Threads, Bilibili have no comment API here)', false);
   toast(`📥 Syncing existing posts/videos + comments from ${real.length} account(s)…`);
   try{
     const r = await api('/api/community/bootstrap-sync',{method:'POST'});
@@ -2032,7 +2147,7 @@ function renderSidebarChannels(summary){
   }).join('') + `<div class="muted" style="font-size:12px;padding:4px 4px 0">${ACCOUNTS.length} channel(s) connected · ${totalComments} total comments tracked</div>`
   : `<div class="page-card" style="padding:14px;text-align:left">
       <div style="font-weight:800;margin-bottom:4px">No channels connected</div>
-      <div class="muted" style="font-size:13px;line-height:1.5;margin-bottom:10px">Connect Instagram, Facebook, YouTube, Threads, Moj or ShareChat to unlock publishing and inbox sync.</div>
+      <div class="muted" style="font-size:13px;line-height:1.5;margin-bottom:10px">Connect Instagram, Facebook, YouTube, Threads, Moj, ShareChat or Bilibili to unlock publishing and inbox sync.</div>
       <button class="btn ghost sm" onclick="switchView('accounts')">＋ Connect your first channel</button>
     </div>`;
 }
@@ -2323,17 +2438,6 @@ window.addEventListener('resize', ()=>{ if(window.innerWidth > 980) closeNav(); 
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeNav(); document.getElementById('avatarMenu').classList.remove('open'); } });
 
 /* ================= accounts ================= */
-/* Moj / ShareChat / Snapchat have no posting API we can call, so the app hands
-   the creative over instead: copy the caption, download the media, open the
-   app. (Snapchat's own API only posts to Public Profiles and is partner-gated.) */
-const MANUAL_OPEN = {
-  youtube:{url:'https://studio.youtube.com',              label:'▶️ Open YouTube Studio'},
-  threads:{url:'https://www.threads.net/',                label:'🧵 Open Threads'},
-  moj:{url:'https://mojapp.in/',                          label:'🎬 Open Moj'},
-  sharechat:{url:'https://sharechat.com/',                label:'💬 Open ShareChat'},
-  snapchat:{url:'https://web.snapchat.com/',              label:'👻 Open Snapchat'},
-  bilibili:{url:'https://member.bilibili.com/platform/upload/video/frame', label:'📺 Open Bilibili uploader'},
-};
 function prepareManualAccount(platform){
   switchView('accounts');
   setTimeout(()=>{
@@ -2346,7 +2450,71 @@ function prepareManualAccount(platform){
     toast(`${PLAT_META[platform]?.label || platform} uses the manual/helper connect flow here.`);
   }, 80);
 }
+function copyMetaField(id){
+  const el = document.getElementById(id);
+  copyToClipboard(el?.textContent || '', 'Copied 📋');
+}
+function renderMetaStatus(st){
+  window._metaStatus = st;
+  const row = document.getElementById('metaStatusRow');
+  if(!row) return;
+  const live = st.live_ready;
+  row.innerHTML = `
+    <span class="mini-pill ${st.configured?'ok':'warn'}">${st.configured?'App credentials saved':'App ID not set yet'}</span>
+    <span class="mini-pill ${st.mock_mode?'warn':'ok'}">${st.mock_mode?'MOCK MODE — fake posts':'LIVE — real Instagram / Facebook'}</span>
+    <span class="mini-pill ${live?'ok':'info'}">${live?'Ready to connect channels':'Save + turn MOCK off to go live'}</span>`;
+  document.getElementById('metaRedirectUri').textContent = st.redirect_uri || '';
+  document.getElementById('metaWebhookUrl').textContent = st.webhook_url || '';
+  document.getElementById('metaVerifyToken').textContent = st.verify_token || 'socialauto-verify-token';
+  const idInp = document.getElementById('metaAppId');
+  if(idInp && !idInp.value) idInp.value = st.app_id || '';
+  const ver = document.getElementById('metaVerifyInp');
+  if(ver && !ver.value) ver.value = st.verify_token || '';
+  const pub = document.getElementById('metaPublicUrl');
+  if(pub && !pub.value) pub.value = st.app_public_url || location.origin;
+  document.getElementById('metaLiveToggle').checked = !st.mock_mode;
+  const pill = document.getElementById('modePill');
+  if(pill) pill.textContent = st.mock_mode ? 'MOCK' : '● LIVE';
+}
+async function loadMetaWizard(){
+  try{
+    const st = await api('/api/settings/meta');
+    renderMetaStatus(st);
+  }catch(e){ /* not logged in */ }
+}
+async function saveMetaApp(){
+  const body = {
+    app_id: document.getElementById('metaAppId').value.trim(),
+    app_secret: document.getElementById('metaAppSecret').value.trim(),
+    verify_token: document.getElementById('metaVerifyInp').value.trim() || 'socialauto-verify-token',
+    mock_mode: !document.getElementById('metaLiveToggle').checked,
+    app_public_url: document.getElementById('metaPublicUrl').value.trim() || location.origin,
+    config_id: (document.getElementById('metaConfigId')?.value || '').trim(),
+  };
+  if(!body.app_id) return toast('Paste the Meta App ID', false);
+  try{
+    const st = await api('/api/settings/meta', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    document.getElementById('metaAppSecret').value = '';
+    renderMetaStatus(st);
+    document.getElementById('metaSaveMsg').textContent = st.live_ready
+      ? 'Saved. LIVE mode on — click Connect Instagram / Facebook below.'
+      : 'Saved. Tick “Turn MOCK MODE off” and save again to publish for real.';
+    toast(st.live_ready ? 'Meta app saved · LIVE ✅' : 'Meta app saved (still MOCK)');
+  }catch(e){ toast(e.message, false); }
+}
+async function testMetaApp(){
+  const body = {
+    app_id: document.getElementById('metaAppId').value.trim(),
+    app_secret: document.getElementById('metaAppSecret').value.trim(),
+  };
+  try{
+    const r = await api('/api/settings/meta/test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    document.getElementById('metaSaveMsg').textContent = r.message;
+    toast(r.message);
+  }catch(e){ toast(e.message, false); }
+}
 async function loadAccounts(){
+  await loadMetaWizard();
   ACCOUNTS = await api('/api/accounts');
   const all = ACCOUNTS;
   const needle = accountSearch.trim();
@@ -2607,11 +2775,10 @@ function openComposer(presetDateISO=null, editPost=null){
   comp.aiAutoStamp = '';
   document.getElementById('linkUrl').value = '';
   document.getElementById('linkOut').innerHTML = '';
-  document.getElementById('mediaPickerFile').onchange = async e => {
-    const f = e.target.files[0];
-    e.target.value = '';            // allow re-picking the same file later
-    if(!f) return;
-    await attachFile(f);
+  document.getElementById('mediaPickerFile').onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    const fd = new FormData(); fd.append('file', f);
+    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); maybeAutoAI(true); });
   };
   renderCompAccs();
   renderCompTags();
@@ -2768,42 +2935,6 @@ function showSelMedia(){
   else { box.style.display='none'; document.getElementById('clearMediaBtn').style.display='none'; }
 }
 function clearMedia(){ comp.mediaUrl=''; showSelMedia(); renderPreviews(); }
-
-/* Uploads used to be fire-and-forget: the POST had no .catch(), so an oversize
-   phone video failed with a 400 that the UI silently swallowed - it looked like
-   nothing had happened at all. Size is now checked up front and the result is
-   always reported. */
-const MAX_UPLOAD_MB = 100;
-async function attachFile(f){
-  const hint = document.getElementById('mediaHint');
-  const mb = f.size / (1024*1024);
-  if(mb > MAX_UPLOAD_MB){
-    toast(`That file is ${mb.toFixed(0)}MB and the upload limit is ${MAX_UPLOAD_MB}MB. Compress it, or use "Paste media link" to attach a public URL instead.`, false);
-    return;
-  }
-  hint.textContent = `Uploading ${f.name} (${mb.toFixed(1)}MB)…`;
-  try{
-    const fd = new FormData(); fd.append('file', f);
-    const m = await api('/api/media',{method:'POST',body:fd});
-    comp.mediaUrl = m.url;
-    showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); maybeAutoAI(true);
-    hint.textContent = '';
-    toast('Media attached ✅');
-  }catch(err){
-    hint.textContent = '';
-    toast(`Upload failed: ${err.message}`, false);
-  }
-}
-function useMediaUrl(){
-  const url = prompt('Paste a public image/video URL (https://...)\n\nHandy for big videos - they do not have to go through this app at all.',
-                     comp.mediaUrl && comp.mediaUrl.startsWith('http') ? comp.mediaUrl : '');
-  if(!url) return;
-  const u = url.trim();
-  if(!/^https?:\/\//i.test(u)){ toast('That needs to start with http:// or https://', false); return; }
-  comp.mediaUrl = u;
-  showSelMedia(); renderPreviews(); renderCustomize();
-  toast('Media link attached 🔗');
-}
 
 function renderPreviews(){
   const cap = document.getElementById('capText').value;
@@ -3122,8 +3253,7 @@ function renderPosts(){
           ? `<div style="background:#fff7e6;border:1px solid #ffd591;border-radius:8px;padding:6px 9px;font-size:12px;margin-top:4px;color:#ad6800">✋ <b>Manual step needed</b> — ${esc(p.error.replace('MANUAL:',''))}
              <div style="margin-top:5px;display:flex;gap:6px">
                <button class="btn ghost sm" style="padding:3px 9px" onclick="copyText(${JSON.stringify(p.caption).replace(/"/g,'&quot;')})">📋 Copy caption</button>
-               ${MANUAL_OPEN[p.account.platform]?`<a class="btn ghost sm" style="padding:3px 9px;text-decoration:none" href="${MANUAL_OPEN[p.account.platform].url}" target="_blank" rel="noopener">${MANUAL_OPEN[p.account.platform].label}</a>`:''}
-               ${p.media_url?`<a class="btn ghost sm" style="padding:3px 9px;text-decoration:none" href="${p.media_url}" download target="_blank" rel="noopener">⬇️ Download media</a>`:''}
+               ${p.account.platform==='youtube'?'<a class="btn ghost sm" style="padding:3px 9px;text-decoration:none" href="https://studio.youtube.com" target="_blank">▶️ Open YouTube</a>':''}
                <button class="btn green sm" style="padding:3px 9px" onclick="markDone(${p.id})">✅ I posted it</button>
              </div></div>`
           : `<div style="color:var(--red);font-size:12px;margin-top:3px">⚠ ${esc(p.error)}</div>`):''}</td>
@@ -3429,22 +3559,20 @@ function pickMedia(url){
 const mediaDrop = document.getElementById('mediaDrop');
 mediaDrop.onclick = ()=>document.getElementById('mediaFile').click();
 document.getElementById('mediaFile').onchange = async e => {
-  const files = [...e.target.files];
-  e.target.value = '';
-  let ok = 0;
-  for(const f of files){
-    try{ await attachFile(f); ok++; }catch(err){ toast(`${f.name}: ${err.message}`, false); }
+  for(const f of e.target.files){
+    const fd = new FormData(); fd.append('file',f);
+    try{ await api('/api/media',{method:'POST',body:fd}); }catch(err){ toast(err.message,false); }
   }
-  if(ok) toast(`${ok} file(s) uploaded ✅`);
-  loadMedia();
+  toast('Uploaded ✅'); loadMedia();
 };
 ['dragover','dragenter'].forEach(ev=>mediaDrop.addEventListener(ev,e=>{e.preventDefault();mediaDrop.classList.add('over')}));
 ['dragleave','drop'].forEach(ev=>mediaDrop.addEventListener(ev,e=>{e.preventDefault();mediaDrop.classList.remove('over')}));
 mediaDrop.addEventListener('drop',async e=>{
   for(const f of e.dataTransfer.files){
-    try{ await attachFile(f); }catch(err){ toast(`${f.name}: ${err.message}`, false); }
+    const fd=new FormData(); fd.append('file',f);
+    try{ await api('/api/media',{method:'POST',body:fd}); }catch(err){ toast(err.message,false); }
   }
-  loadMedia();
+  toast('Uploaded ✅'); loadMedia();
 });
 
 /* ================= sync ================= */
@@ -3525,6 +3653,73 @@ async function refreshData(){
   renderBulkAccs();
 }
 
+
+/* ================= PWA (install + service worker) ================= */
+let _pwaPrompt = null;
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+function showPwaBanner(ios){
+  if(localStorage.getItem('sa_pwa_hide') === '1') return;
+  if(isStandalone()) return;
+  const bar = document.getElementById('pwaBanner');
+  const hint = document.getElementById('pwaBannerHint');
+  const btn = document.getElementById('pwaInstallBtn');
+  if(!bar) return;
+  if(ios){
+    hint.textContent = 'Safari → Share → Add to Home Screen';
+    btn.textContent = 'How';
+  } else {
+    hint.textContent = 'Home screen lo app laga open avuthundi';
+    btn.textContent = 'Install';
+  }
+  bar.classList.add('show');
+}
+function hidePwaBanner(persist){
+  document.getElementById('pwaBanner')?.classList.remove('show');
+  if(persist) localStorage.setItem('sa_pwa_hide', '1');
+}
+async function promptPwaInstall(fromMenu){
+  document.getElementById('avatarMenu')?.classList.remove('open');
+  if(isStandalone()){
+    toast('Already running as the phone app ✅');
+    return;
+  }
+  if(_pwaPrompt){
+    _pwaPrompt.prompt();
+    const choice = await _pwaPrompt.userChoice.catch(()=>({outcome:'dismissed'}));
+    _pwaPrompt = null;
+    hidePwaBanner(choice.outcome === 'accepted');
+    if(choice.outcome === 'accepted') toast('SocialAuto installed on this phone 📲');
+    return;
+  }
+  if(isIos()){
+    showPwaBanner(true);
+    toast('iPhone: Share button → Add to Home Screen');
+    return;
+  }
+  if(fromMenu) toast('Chrome menu → Install app  (or the Install bar below)');
+  showPwaBanner(false);
+}
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  _pwaPrompt = e;
+  showPwaBanner(false);
+});
+window.addEventListener('appinstalled', ()=>{
+  hidePwaBanner(true);
+  toast('SocialAuto installed 📲');
+});
+document.getElementById('pwaInstallBtn')?.addEventListener('click', ()=>promptPwaInstall(false));
+document.getElementById('pwaDismissBtn')?.addEventListener('click', ()=>hidePwaBanner(true));
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+if(isIos() && !isStandalone()){
+  setTimeout(()=>showPwaBanner(true), 2500);
+}
+
 /* ================= boot ================= */
 (async () => {
   try{
@@ -3539,6 +3734,10 @@ async function refreshData(){
     window._forceNextAutoSync = true;
     history.replaceState({}, '', '/');
     setTimeout(()=>toast('✅ Channel connected! Syncing your existing posts, comments, and analytics…'), 500);
+  }
+  const owarn = qp.get('oauth_warn');
+  if(owarn){
+    setTimeout(()=>toast(owarn, false), 700);
   }
   const oerr = qp.get('oauth_error');
   if(oerr){

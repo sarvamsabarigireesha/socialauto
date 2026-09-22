@@ -9,6 +9,9 @@ Everything below is **FREE**. Total time: ~25 minutes. After setup, set env vars
 
 ## PART 1 — Meta Developer App (Instagram + Facebook + Threads, one app)
 
+Full click-path: **[META_APP_SETUP.md](./META_APP_SETUP.md)**. Or use the in-app wizard:
+**Channels → Meta App setup** (paste App ID + Secret there — no Render redeploy needed).
+
 ### A. Prepare your socials (one time)
 1. Instagram app → Settings → Account type → switch to **Professional** (Business or Creator — free).
 2. Create/own a **Facebook Page** (any Page, even empty) and link it to that IG account:
@@ -16,15 +19,21 @@ Everything below is **FREE**. Total time: ~25 minutes. After setup, set env vars
    *(Instagram Graph API only works with an IG Professional account linked to a FB Page.)*
 
 ### B. Create the app
-1. Go to **https://developers.facebook.com/** → login with your Facebook → **My Apps → Create App**.
-2. Type: **Business** → name it `SocialAuto` → Create.
-3. Dashboard → **Add products**: add **Instagram Graph API**, **Facebook Pages API** (or "Pages"),
-   and **Webhooks**.
+1. Go to **https://developers.facebook.com/apps/creation/** → login with the Facebook that owns the Page.
+2. Use case: **Other** → App type: **Business** → name it `SocialAuto` → Create.
+3. **Add products** (all three are required):
+   - **Facebook Login for Business** (OAuth popup)
+   - **Instagram** (Graph API — publish + comments)
+   - **Webhooks**
+4. Facebook Login for Business → **Settings** → **Valid OAuth Redirect URIs**:
+   `https://socialauto-k5ou.onrender.com/api/oauth/callback`
+   (exact match, https, no trailing slash). Save.
 
 ### C. Copy credentials
 1. Left menu → **App settings → Basic**.
 2. Copy **App ID** and **App Secret** (click Show, enter password).
    → these become `META_APP_ID` and `META_APP_SECRET`.
+   Paste them in the app (**Channels → Meta App setup**) or as Render env vars.
 
 ### D. Add yourself as tester/admin (so NO app review is needed for YOUR accounts)
 1. Left menu → **App roles → Roles**.
@@ -39,7 +48,8 @@ Everything below is **FREE**. Total time: ~25 minutes. After setup, set env vars
    - Verify token: `socialauto-verify-token`  ← (value of `META_VERIFY_TOKEN`; you can keep default)
 2. Click **Verify and save**. After subscribe, tick fields: **`comments`**, **`feed`**, **`mentions`**.
 3. Also add the same callback URL under the **Instagram** object and subscribe to **`comments`**.
-4. On the same screen click **"Subscribe"** for each Page you manage.
+4. After you click **Connect Instagram / Facebook** in SocialAuto, the app also calls
+   `/{page-id}/subscribed_apps` so events start flowing without extra clicks.
 
 ### F. Threads (optional, same Meta app)
 - Threads API uses the same App ID/Secret. Request access at
@@ -113,8 +123,17 @@ Save → Render auto-redeploys (~2 min).
    (it says unverified because consent screen is in Testing — that's fine, you're a test user) →
    your YouTube channel appears.
 4. 🧵 Threads similarly once Threads API access is on.
-5. **Community tab → "🔄 Fetch latest comments"** now pulls REAL comments from your posts →
-   auto-replies fire (webhook = instant; cron = every 15 min) → you can also type **manual replies**.
+5. **Community tab → "🔄 Fetch latest comments"** now pulls REAL comments from your posts
+   **from the last 7 days only** (older history is not stored). Auto-replies fire
+   (webhook = instant; cron = every 15 min) → you can also type **manual replies**.
+
+### Bilibili
+Bilibili has no public OAuth like Instagram. Connect it as a **manual helper**
+(Channels → 📺 Bilibili → display name = your Bilibili nickname / UID). SocialAuto
+prepares caption + media; you finish the upload on [bilibili.com](https://www.bilibili.com).
+Auto-publish later needs a Bilibili **开放平台** `access_key_id` + `access_key_secret`
+(developer approval). Monetization (创作激励 / 充电) needs Chinese real-name ID — not
+available for an India-only account. Faster money today: YouTube + Instagram Reels.
 6. **Create Post**: pick IG + FB + YouTube → attach photo → **✨ AI suggest** → schedule.
    Posts publish to the real platforms at the scheduled time.
 

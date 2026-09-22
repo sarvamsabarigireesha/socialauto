@@ -1,764 +1,498 @@
-"""Publishing + sync engine.
+"""Core background jobs: publish due posts, sync comments + auto-reply, sync analytics."""
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
-This is the orchestration layer that sits on top of the platform clients in
-`platforms.py`. It is responsible for:
+from sqlalchemy.orm import Session
 
-  * queue / slot assignment (Buffer-style "Next slot" + "Share next in queue")
-  * publishing due posts (driven by the cron tick: GitHub Actions or the
-    Cloudflare Worker)
-  * importing existing channel content so old posts/comments show up
-  * syncing comments (and firing auto-replies) and metrics snapshots
-  * aggregating the analytics numbers the dashboard renders
-
-Every datetime that touches the database is UTC. Rows come back naive from
-SQLite/Postgres TIMESTAMP columns, so `_aware()` re-stamps UTC on them before
-they are compared or sent to the API (the browser needs the offset).
-"""
-import random
-import uuid
-from datetime import datetime, timedelta, timezone
-
+from ..models import Post, PostStatus, Comment, Metric, Account, User
 from ..config import settings
-from ..models import Account, Comment, Metric, Post, PostStatus
-from . import platforms
-from .autocomment import generate_reply, post_reply
-
-UTC = timezone.utc
-
-# Posts we already tried to hand-publish (no API available) are tagged with this
-# prefix in `Post.error` so the cron never retries them forever.
-MANUAL_PREFIX = "MANUAL:"
-
-# Default weekly slots (Sunday = 0), matching the frontend schedule editor's
-# fallback grid. Used when a channel has no `posting_slots` configured.
-DEFAULT_SLOTS = (
-    (0, 9, 0), (0, 18, 30), (1, 9, 0), (1, 18, 30), (2, 9, 0), (2, 18, 30),
-    (3, 9, 0), (3, 18, 30), (4, 9, 0), (4, 18, 30), (5, 11, 0), (5, 17, 0),
-    (6, 11, 0), (6, 17, 0),
-)
-
-# Intent-flavoured sample comments used in MOCK_MODE so the community inbox and
-# the auto-comment engine are demoable without any real API.
-MOCK_COMMENTS = (
-    ("Aditi", "How much is this? I want to order 😍"),
-    ("Rahul", "Love this! Amazing work 🔥"),
-    ("Sneha", "Is this available in Hyderabad?"),
-    ("Vikram", "This is not working for me, tried twice 😞"),
-    ("Priya", "Wow, beautiful shot 🔥"),
-    ("Imran", "Can I get the link please?"),
-    ("Meghana", "Best one so far 👏"),
-)
+from . import platforms, autocomment
 
 
-# ---------------------------------------------------------------- time helpers
-def _now() -> datetime:
-    """Timezone-aware "now" in UTC."""
-    return datetime.now(UTC)
+def _aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def _aware(dt: datetime | None) -> datetime | None:
-    """Normalize any datetime to timezone-aware UTC.
-
-    SQLite (and `TIMESTAMP WITHOUT TIME ZONE` on Postgres) drops the tzinfo on
-    write and hands back a naive value on read. Everything we store is UTC, so a
-    naive value simply gets UTC stamped on it.
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC)
+# Buffer-style default weekly posting slots (used until user sets their own).
+DEFAULT_SLOTS = [
+    {"day": 0, "time": "09:00"}, {"day": 0, "time": "18:30"},
+    {"day": 1, "time": "09:00"}, {"day": 1, "time": "18:30"},
+    {"day": 2, "time": "09:00"}, {"day": 2, "time": "18:30"},
+    {"day": 3, "time": "09:00"}, {"day": 3, "time": "18:30"},
+    {"day": 4, "time": "09:00"}, {"day": 4, "time": "18:30"},
+    {"day": 5, "time": "11:00"}, {"day": 5, "time": "17:00"},
+    {"day": 6, "time": "11:00"}, {"day": 6, "time": "17:00"},
+]
 
 
-def _naive_utc(dt: datetime | None = None) -> datetime:
-    """UTC datetime without tzinfo — the shape the DB columns actually hold.
-
-    Used for WHERE comparisons so SQLite and Postgres behave identically.
-    """
-    return _aware(dt or _now()).replace(tzinfo=None)
-
-
-def _user_tz(account: Account):
-    """The channel owner's timezone (slots are wall-clock times in it)."""
-    name = getattr(getattr(account, "user", None), "timezone", "") or "Asia/Kolkata"
+def _tz_for(db: Session, user_id: int) -> ZoneInfo:
+    u = db.get(User, user_id)
+    name = (u.timezone if u and u.timezone else "Asia/Kolkata")
     try:
-        from zoneinfo import ZoneInfo
-
         return ZoneInfo(name)
     except Exception:
-        # No tzdata available (or a bad value) → fall back to a fixed IST offset
-        # so scheduling still works instead of blowing up.
-        return timezone(timedelta(hours=5, minutes=30))
+        return ZoneInfo("Asia/Kolkata")
 
 
-def _parse_slots(account: Account) -> list[tuple[int, int, int]]:
-    """`[{"day":0,"time":"09:00"}]` -> sorted `[(dow, hour, minute)]`."""
-    out = set()
-    for slot in account.posting_slots or []:
-        try:
-            day = int(slot.get("day"))
-            hh, mm = str(slot.get("time", "")).split(":")
-            if 0 <= day <= 6 and 0 <= int(hh) <= 23 and 0 <= int(mm) <= 59:
-                out.add((day, int(hh), int(mm)))
-        except (AttributeError, TypeError, ValueError):
-            continue
-    return sorted(out)
+def _slots_of(account: Account) -> list[dict]:
+    slots = account.posting_slots if isinstance(account.posting_slots, list) else []
+    return slots or DEFAULT_SLOTS
 
 
-def _slot_dow(day) -> int:
-    """Python weekday (Mon=0) -> frontend day index (Sun=0)."""
-    return (day.weekday() + 1) % 7
-
-
-# ------------------------------------------------------------- queue / slots
-def next_slot_for(db, account: Account, anchor: datetime,
-                  exclude_post_id: int | None = None) -> datetime:
-    """First free posting slot strictly after `anchor` (UTC) for this channel.
-
-    Slots are stored as wall-clock times in the owner's timezone; the returned
-    datetime is UTC so it can be dropped straight into `Post.scheduled_at`.
-    """
-    anchor = _aware(anchor)
-    tz = _user_tz(account)
-
-    slots = _parse_slots(account)
-    if not slots:
-        slots = list(DEFAULT_SLOTS)
-
-    # Slots already promised to other queued posts on this channel.
-    q = db.query(Post.id, Post.scheduled_at).filter(
-        Post.account_id == account.id,
-        Post.status.in_((PostStatus.scheduled, PostStatus.publishing)),
-    )
-    if exclude_post_id:
-        q = q.filter(Post.id != exclude_post_id)
-    taken = {_naive_utc(row[1]) for row in q.all() if row[1] is not None}
-
-    start_local = anchor.astimezone(tz)
-    for offset in range(15):  # look up to two weeks ahead
-        day = start_local.date() + timedelta(days=offset)
-        dow = _slot_dow(day)
-        for slot_day, hh, mm in slots:
-            if slot_day != dow:
-                continue
-            candidate = datetime(day.year, day.month, day.day, hh, mm, tzinfo=tz)
-            candidate_utc = candidate.astimezone(UTC)
-            if candidate_utc <= anchor:
-                continue
-            if _naive_utc(candidate_utc) in taken:
-                continue
-            return candidate_utc
-
-    # No slot fits (fully booked / no matching day) — just go an hour out.
-    return anchor + timedelta(hours=1)
-
-
-def reorder_queue(db, user_id: int, ordered_ids: list[int]) -> list[Post]:
-    """Buffer-style drag-to-reorder: re-slot queued posts in the given order.
-
-    Only unpublished posts are touched; each one is pushed into the next free
-    slot of its own channel, in order.
-    """
-    posts = []
-    for pid in ordered_ids:
-        post = db.get(Post, pid)
-        if (not post or post.user_id != user_id
-                or post.status in (PostStatus.published, PostStatus.draft)):
-            continue
-        posts.append(post)
-
-    anchor = _now()
-    for post in posts:
-        account = post.account or db.get(Account, post.account_id)
-        if not account:
-            continue
-        slot = next_slot_for(db, account, anchor, exclude_post_id=post.id)
-        post.scheduled_at = slot
-        anchor = slot  # keep the dragged order strictly increasing
-
-    db.commit()
-    for post in posts:
-        db.refresh(post)
-    return posts
-
-
-# ---------------------------------------------------------------- publishing
-async def publish_one(db, post_id: int) -> Post | None:
-    """Publish a single post through its platform client.
-
-    The post is atomically claimed first (`scheduled`/`failed`/`draft` ->
-    `publishing`) so two cron ticks firing at once can't double-post.
-    """
-    claimable = (PostStatus.scheduled, PostStatus.failed, PostStatus.draft)
-    claimed = (db.query(Post)
-               .filter(Post.id == post_id, Post.status.in_(claimable))
-               .update({Post.status: PostStatus.publishing},
-                       synchronize_session=False))
-    db.commit()
-
-    post = db.get(Post, post_id)
-    if post is None or not claimed:
-        # Already published, or another worker is on it right now.
-        return post
-
-    account = post.account or db.get(Account, post.account_id)
-    if account is None:
-        post.status = PostStatus.failed
-        post.error = "account no longer connected"
-        db.commit()
-        return post
-
-    post.error = ""
-    db.commit()
-
+def _next_occurrence(slot: dict, tz: ZoneInfo, after_local: datetime) -> datetime | None:
+    """Next local datetime matching {day:0-6, time:'HH:MM'} strictly after after_local."""
     try:
-        result = await platforms.get_client(account.platform).publish(
-            account, post.caption, post.media_url, post_type=post.post_type)
-    except Exception as exc:  # a client blowing up must not kill the whole tick
-        result = platforms.PublishResult(
-            False, error=f"{type(exc).__name__}: {exc}")
+        hh, mm = (int(x) for x in str(slot["time"]).split(":")[:2])
+        day = int(slot["day"])
+    except Exception:
+        return None
+    base = after_local.date()
+    for offset in range(8):  # up to a week ahead
+        d = base + timedelta(days=offset)
+        if d.weekday() != day:
+            continue
+        cand = datetime(d.year, d.month, d.day, hh, mm, tzinfo=tz)
+        if cand > after_local:
+            return cand
+    return None
 
+
+def next_slot_for(db: Session, account: Account, after_utc: datetime | None = None,
+                  exclude_post_id: int | None = None) -> datetime:
+    """Buffer-style: next FREE posting slot for this channel (skips taken ones)."""
+    now = datetime.now(timezone.utc)
+    after = _aware(after_utc) if after_utc else now
+    tz = _tz_for(db, account.user_id)
+    taken = {
+        p.scheduled_at.replace(tzinfo=timezone.utc) if p.scheduled_at and p.scheduled_at.tzinfo is None else p.scheduled_at
+        for p in (db.query(Post)
+                  .filter(Post.account_id == account.id,
+                          Post.status == PostStatus.scheduled,
+                          Post.source.in_(["queue", "next"]),
+                          Post.id != (exclude_post_id or -1))
+                  .all())
+    }
+    candidate = after
+    for _ in range(300):
+        cand_local = candidate.astimezone(tz)
+        options = [_next_occurrence(s, tz, cand_local) for s in _slots_of(account)]
+        options = [o for o in options if o]
+        if not options:
+            # no valid slots -> fall back to 1 hour from now
+            return candidate + timedelta(hours=1)
+        nxt = min(options)
+        if nxt.astimezone(timezone.utc) not in taken:
+            return nxt.astimezone(timezone.utc)
+        candidate = nxt.astimezone(timezone.utc) + timedelta(minutes=1)
+    return candidate + timedelta(minutes=30)
+
+
+def reorder_queue(db: Session, user_id: int, ordered_ids: list[int]) -> list[Post]:
+    """Drag-reorder: reassign slot times so queued posts follow the new order,
+    per channel, keeping the earliest scheduled date as the anchor."""
+    posts = (db.query(Post)
+             .filter(Post.user_id == user_id, Post.id.in_(ordered_ids),
+                     Post.status == PostStatus.scheduled,
+                     Post.source.in_(["queue", "next"]))
+             .all())
+    by_id = {p.id: p for p in posts}
+    ordered = [by_id[i] for i in ordered_ids if i in by_id]
+    by_account: dict[int, list[Post]] = {}
+    for p in ordered:
+        by_account.setdefault(p.account_id, []).append(p)
+    now = datetime.now(timezone.utc)
+    for acc_id, group in by_account.items():
+        acc = db.get(Account, acc_id)
+        if not acc:
+            continue
+        tz = _tz_for(db, user_id)
+        existing = [p for p in group if p.scheduled_at]
+        anchor = min(p.scheduled_at for p in existing)
+        if anchor.tzinfo is None:
+            anchor = anchor.replace(tzinfo=timezone.utc)
+        anchor = max(anchor - timedelta(minutes=1), now - timedelta(days=1))
+        t = anchor
+        for p in group:
+            cand = t
+            for _ in range(300):
+                cand_local = cand.astimezone(tz)
+                options = [_next_occurrence(s, tz, cand_local) for s in _slots_of(acc)]
+                options = [o for o in options if o]
+                if not options:
+                    nxt = cand + timedelta(hours=1)
+                else:
+                    nxt = min(options).astimezone(timezone.utc)
+                if nxt > t:
+                    break
+                cand = cand + timedelta(minutes=1)
+            t = nxt
+            p.scheduled_at = t
+    db.commit()
+    for p in ordered:
+        db.refresh(p)
+    return ordered
+
+
+# ------------------------------------------------------------------ publishing
+async def publish_due_posts(db: Session, user_id: int | None = None) -> dict:
+    """Publish every scheduled post whose time has come (optionally one user)."""
+    now = datetime.now(timezone.utc)
+    q = (db.query(Post)
+         .filter(Post.status == PostStatus.scheduled)
+         .filter(Post.scheduled_at <= now))
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    due = q.all()
+    published, failed = 0, 0
+    for post in due:
+        post.status = PostStatus.publishing
+        db.commit()
+        result = await platforms.publish_post(post.account, post.caption, post.media_url,
+                                              post_type=getattr(post, "post_type", "feed") or "feed")
+        if result.ok:
+            post.status = PostStatus.published
+            post.platform_post_id = result.platform_post_id
+            post.published_at = now
+            published += 1
+        else:
+            post.status = PostStatus.failed
+            post.error = result.error
+            failed += 1
+        db.commit()
+    return {"checked": len(due), "published": published, "failed": failed}
+
+
+async def publish_one(db: Session, post_id: int) -> Post:
+    post = db.get(Post, post_id)
+    if not post or post.status != PostStatus.scheduled:
+        return post
+    result = await platforms.publish_post(post.account, post.caption, post.media_url,
+                                          post_type=getattr(post, "post_type", "feed") or "feed")
     if result.ok:
         post.status = PostStatus.published
-        post.platform_post_id = result.platform_post_id or post.platform_post_id
-        post.published_at = _now()
-        post.error = ""
-    elif getattr(result, "manual", False):
-        # No publishing API for this platform/format (YouTube video, Moj,
-        # ShareChat…). Keep it queued with a hint and let the user finish it by
-        # hand and tap "Mark done" — publish_due_posts() skips MANUAL: posts.
-        post.status = PostStatus.scheduled
-        post.error = result.error or f"{MANUAL_PREFIX} publish manually"
+        post.platform_post_id = result.platform_post_id
+        post.published_at = datetime.now(timezone.utc)
     else:
         post.status = PostStatus.failed
-        post.error = (result.error or "publish failed")[:2000]
-
+        post.error = result.error
     db.commit()
-    db.refresh(post)
     return post
 
 
-async def publish_due_posts(db, limit: int = 25) -> dict:
-    """Publish everything that is due. Called by the cron tick."""
-    due = (db.query(Post)
-           .filter(Post.status == PostStatus.scheduled,
-                   Post.scheduled_at <= _naive_utc(),
-                   ~Post.error.like(f"{MANUAL_PREFIX}%"))
-           .order_by(Post.scheduled_at)
-           .limit(limit)
-           .all())
-
-    published = failed = manual = 0
-    for post in due:
-        try:
-            result = await publish_one(db, post.id)
-        except Exception as exc:
-            print(f"publish_due_posts: post {post.id} crashed: {exc}", flush=True)
-            continue
-        if result is None:
-            continue
-        if result.status == PostStatus.published:
-            published += 1
-        elif result.status == PostStatus.failed:
-            failed += 1
-        elif (result.error or "").startswith(MANUAL_PREFIX):
-            manual += 1
-
-    return {"ok": True, "scanned": len(due), "published": published,
-            "failed": failed, "manual": manual}
+def _comment_sync_cutoff() -> datetime:
+    days = max(1, int(getattr(settings, "COMMENT_SYNC_WINDOW_DAYS", 7) or 7))
+    return datetime.now(timezone.utc) - timedelta(days=days)
 
 
-# ------------------------------------------------------------------ comments
-def _comment_time(item: dict) -> datetime:
-    """When the comment was actually written, not when we fetched it.
-
-    The inbox is sorted by this and the auto-reply watch window depends on it,
-    so falling back to "now" for every fetched comment (the old behaviour) made
-    months-old comments look brand new.
-    """
-    raw = item.get("created_at") or item.get("timestamp") or ""
-    if raw:
-        try:
-            return _aware(datetime.fromisoformat(str(raw).replace("Z", "+00:00")))
-        except (ValueError, TypeError):
-            pass
-    return _now()
-
-
-def _mock_incoming(post: Post) -> list[dict]:
-    """Fake follower comments so MOCK_MODE has a live-looking inbox."""
-    if not settings.MOCK_MODE:
-        return []
-    watch = settings.COMMENT_WATCH_WINDOW_HOURS
-    if watch > 0 and post.published_at and _aware(post.published_at) < _now() - timedelta(
-            hours=watch):
-        return []
-    return [
-        {"id": f"mock_{post.id}_{uuid.uuid4().hex[:8]}", "author": author, "text": text}
-        for author, text in random.sample(MOCK_COMMENTS, k=random.choice((1, 2)))
-    ]
-
-
-def simulate_incoming_comment(db, post_id: int, author: str, text: str) -> Comment | None:
-    """Demo helper: a follower comments, the bot replies immediately."""
-    post = db.get(Post, post_id)
-    if post is None:
+def _parse_comment_time(raw) -> datetime | None:
+    if not raw:
         return None
-    account = post.account or db.get(Account, post.account_id)
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
 
-    comment = Comment(
-        post_id=post.id,
-        external_comment_id=f"sim_{uuid.uuid4().hex[:12]}",
-        author=(author or "follower")[:200],
-        author_avatar=(author or "?")[:1].upper(),
-        text=text or "",
-    )
+
+def _aware_or_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+# ------------------------------------------------------- comments + auto-reply
+async def sync_comments(db: Session, user_id: int | None = None,
+                        force_all: bool = False) -> dict:
+    """Fetch comments on published posts and auto-reply once.
+
+    Hard rule: only the last COMMENT_SYNC_WINDOW_DAYS (default 7) of comments
+    are stored or replied to — even on first import / force_all. Older rows
+    are pruned so the Community inbox never fills with months of history.
+    """
+    cutoff = _comment_sync_cutoff()
+    q = (db.query(Post)
+         .filter(Post.status == PostStatus.published)
+         .filter(Post.platform_post_id != ""))
+    # Scan posts from the same window. force_all used to dump every historical
+    # comment; it no longer bypasses the 7-day cap.
+    naive_cutoff = cutoff.replace(tzinfo=None)
+    q = q.filter((Post.published_at == None) | (Post.published_at >= naive_cutoff))  # noqa: E711
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    posts = q.all()
+    ingested, replied, skipped_old = 0, 0, 0
+    for post in posts:
+        pub = _aware_or_utc(post.published_at)
+        if pub is not None and pub < cutoff:
+            continue
+        result = await platforms.fetch_post(post.account, post.platform_post_id)
+        for c in result.comments:
+            created = _parse_comment_time(
+                c.get("created_at") or c.get("timestamp") or c.get("published_at"))
+            # Live polls without a timestamp are treated as "now" (new comments).
+            if created is not None and created < cutoff:
+                skipped_old += 1
+                continue
+            exists = (db.query(Comment)
+                      .filter(Comment.post_id == post.id)
+                      .filter(Comment.external_comment_id == c["external_id"])
+                      .first())
+            if exists:
+                continue
+            comment = Comment(
+                post_id=post.id,
+                external_comment_id=c["external_id"],
+                author=c["author"],
+                author_avatar=(c["author"][:1].upper() if c.get("author") else "?"),
+                text=c["text"],
+            )
+            db.add(comment)
+            db.commit()
+            ingested += 1
+
+            # auto-reply via the real platform comment-reply API (mock in demo mode)
+            if settings.AUTO_COMMENT_ENABLED and post.account.auto_comment:
+                reply = autocomment.generate_reply(c["text"], post.account)
+                client = platforms.get_client(post.account.platform)
+                ok = await client.reply_to_comment(post.account, post.platform_post_id,
+                                                   c["external_id"], reply)
+                if ok:
+                    comment.our_reply = reply
+                    comment.replied = True
+                    replied += 1
+                    db.commit()
+
+    pruned = 0
+    cq = db.query(Comment)
+    if user_id is not None:
+        cq = cq.join(Post, Comment.post_id == Post.id).filter(Post.user_id == user_id)
+    for row in cq.all():
+        created = _aware_or_utc(row.created_at)
+        if created is not None and created < cutoff:
+            db.delete(row)
+            pruned += 1
+    if pruned:
+        db.commit()
+    return {"posts_scanned": len(posts), "new_comments": ingested, "auto_replies": replied,
+            "skipped_old": skipped_old, "pruned": pruned,
+            "window_days": getattr(settings, "COMMENT_SYNC_WINDOW_DAYS", 7)}
+
+
+def simulate_incoming_comment(db: Session, post_id: int, author: str, text: str) -> Comment | None:
+    """Demo helper: inject a comment as if the platform sent it, then auto-reply."""
+    post = db.get(Post, post_id)
+    if not post:
+        return None
+    comment = Comment(post_id=post_id, external_comment_id=f"sim_{post_id}_{datetime.now(timezone.utc).timestamp()}",
+                      author=author, author_avatar=(author[:1].upper() if author else "?"), text=text)
     db.add(comment)
-    db.flush()
-
-    if settings.AUTO_COMMENT_ENABLED and account is not None and account.auto_comment:
-        reply = generate_reply(comment.text, account)
-        post_reply(account, post.platform_post_id, comment.external_comment_id, reply)
-        comment.our_reply = reply
-        comment.replied = True
-        comment.reply_type = "auto"
-
     db.commit()
-    db.refresh(comment)
+    if settings.AUTO_COMMENT_ENABLED and post.account.auto_comment:
+        reply = autocomment.generate_reply(text, post.account)
+        if autocomment.post_reply(post.account, post.platform_post_id, comment.external_comment_id, reply):
+            comment.our_reply = reply
+            comment.replied = True
+            db.commit()
     return comment
 
 
-async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict:
-    """Pull new comments on our published posts and run auto-replies.
-
-    Pass `user_id` to scope it to one workspace; omit it for the global cron.
-    """
+# ------------------------------------------------------------------ analytics
+async def sync_metrics(db: Session, user_id: int | None = None) -> dict:
+    """Pull latest metrics for published posts and store a snapshot row."""
     q = (db.query(Post)
-         .filter(Post.status == PostStatus.published,
-                 Post.platform_post_id != "")
-         .order_by(Post.published_at.desc()))
-    if user_id:
+         .filter(Post.status == PostStatus.published)
+         .filter(Post.platform_post_id != ""))
+    if user_id is not None:
         q = q.filter(Post.user_id == user_id)
-    posts = q.limit(limit).all()
-
-    new_comments = auto_replies = skipped_old = pruned = 0
-    replied_seen: set[str] = set()
+    posts = q.all()
+    updated = 0
     for post in posts:
-        account = post.account
-        if account is None:
+        result = await platforms.fetch_post(post.account, post.platform_post_id)
+        m = result.metrics
+        if "error" in m:
             continue
-        client = platforms.get_client(account.platform)
-        try:
-            fetched = await client.fetch(account, post.platform_post_id)
-            incoming = list(getattr(fetched, "comments", None) or [])
-        except Exception as exc:
-            print(f"sync_comments: {account.display_name} fetch failed: {exc}",
-                  flush=True)
-            incoming = []
-        if not incoming:
-            incoming = _mock_incoming(post)
-
-        for item in incoming:
-            external_id = str(item.get("id") or item.get("external_comment_id") or "")
-
-            # Dedupe per ACCOUNT, not per post: the same video/post can be
-            # reached through more than one post row (an import plus a manual
-            # post), and deduping per post meant the same comment was stored —
-            # and auto-replied to — twice.
-            if external_id:
-                existing = (db.query(Comment)
-                            .join(Post, Comment.post_id == Post.id)
-                            .filter(Post.account_id == account.id,
-                                    Comment.external_comment_id == external_id)
-                            .first())
-                if existing:
-                    # Rows written by older builds carry the *fetch* time as
-                    # created_at, so they would never age out of the 7-day
-                    # window. Re-syncing corrects them to the platform's own
-                    # timestamp, and the prune below then drops the truly old
-                    # ones instead of archiving them forever.
-                    real_time = _comment_time(item)
-                    if abs((_aware(existing.created_at) - real_time).total_seconds()) > 300:
-                        existing.created_at = real_time
-                    continue
-            if external_id and external_id in replied_seen:
-                continue
-
-            author = str(item.get("author") or item.get("from") or "someone")[:200]
-            posted_at = _comment_time(item)
-
-            # Only recent comments matter in a daily-cleared inbox. Anything
-            # older than the sync window is skipped entirely: not stored, not
-            # replied to, and it never inflates the dashboard counts.
-            sync_days = settings.COMMENT_SYNC_WINDOW_DAYS
-            if sync_days > 0 and (_now() - posted_at) > timedelta(days=sync_days):
-                skipped_old += 1
-                continue
-            comment = Comment(
-                post_id=post.id, external_comment_id=external_id,
-                author=author, author_avatar=author[:1].upper(),
-                text=str(item.get("text") or item.get("message") or ""),
-                # the platform's real timestamp, so age-based rules work
-                created_at=posted_at,
-            )
-            db.add(comment)
-            db.flush()
-            new_comments += 1
-
-            if not (settings.AUTO_COMMENT_ENABLED and account.auto_comment):
-                continue
-            if not comment.text.strip():
-                continue
-            # COMMENT_WATCH_WINDOW_HOURS is the whole point of the setting: an
-            # account connecting for the first time pulls in months of old
-            # comments, and auto-replying to all of them looks like spam. Old
-            # ones still land in the Community inbox for a human to handle.
-            # Set COMMENT_WATCH_WINDOW_HOURS=0 to reply to everything,
-            # including the backlog a first-time connect pulls in.
-            watch = settings.COMMENT_WATCH_WINDOW_HOURS
-            age_hours = (_now() - posted_at).total_seconds() / 3600
-            if watch > 0 and age_hours > watch:
-                continue
-            if external_id:
-                replied_seen.add(external_id)
-            reply = generate_reply(comment.text, account)
-            try:
-                ok = await client.reply_to_comment(account, post.platform_post_id,
-                                                   external_id, reply)
-            except Exception as exc:
-                print(f"sync_comments: reply failed: {exc}", flush=True)
-                ok = False
-            if ok:
-                comment.our_reply = reply
-                comment.replied = True
-                comment.reply_type = "auto"
-                auto_replies += 1
-        db.commit()
-
-    # Keep the table matching the window: rows that aged out are removed, so the
-    # Community inbox shows what is alive now instead of an ever-growing archive.
-    sync_days = settings.COMMENT_SYNC_WINDOW_DAYS
-    if sync_days > 0:
-        cutoff = _now() - timedelta(days=sync_days)
-        for row in db.query(Comment).filter(Comment.created_at < cutoff).all():
-            db.delete(row)
-            pruned += 1
-        if pruned:
-            db.commit()
-
-    return {"new_comments": new_comments, "auto_replies": auto_replies,
-            "posts_scanned": len(posts), "skipped_old": skipped_old,
-            "pruned": pruned}
-
-
-# ------------------------------------------------------------------- metrics
-async def sync_metrics(db, user_id: int | None = None, limit: int = 50,
-                       min_age_minutes: int = 30) -> dict:
-    """Refresh the analytics snapshot for published posts.
-
-    When called for a whole user (dashboard "Refresh") every post is re-fetched.
-    The global cron pass skips posts that already have a fresh snapshot.
-    """
-    q = (db.query(Post)
-         .filter(Post.status == PostStatus.published,
-                 Post.platform_post_id != "")
-         .order_by(Post.published_at.desc()))
-    if user_id:
-        q = q.filter(Post.user_id == user_id)
-    posts = q.limit(limit).all()
-
-    snapshots = 0
-    for post in posts:
-        account = post.account
-        if account is None:
-            continue
-        client = platforms.get_client(account.platform)
-        try:
-            metrics = dict(getattr(await client.fetch(account, post.platform_post_id),
-                                   "metrics", None) or {})
-        except Exception as exc:
-            print(f"sync_metrics: {account.display_name} fetch failed: {exc}",
-                  flush=True)
-            continue
-        if not metrics:
-            continue
-
-        row = (db.query(Metric).filter(Metric.post_id == post.id)
-               .order_by(Metric.fetched_at.desc()).first())
-        if (row is not None and user_id is None
-                and _aware(row.fetched_at) > _now() - timedelta(minutes=min_age_minutes)):
-            continue
-
-        def _num(key, fallback=0):
-            try:
-                return int(metrics.get(key, fallback) or 0)
-            except (TypeError, ValueError):
-                return int(fallback or 0)
-
-        if row is None:
-            row = Metric(post_id=post.id)
-            db.add(row)
-        row.likes = _num("likes")
-        row.comments_count = _num("comments_count")
-        row.shares = _num("shares")
-        row.impressions = _num("impressions")
-        row.reach = _num("reach")
-        row.raw = metrics
-        row.fetched_at = _now()
-        snapshots += 1
-
+        snap = Metric(
+            post_id=post.id,
+            likes=m.get("likes", 0),
+            comments_count=m.get("comments_count", 0),
+            shares=m.get("shares", 0),
+            impressions=m.get("impressions", 0),
+            reach=m.get("reach", 0),
+            raw=m,
+        )
+        db.add(snap)
+        updated += 1
     db.commit()
-    return {"snapshots": snapshots, "posts_scanned": len(posts)}
+    return {"posts_scanned": len(posts), "snapshots": updated}
 
 
-# ------------------------------------------------------------------- imports
-async def import_channel_content(db, user_id: int, account_id: int) -> dict:
-    """Import a connected channel's existing videos/posts.
-
-    Already-imported content is matched on `platform_post_id`, so this is safe
-    to run repeatedly (it's what the first-login bootstrap sync does).
-    """
-    account = db.get(Account, account_id)
-    if account is None or account.user_id != user_id:
-        return {"ok": False, "imported": 0, "scanned": 0,
-                "error": "account not found"}
-
-    result = {"ok": True, "account_id": account.id, "name": account.display_name,
-              "platform": account.platform.value, "scanned": 0, "imported": 0,
-              "note": "", "error": ""}
-
-    client = platforms.get_client(account.platform)
+async def import_channel_content(db: Session, user_id: int, account_id: int,
+                                 *, sync_after: bool = True,
+                                 force_all_sync: bool = False) -> dict:
+    """Import an account's existing videos/posts as 'published' posts so their
+    comments show up in the Community inbox. Optionally sync comments + metrics."""
+    acc = db.query(Account).filter(Account.id == account_id,
+                                   Account.user_id == user_id).first()
+    if not acc:
+        return {"imported": 0, "error": "account not found"}
+    client = platforms.get_client(acc.platform)
+    if not hasattr(client, "list_recent_videos"):
+        return {"imported": 0, "error": "import not supported on this platform"}
     try:
-        items = list(await client.list_recent_videos(account) or [])
-    except Exception as exc:
-        result["ok"] = False
-        result["error"] = f"{account.display_name}: {type(exc).__name__}: {exc}"
-        return result
-
-    result["scanned"] = len(items)
-    skipped = 0
-    for item in items:
-        external_id = str(item.get("id") or item.get("video_id") or "")[:200]
-        if not external_id:
-            continue
-        exists = (db.query(Post)
-                  .filter(Post.account_id == account.id,
-                          Post.platform_post_id == external_id)
-                  .first())
+        videos = await client.list_recent_videos(acc)
+    except Exception as e:
+        return {"imported": 0, "scanned": 0, "error": f"{acc.platform.value}: {e}"}
+    imported = 0
+    for v in videos:
+        exists = db.query(Post).filter(
+            Post.account_id == acc.id,
+            Post.platform_post_id == v["id"]).first()
         if exists:
             continue
-
-        raw_date = item.get("published_at") or item.get("timestamp") or ""
+        pub_at = datetime.now(timezone.utc)
         try:
-            published = _aware(datetime.fromisoformat(
-                str(raw_date).replace("Z", "+00:00"))) if raw_date else _now()
-        except (ValueError, TypeError):
-            published = _now()
-
-        post = Post(
-            user_id=user_id,
-            account_id=account.id,
-            caption=item.get("title") or item.get("caption") or "(imported post)",
-            media_url=(item.get("url") or item.get("media_url") or ""),
-            post_type=(item.get("post_type") or "video")[:12],
-            source="scheduled",
-            scheduled_at=published,
-            status=PostStatus.published,
-            platform_post_id=external_id,
-            published_at=published,
-        )
-        # One unusable row (an over-long CDN URL, an odd date) must not throw
-        # away the whole import — a savepoint keeps the rest of the batch alive.
-        try:
-            with db.begin_nested():
-                db.add(post)
-            result["imported"] += 1
-        except Exception as exc:
-            skipped += 1
-            print(f"import skip ({account.display_name}) {external_id}: "
-                  f"{type(exc).__name__}: {str(exc)[:200]}", flush=True)
-
-    if skipped:
-        result["skipped"] = skipped
-        result["note"] = f"{skipped} item(s) skipped"
-    elif not items:
-        result["note"] = ("connect a real account to import" if settings.MOCK_MODE
-                          else "nothing new to import")
-    try:
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        result["ok"] = False
-        result["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
-    return result
+            dt = datetime.fromisoformat(str(v["published_at"]).replace("Z", "+00:00"))
+            if dt.tzinfo:
+                pub_at = dt
+        except Exception:
+            pass
+        p = Post(user_id=user_id, account_id=acc.id,
+                 platform_post_id=v["id"],
+                 caption=v.get("title", "imported post"),
+                 media_url=v.get("thumb", ""),
+                 scheduled_at=pub_at, published_at=pub_at,
+                 status=PostStatus.published)
+        db.add(p)
+        imported += 1
+    db.commit()
+    comments_sync = {"posts_scanned": 0, "new_comments": 0, "auto_replies": 0}
+    metrics_sync = {"posts_scanned": 0, "snapshots": 0}
+    if sync_after:
+        comments_sync = await sync_comments(db, user_id, force_all=force_all_sync)
+        metrics_sync = await sync_metrics(db, user_id)
+    note = ""
+    if not videos:
+        if acc.platform.value == "youtube":
+            note = ("No UPLOADED videos found on this channel. Note: YouTube "
+                    "Community posts (text/image posts) can NOT be read via any "
+                    "API — only uploaded videos & shorts sync. If you have videos, "
+                    "make sure they're uploaded as Public on THIS channel.")
+        else:
+            note = "No recent posts found on this account (or the API returned none)."
+    elif imported == 0:
+        note = f"{len(videos)} posts already synced — comments refreshed."
+    return {"imported": imported, "scanned": len(videos), "note": note,
+            "comments_sync": comments_sync, "metrics_sync": metrics_sync}
 
 
-async def auto_import_all(db, user_id: int | None = None, run_sync: bool = False,
+async def auto_import_all(db: Session, user_id: int | None = None,
+                          *, run_sync: bool = True,
                           force_all_sync: bool = False) -> dict:
-    """Import existing content from every connected account.
-
-    Called by the cron tick (all users), and by the workspace bootstrap sync
-    (one user, `run_sync=True`) that the dashboard fires on first login.
-    """
-    q = db.query(Account)
-    if user_id:
+    """Background safety net: for every connected account that supports it,
+    make sure existing channel content is imported (idempotent). Called after
+    OAuth connect and periodically by cron — that's what makes the app feel
+    'connected for real' without a manual button press."""
+    q = db.query(Account).filter(Account.access_token != "")
+    if user_id is not None:
         q = q.filter(Account.user_id == user_id)
-    accounts = q.all()
-
-    imported = 0
-    per_account: list[dict] = []
-    errors: list[str] = []
-
-    for account in accounts:
+    accs = q.all()
+    total = 0
+    results, errors = [], []
+    supported = 0
+    for acc in accs:
+        client = platforms.get_client(acc.platform)
+        if not hasattr(client, "list_recent_videos"):
+            continue  # Moj/ShareChat/Threads/manual helpers — no data API
+        supported += 1
         try:
-            result = await import_channel_content(db, account.user_id, account.id)
-        except Exception as exc:
-            errors.append(f"{account.display_name}: {type(exc).__name__}: {exc}")
-            continue
-        imported += result.get("imported", 0)
-        if result.get("error"):
-            errors.append(result["error"])
-        per_account.append({
-            "name": account.display_name,
-            "platform": account.platform.value,
-            "scanned": result.get("scanned", 0),
-            "imported": result.get("imported", 0),
-            "note": result.get("note") or result.get("error", ""),
-        })
+            res = await import_channel_content(db, acc.user_id, acc.id, sync_after=False)
+            total += res.get("imported", 0)
+            if res.get("error"):
+                errors.append(f"{acc.display_name}: {res['error']}")
+            else:
+                results.append({"platform": acc.platform.value,
+                                "name": acc.display_name,
+                                "imported": res.get("imported", 0),
+                                "scanned": res.get("scanned", 0),
+                                "note": res.get("note", "")})
+        except Exception as e:
+            errors.append(f"{acc.display_name}: {e}")
+    comments_sync = {"posts_scanned": 0, "new_comments": 0, "auto_replies": 0}
+    metrics_sync = {"posts_scanned": 0, "snapshots": 0}
+    if run_sync:
+        comments_sync = await sync_comments(db, user_id, force_all=force_all_sync)
+        metrics_sync = await sync_metrics(db, user_id)
+    return {"imported": total, "accounts": len(accs), "supported_accounts": supported,
+            "per_account": results, "errors": errors,
+            "comments_sync": comments_sync, "metrics_sync": metrics_sync}
 
-    out = {"ok": True, "imported": imported, "per_account": per_account,
-           "errors": errors, "comments_sync": None, "metrics_sync": None}
-    if run_sync or force_all_sync:
-        out["comments_sync"] = await sync_comments(db, user_id)
-        out["metrics_sync"] = await sync_metrics(db, user_id)
-    return out
 
-
-# ----------------------------------------------------------------- analytics
-def analytics_summary(db, user_id: int, days: int | None = None) -> dict:
-    """Aggregated numbers behind the Insights screen and the CSV export."""
-    since = _now() - timedelta(days=days) if days else None
-
-    published = (db.query(Post)
-                 .filter(Post.user_id == user_id,
-                         Post.status == PostStatus.published)
-                 .order_by(Post.published_at.desc())
-                 .all())
-    posts_scheduled = (db.query(Post)
-                       .filter(Post.user_id == user_id,
-                               Post.status == PostStatus.scheduled)
-                       .count())
-
+def analytics_summary(db: Session, user_id: int | None = None, days: int | None = None) -> dict:
+    """Aggregate dashboard numbers for one user (optional last-N-days filter)."""
+    q = db.query(Post).filter(Post.status == PostStatus.published)
+    if user_id is not None:
+        q = q.filter(Post.user_id == user_id)
+    if days:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        q = q.filter(Post.published_at >= cutoff)
+    posts = q.all()
     totals = {"likes": 0, "comments": 0, "shares": 0, "impressions": 0, "reach": 0}
     by_platform: dict[str, dict] = {}
     by_tag: dict[str, dict] = {}
-    per_post: list[dict] = []
+    per_post = []
+    for p in posts:
+        latest = (db.query(Metric).filter(Metric.post_id == p.id)
+                  .order_by(Metric.fetched_at.desc()).first())
+        row = {
+            "post_id": p.id, "platform": p.account.platform.value,
+            "account": p.account.display_name,
+            "caption": p.caption[:60],
+            "published_at": p.published_at.isoformat() if p.published_at else None,
+            "likes": latest.likes if latest else 0,
+            "comments": latest.comments_count if latest else 0,
+            "shares": latest.shares if latest else 0,
+            "impressions": latest.impressions if latest else 0,
+            "reach": latest.reach if latest else 0,
+        }
+        per_post.append(row)
+        for k in totals:
+            totals[k] += row[{"likes": "likes", "comments": "comments",
+                              "shares": "shares", "impressions": "impressions",
+                              "reach": "reach"}[k]]
+        bp = by_platform.setdefault(p.account.platform.value,
+                                    {"likes": 0, "comments": 0, "shares": 0, "posts": 0})
+        bp["likes"] += row["likes"]; bp["comments"] += row["comments"]
+        bp["shares"] += row["shares"]; bp["posts"] += 1
+        for t in p.tags:
+            bt = by_tag.setdefault(t.name, {"posts": 0, "likes": 0, "comments": 0,
+                                            "shares": 0, "color": t.color})
+            bt["posts"] += 1
+            bt["likes"] += row["likes"]
+            bt["comments"] += row["comments"]
+            bt["shares"] += row["shares"]
 
-    for post in published:
-        published_at = _aware(post.published_at or post.scheduled_at)
-        if since and published_at < since:
-            continue
-
-        snapshot = (db.query(Metric).filter(Metric.post_id == post.id)
-                    .order_by(Metric.fetched_at.desc()).first())
-        likes = snapshot.likes if snapshot else 0
-        comments_count = snapshot.comments_count if snapshot else 0
-        shares = snapshot.shares if snapshot else 0
-        impressions = snapshot.impressions if snapshot else 0
-        reach = snapshot.reach if snapshot else 0
-
-        account = post.account
-        platform = account.platform.value if account else "instagram"
-
-        totals["likes"] += likes
-        totals["comments"] += comments_count
-        totals["shares"] += shares
-        totals["impressions"] += impressions
-        totals["reach"] += reach
-
-        bucket = by_platform.setdefault(platform, {
-            "posts": 0, "likes": 0, "comments": 0, "shares": 0,
-            "impressions": 0, "reach": 0})
-        bucket["posts"] += 1
-        bucket["likes"] += likes
-        bucket["comments"] += comments_count
-        bucket["shares"] += shares
-        bucket["impressions"] += impressions
-        bucket["reach"] += reach
-
-        for tag in post.tags:
-            tag_bucket = by_tag.setdefault(tag.name, {
-                "color": tag.color, "posts": 0, "likes": 0, "comments": 0,
-                "shares": 0})
-            tag_bucket["posts"] += 1
-            tag_bucket["likes"] += likes
-            tag_bucket["comments"] += comments_count
-            tag_bucket["shares"] += shares
-
-        per_post.append({
-            "post_id": post.id,
-            "platform": platform,
-            "account": account.display_name if account else "",
-            "caption": (post.caption or "")[:200],
-            "published_at": published_at,
-            "likes": likes,
-            "comments": comments_count,
-            "shares": shares,
-            "impressions": impressions,
-            "reach": reach,
-        })
-
-    comment_rows = (db.query(Comment)
-                    .join(Post, Comment.post_id == Post.id)
-                    .filter(Post.user_id == user_id))
-    if since:
-        comment_rows = comment_rows.filter(
-            Comment.created_at >= _naive_utc(since))
-    comment_rows = comment_rows.all()
-    comments_total = len(comment_rows)
-    auto_replied = sum(1 for c in comment_rows
-                       if c.replied and c.reply_type == "auto")
-
+    post_ids = [p.id for p in posts]
+    cq = db.query(Comment)
+    if post_ids:
+        cq = cq.filter(Comment.post_id.in_(post_ids))
+    else:
+        cq = cq.filter(Comment.id == -1)
+    auto_replied = cq.filter(Comment.replied == True).count()
+    total_comments = cq.count()
+    sq = db.query(Post).filter(Post.status == PostStatus.scheduled)
+    if user_id is not None:
+        sq = sq.filter(Post.user_id == user_id)
     return {
-        "days": days,
-        "posts_published": len(per_post),
-        "posts_scheduled": posts_scheduled,
-        "comments_total": comments_total,
-        "auto_replied": auto_replied,
         "totals": totals,
         "by_platform": by_platform,
         "by_tag": by_tag,
         "per_post": per_post,
+        "comments_total": total_comments,
+        "auto_replied": auto_replied,
+        "posts_published": len(posts),
+        "posts_scheduled": sq.count(),
     }
-
-
-# ------------------------------------------------------- backwards-compat API
-# Older modules imported these helpers straight from `engine`; keep them working
-# by delegating to the platform client layer.
-class Result:
-    def __init__(self, ok, platform_post_id="", error=""):
-        self.ok = ok
-        self.platform_post_id = platform_post_id
-        self.error = error
-
-
-async def publish_post(account: Account, caption: str, media_url: str,
-                       post_type: str = "feed") -> Result:
-    res = await platforms.publish_post(account, caption, media_url, post_type=post_type)
-    return Result(res.ok, res.platform_post_id, res.error)
-
-
-async def list_recent_videos(account: Account):
-    return await platforms.get_client(account.platform).list_recent_videos(account)
-
-
-async def fetch_post(account: Account, platform_post_id: str):
-    return await platforms.fetch_post(account, platform_post_id)
-
-
-def get_client(platform):
-    return platforms.get_client(platform)
-
-
-async def reply_to_comment(*args, **kwargs) -> bool:
-    return False

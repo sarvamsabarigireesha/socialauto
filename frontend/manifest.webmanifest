@@ -1,0 +1,37 @@
+{
+  "id": "/",
+  "name": "SocialAuto",
+  "short_name": "SocialAuto",
+  "description": "Schedule posts, reply to comments, and manage Instagram, Facebook, YouTube and more from your phone.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#5b6cff",
+  "theme_color": "#5b6cff",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["social", "productivity", "business"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

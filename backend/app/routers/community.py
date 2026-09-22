@@ -12,6 +12,7 @@ from ..database import get_db
 from ..models import Comment, Post, User, PostStatus
 from ..security import get_current_user
 from ..services import platforms, engine
+from sqlalchemy import func
 
 router = APIRouter(prefix="/api/community", tags=["community"])
 
@@ -83,7 +84,7 @@ async def import_all(db: Session = Depends(get_db), user: User = Depends(get_cur
 async def bootstrap_sync(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Run the full first-login sync: import existing channel content,
     fetch existing comments, run auto-replies, and refresh metrics."""
-    return await engine.auto_import_all(db, user.id, run_sync=True, force_all_sync=True)
+    return await engine.auto_import_all(db, user.id, run_sync=True, force_all_sync=False)
 
 
 @router.post("/comments/{comment_id}/reply")
