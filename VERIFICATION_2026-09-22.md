@@ -172,6 +172,39 @@ Two real bugs surfaced while verifying:
    auto-replies at all of it. Set `COMMENT_WATCH_WINDOW_HOURS=0` in Render to
    auto-reply to everything, backlog included.
 
+## 6c. Round 4 — the failed deploy, Bilibili, and a 7-day comment window
+
+**"Push ayendi kada kani deploy error vastundi."** Correct — and the cause was my
+own code. `_run_migrations()` did `cols["posts"]["media_url"]["type"]`, but `cols`
+holds *sets of column names*, so startup raised
+`TypeError: 'set' object is not subscriptable` and uvicorn exited. Render keeps
+serving the previous version when a new one never becomes healthy, which is why
+the site sat on 1.8.0 through four green-looking pushes. Reproduced locally
+(uvicorn exited against the live DB), fixed with a tested helper
+(`_media_url_needs_widening`), and startup now wraps migrations in try/except so
+an optional migration can never stop the service from booting again. There are
+four smoke tests on that function now. **Live: version 1.9.2, verified.**
+
+**Comment sync is now 7 days only.** `COMMENT_SYNC_WINDOW_DAYS` (default 7):
+comments older than the window are neither stored nor replied to, and rows that
+age out are pruned, so the inbox is "what is alive now" instead of an archive.
+Re-syncing also repairs timestamps written by older builds (they stored the
+*fetch* time, which made month-old comments look brand new and invisible to the
+prune). Verified live: `new_comments: 0, skipped_old: 0, pruned: 0`, **0
+duplicate groups**. Auto-replies still respect `COMMENT_WATCH_WINDOW_HOURS`
+(24 h) — set it to `168` if the app should answer everything inside the 7-day
+window.
+
+**Bilibili added** as a manual/helper platform, like Snapchat. Its official
+开放平台 does have server-side video submission (chunked upload → merge → cover →
+submit, HMAC-SHA256 signed) but it is developer-approval gated; see
+`CONNECT_ACCOUNTS.md` for the path to make it automatic.
+
+**Cleanup from the duplicate bug** (the old code ran until this deploy): **143
+duplicate auto-replies deleted from Instagram** and **2,729 duplicate comment
+rows removed** from the database (3,469 → 740, all real). Live re-check after
+the deploy: duplicates do not come back.
+
 ## 7. Open items
 
 | # | Item | Action |
@@ -184,6 +217,9 @@ Two real bugs surfaced while verifying:
 | 6 | Duplicate replies already on Instagram (`Thanks for stopping by! 👋` posted twice under one comment, from the pre-fix double-reply bug) | Nothing will *re*-post them; say the word and the extras get deleted from the platform. |
 | 7 | The 2 test posts from round 2 are still live | Delete them from Instagram/Facebook when you are done testing. |
 | 8 | `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` were also shared in chat | Rotate when convenient (JWT_SECRET and the DB password are done). |
+| 9 | A 55 MB test video sits in your media library (`u3/195d1e80c3a1.mp4`) from verifying the upload fix | Ignore it, or ask and a delete button gets added. |
+| 10 | YouTube account #26 still has a dead refresh token | Publish the Google OAuth consent screen, then reconnect. |
+| 11 | Render's `CRON_SECRET` no longer matches the value in this report | The GitHub Actions cron is working; if you changed it, update the repo secret too. |
 
 ## 8. What a real post does now
 
