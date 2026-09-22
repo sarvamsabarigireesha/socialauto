@@ -2,6 +2,7 @@
 
 Run:  MOCK_MODE=true DATABASE_URL="sqlite:///./data/smoke.db" python3 smoke_test.py
 """
+import json
 import os
 import sys
 import pathlib
@@ -386,6 +387,131 @@ with TestClient(app) as client:
     check("media rejects bad extension", r.status_code == 400)
     r = client.post("/api/media", files={"file": ("empty.png", b"", "image/png")}, headers=H)
     check("media rejects an empty file", r.status_code == 400)
+
+    # ------------------------- upload limit / long URL / comment sync bugs
+    print("\n[media upload — the video that silently never attached]")
+    from app import media_store  # noqa: E402
+    from app.routers import media as media_mod  # noqa: E402
+
+    check("upload ceiling fits a phone video (>=100MB)",
+          media_store.MAX_UPLOAD_BYTES >= 100 * 1024 * 1024,
+          f"{media_store.MAX_UPLOAD_BYTES} bytes")
+    limit_msg = media_store.size_error(53 * 1024 * 1024, "beach.mp4")
+    check("an oversize upload explains itself and offers a way forward",
+          "53MB" in limit_msg and "Compress" in limit_msg and "https://" in limit_msg,
+          limit_msg)
+
+    clip = b"\x00" * (3 * 1024 * 1024)
+    r = client.post("/api/media", files={"file": ("clip.mp4", clip, "video/mp4")},
+                    headers=H)
+    check("POST /api/media takes a multi-MB video (streamed, not read into RAM)",
+          r.status_code == 200 and r.json()["size"] == len(clip), r.text[:200])
+    check("the big upload is served back byte-for-byte",
+          client.get(r.json()["url"]).content == clip)
+
+    was = media_mod.MAX_UPLOAD_BYTES, media_store.MAX_UPLOAD_BYTES
+    media_mod.MAX_UPLOAD_BYTES = media_store.MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+    try:
+        r = client.post("/api/media", files={"file": ("huge.mp4", b"\x00" * (3 * 1024 * 1024),
+                                                      "video/mp4")}, headers=H)
+    finally:
+        media_mod.MAX_UPLOAD_BYTES, media_store.MAX_UPLOAD_BYTES = was
+    check("an oversize upload is rejected with an actionable 400, not a bare one",
+          r.status_code == 400 and "Compress" in r.json().get("detail", ""), r.text[:250])
+    leftover = [f.name for f in pathlib.Path(f"data/media/u{UID}").glob("*.mp4")]
+    check("a rejected upload leaves no half-written file on disk",
+          not any("huge" in name for name in leftover), str(leftover))
+
+    print("\n[long media urls — why the first import stored nothing]")
+    from sqlalchemy import Text as SaText  # noqa: E402
+    from app.models import Post as PostModel  # noqa: E402
+
+    check("posts.media_url is TEXT, not VARCHAR(500)",
+          isinstance(PostModel.__table__.c.media_url.type, SaText),
+          str(PostModel.__table__.c.media_url.type))
+    cdn = ("https://scontent-bom1-1.xx.fbcdn.net/v/t39.30808-6/4987_n.jpg"
+           "?_nc_cat=110&ccb=1-7&_nc_sid=127cfc&_nc_ohc=" + "A" * 400 + "&oe=67D0ABCD")
+    r = client.post("/api/posts", json={
+        "account_ids": [ig_id], "caption": "long cdn url", "media_url": cdn,
+        "post_type": "feed", "scheduled_at": "2030-01-03T10:00:00Z"}, headers=H)
+    check("a 500+ character CDN url round-trips through the API",
+          r.status_code == 201 and r.json()[0]["media_url"] == cdn, r.text[:200])
+
+    print("\n[comments — dedupe, real timestamps, watch window]")
+    import asyncio  # noqa: E402
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz  # noqa: E402
+    from app.database import SessionLocal  # noqa: E402
+    from app.models import Comment, Post, PostStatus  # noqa: E402
+    from app.services import engine as engine_mod, platforms as platforms_mod  # noqa: E402
+
+    _now = _dt.now(_tz.utc)
+    payload = [
+        {"id": "cmt_recent", "author": "priya", "text": "Rate enti?",
+         "created_at": (_now - _td(hours=2)).isoformat()},
+        {"id": "cmt_ancient", "author": "ravi", "text": "Chala bagundi",
+         "created_at": (_now - _td(hours=600)).isoformat()},
+    ]
+
+    class _Stub:
+        """Same two comments come back for both post rows of one account."""
+
+        def __init__(self):
+            self.replies = []
+
+        async def fetch(self, account, pid):
+            if pid not in ("ig_post_A", "ig_post_B"):
+                return platforms_mod.FetchResult([], {})
+            return platforms_mod.FetchResult([dict(c) for c in payload], {})
+
+        async def reply_to_comment(self, account, pid, cid, text):
+            self.replies.append((cid, text))
+            return True
+
+    stub = _Stub()
+    real_get_client = platforms_mod.get_client
+    saved_mock_mode = cfg.MOCK_MODE
+    platforms_mod.get_client = lambda platform: stub
+    cfg.MOCK_MODE = False          # no random filler comments during this test
+    try:
+        db = SessionLocal()
+        for pid in ("ig_post_A", "ig_post_B"):   # one account, two post rows
+            db.add(Post(user_id=UID, account_id=ig_id, caption="synced",
+                        media_url="", post_type="feed", status=PostStatus.published,
+                        platform_post_id=pid, scheduled_at=_now - _td(hours=3),
+                        published_at=_now - _td(hours=3)))
+        db.commit()
+        first = asyncio.run(engine_mod.sync_comments(db, user_id=UID, limit=10))
+        seen = [(c.external_comment_id, c.post_id, bool(c.replied), c.created_at)
+                for c in db.query(Comment)
+                .filter(Comment.external_comment_id.in_(["cmt_recent", "cmt_ancient"])).all()]
+        second = asyncio.run(engine_mod.sync_comments(db, user_id=UID, limit=10))
+        db.close()
+    finally:
+        platforms_mod.get_client = real_get_client
+        cfg.MOCK_MODE = saved_mock_mode
+
+    by_id = {}
+    for ext_id, post_id, replied, created in seen:
+        by_id.setdefault(ext_id, []).append((post_id, replied, created))
+
+    check("a comment reached through two post rows is stored exactly once",
+          len(by_id.get("cmt_recent", [])) == 1 and first["new_comments"] == 2,
+          f"rows={ {k: len(v) for k, v in by_id.items()} } new_comments={first['new_comments']}")
+    check("the recent comment was auto-replied exactly once",
+          by_id.get("cmt_recent", [(None, False, None)])[0][1] and
+          first["auto_replies"] == 1 and len(stub.replies) == 1,
+          f"auto_replies={first['auto_replies']} posted={len(stub.replies)}")
+    _created = by_id.get("cmt_recent", [(None, False, None)])[0][2]
+    check("the comment keeps the platform timestamp, not fetch time",
+          _created is not None and abs((_created.replace(tzinfo=_tz.utc)
+                                        - (_now - _td(hours=2))).total_seconds()) < 90,
+          str(_created))
+    check("a comment older than the watch window is kept but not auto-answered",
+          by_id.get("cmt_ancient", [(None, True, None)])[0][1] is False,
+          str(by_id.get("cmt_ancient")))
+    check("re-syncing the same comments changes nothing (no double replies)",
+          second["new_comments"] == 0 and second["auto_replies"] == 0
+          and len(stub.replies) == 1, json.dumps(second))
 
     print("\n[health check compatibility]")
     r = client.head("/api/health")

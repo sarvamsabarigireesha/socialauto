@@ -178,6 +178,10 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE comments ADD COLUMN author_avatar VARCHAR(20) NOT NULL DEFAULT ''"))
         if "accounts" in cols and "refresh_token" not in cols["accounts"]:
             conn.execute(text("ALTER TABLE accounts ADD COLUMN refresh_token VARCHAR(500) NOT NULL DEFAULT ''"))
+        # posts.media_url was VARCHAR(500) — real CDN URLs are longer and made
+        # every import fail. Postgres needs an explicit widening.
+        if "posts" in cols and engine.dialect.name == "postgresql":
+            conn.execute(text("ALTER TABLE posts ALTER COLUMN media_url TYPE TEXT"))
         if "posts" in cols and "post_type" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN post_type VARCHAR(12) NOT NULL DEFAULT 'feed'"))
         if "users" in cols and "reset_token" not in cols["users"]:

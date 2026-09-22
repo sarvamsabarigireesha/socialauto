@@ -111,6 +111,67 @@ path, or an absolute URL on the same host as `APP_PUBLIC_URL`. Anything else is
 passed to the platform. Facebook published fine on the first attempt; Instagram
 succeeded immediately after the fix.
 
+## 6b. The two defects you reported (round 3)
+
+**"Image or video upload chestey ravadam ledu, only text post avutundi."**
+
+The upload form did work — an 11 MB image uploads fine (HTTP 200, verified
+live). What actually happened, measured live:
+
+| Upload | Result |
+|--------|--------|
+| 11 MB photo | ✅ 200 |
+| 53 MB video (a normal phone clip) | ❌ **400 "File too large, max 50MB"** |
+
+Two things turned that into "nothing happened": the limit was **50 MB**, which
+almost every phone video exceeds, and the composer's upload was a `.then()`
+with **no `.catch()`** — the 400 was swallowed, `comp.mediaUrl` stayed `""`, and
+the post went out text-only with no warning. Posts #45 (IG) and #43 (YT) both
+failed this way with an empty `media_url`.
+
+Fixed: the ceiling is 100 MB, uploads now **stream to disk in 1 MB chunks**
+(a 400 MB file can no longer exhaust the instance's RAM), the size is checked
+before the upload starts, every failure shows a toast with the reason, the
+media library accepts video too, and a new **"Paste media link"** button lets
+you attach a public https:// URL — the way to post a big clip that never has to
+travel through this host at all.
+
+**"Comments analytics real accounts nunchi sync avvadam ledu, reply avvadam ledu."**
+
+Root cause was one column. `posts.media_url` was `VARCHAR(500)`, and real
+Facebook/Instagram CDN URLs are longer than that (they carry signed query
+strings). `import_channel_content` hit
+`psycopg2.errors.StringDataRightTruncation: value too long for type
+character varying(500)` and **the whole transaction rolled back — 0 items
+imported.** With no posts imported, there was nothing for comments or metrics
+to sync against. That is the entire explanation for both halves of the report.
+
+Fixed: `media_url` is `TEXT` (migrated live: `posts.media_url` is now `text`),
+and the import writes **per-item savepoints**, so one bad item can never again
+discard an entire channel. Live result after the fix: **Facebook 14 posts,
+Instagram 25 posts imported**, comments synced (**60 rows**, real usernames
+like @harshavineethraj, @ugadimahesh, @CULT_GAMING_TL), metrics snapshots
+written, and every one of them auto-replied.
+
+The reply path itself was then exercised live: a reply was posted through the
+app's own client to a real comment, read back from the Graph API, and deleted
+again — it works (`POST /{comment-id}/replies` → 200).
+
+Two real bugs surfaced while verifying:
+
+1. **Double replies.** Comment dedupe was per *post*, but the same comment can
+   be reached through two post rows of the same account (an import plus a
+   manual post). The same comment was stored twice and answered twice — the
+   account had `Thanks for stopping by! 👋` posted twice under one comment.
+   Dedupe is now per **account**, plus a per-run guard. 41 duplicate rows and
+   19 demo-seeded rows were removed from the DB (79 → 60 real comments).
+2. **Reply backlog.** Comments were stored with the *fetch* time, so the
+   `COMMENT_WATCH_WINDOW_HOURS` guard (default 24 h) could never work — it
+   compared "now" against "now". Comments now keep the platform's real
+   timestamp, so a first import stores months of backlog **without** spamming
+   auto-replies at all of it. Set `COMMENT_WATCH_WINDOW_HOURS=0` in Render to
+   auto-reply to everything, backlog included.
+
 ## 7. Open items
 
 | # | Item | Action |
@@ -120,6 +181,9 @@ succeeded immediately after the fix.
 | 3 | All these secrets were shared in chat — DB password, Meta app secret, Google client secret, Gemini key. | Rotate the sensitive ones in each provider's dashboard. |
 | 4 | Render Settings → Health Check Path is worth setting to `/api/health` explicitly. | One-click change. |
 | 5 | ~~Three leftover test users in the DB~~ | **Done** — deleted; the DB now holds only `demo@socialauto.app` and your account. |
+| 6 | Duplicate replies already on Instagram (`Thanks for stopping by! 👋` posted twice under one comment, from the pre-fix double-reply bug) | Nothing will *re*-post them; say the word and the extras get deleted from the platform. |
+| 7 | The 2 test posts from round 2 are still live | Delete them from Instagram/Facebook when you are done testing. |
+| 8 | `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` were also shared in chat | Rotate when convenient (JWT_SECRET and the DB password are done). |
 
 ## 8. What a real post does now
 

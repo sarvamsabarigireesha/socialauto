@@ -23,7 +23,10 @@ from pathlib import Path
 from .config import DATA_DIR, settings
 
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".m4v"}
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+# Phone videos are routinely 100-400MB. We stream uploads straight to disk so a
+# large file cannot blow the 512MB RAM of a free instance, but the platform
+# still has to fetch the file over this host's egress, so keep a sane ceiling.
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 MEDIA_URL_PREFIX = "/media"
 MEDIA_DIR = DATA_DIR / "media"
@@ -62,10 +65,20 @@ def new_filename(original: str) -> str:
 
 
 def save(user_id: int, original_name: str, content: bytes) -> tuple[str, str]:
-    """Write an upload and return `(rel_path, public_url)`."""
+    """Write already-read bytes and return `(rel_path, public_url)`."""
     name = new_filename(original_name)
     (user_dir(user_id) / name).write_bytes(content)
     return rel_path(user_id, name), url_for(rel_path(user_id, name))
+
+
+def size_error(size: int, name: str = "") -> str:
+    """Message for an upload that is too big — says what to do about it."""
+    mb = size / (1024 * 1024)
+    limit = MAX_UPLOAD_BYTES / (1024 * 1024)
+    return (f"{name or 'file'} is {mb:.0f}MB and the upload limit is "
+            f"{limit:.0f}MB. Compress it, or paste a public https:// link "
+            f"instead (videos hosted on Drive/Cloudinary work fine and skip "
+            f"this host entirely).")
 
 
 def resolve(rel: str) -> Path | None:

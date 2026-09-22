@@ -1180,8 +1180,8 @@
 
   <!-- MEDIA -->
   <section id="view-media" style="display:none">
-    <div class="upload-drop" id="mediaDrop">🖼 Upload images to your media library — click or drag &amp; drop (JPG/PNG/GIF, max 8MB)</div>
-    <input type="file" id="mediaFile" accept="image/*" multiple style="display:none">
+    <div class="upload-drop" id="mediaDrop">🖼 Upload images or videos — click or drag &amp; drop (JPG/PNG/WEBP/MP4/MOV, max 100MB)</div>
+    <input type="file" id="mediaFile" accept="image/*,video/*" multiple style="display:none">
     <div class="media-grid" id="mediaGrid"></div>
   </section>
 
@@ -1301,8 +1301,9 @@ gcloud run deploy socialauto --source . --region asia-south1 --allow-unauthentic
         </div>
 
         <div class="comp-actions">
-          <button class="tool-btn" onclick="document.getElementById('mediaPickerFile').click()">🖼 Media library</button>
+          <button class="tool-btn" onclick="document.getElementById('mediaPickerFile').click()">Upload</button>
           <input type="file" id="mediaPickerFile" accept="image/*,video/*" style="display:none">
+          <button class="tool-btn" onclick="useMediaUrl()">🔗 Paste media link</button>
           <button class="tool-btn" id="clearMediaBtn" style="display:none" onclick="clearMedia()">✕ Remove</button>
           <button class="tool-btn" style="background:#f0eafe;color:var(--purple);border-color:#d9cbfb" onclick="runAI()">
             ✨ AI suggest <small style="display:block;font-size:10.5px;color:#8b7fd0">caption · hashtags · SEO · disclaimers</small></button>
@@ -2583,10 +2584,11 @@ function openComposer(presetDateISO=null, editPost=null){
   comp.aiAutoStamp = '';
   document.getElementById('linkUrl').value = '';
   document.getElementById('linkOut').innerHTML = '';
-  document.getElementById('mediaPickerFile').onchange = e => {
-    const f = e.target.files[0]; if(!f) return;
-    const fd = new FormData(); fd.append('file', f);
-    api('/api/media',{method:'POST',body:fd}).then(m=>{ comp.mediaUrl=m.url; showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); maybeAutoAI(true); });
+  document.getElementById('mediaPickerFile').onchange = async e => {
+    const f = e.target.files[0];
+    e.target.value = '';            // allow re-picking the same file later
+    if(!f) return;
+    await attachFile(f);
   };
   renderCompAccs();
   renderCompTags();
@@ -2743,6 +2745,42 @@ function showSelMedia(){
   else { box.style.display='none'; document.getElementById('clearMediaBtn').style.display='none'; }
 }
 function clearMedia(){ comp.mediaUrl=''; showSelMedia(); renderPreviews(); }
+
+/* Uploads used to be fire-and-forget: the POST had no .catch(), so an oversize
+   phone video failed with a 400 that the UI silently swallowed - it looked like
+   nothing had happened at all. Size is now checked up front and the result is
+   always reported. */
+const MAX_UPLOAD_MB = 100;
+async function attachFile(f){
+  const hint = document.getElementById('mediaHint');
+  const mb = f.size / (1024*1024);
+  if(mb > MAX_UPLOAD_MB){
+    toast(`That file is ${mb.toFixed(0)}MB and the upload limit is ${MAX_UPLOAD_MB}MB. Compress it, or use "Paste media link" to attach a public URL instead.`, false);
+    return;
+  }
+  hint.textContent = `Uploading ${f.name} (${mb.toFixed(1)}MB)…`;
+  try{
+    const fd = new FormData(); fd.append('file', f);
+    const m = await api('/api/media',{method:'POST',body:fd});
+    comp.mediaUrl = m.url;
+    showSelMedia(); renderPreviews(); renderCustomize(); loadMedia(); maybeAutoAI(true);
+    hint.textContent = '';
+    toast('Media attached ✅');
+  }catch(err){
+    hint.textContent = '';
+    toast(`Upload failed: ${err.message}`, false);
+  }
+}
+function useMediaUrl(){
+  const url = prompt('Paste a public image/video URL (https://...)\n\nHandy for big videos - they do not have to go through this app at all.',
+                     comp.mediaUrl && comp.mediaUrl.startsWith('http') ? comp.mediaUrl : '');
+  if(!url) return;
+  const u = url.trim();
+  if(!/^https?:\/\//i.test(u)){ toast('That needs to start with http:// or https://', false); return; }
+  comp.mediaUrl = u;
+  showSelMedia(); renderPreviews(); renderCustomize();
+  toast('Media link attached 🔗');
+}
 
 function renderPreviews(){
   const cap = document.getElementById('capText').value;
@@ -3367,20 +3405,22 @@ function pickMedia(url){
 const mediaDrop = document.getElementById('mediaDrop');
 mediaDrop.onclick = ()=>document.getElementById('mediaFile').click();
 document.getElementById('mediaFile').onchange = async e => {
-  for(const f of e.target.files){
-    const fd = new FormData(); fd.append('file',f);
-    try{ await api('/api/media',{method:'POST',body:fd}); }catch(err){ toast(err.message,false); }
+  const files = [...e.target.files];
+  e.target.value = '';
+  let ok = 0;
+  for(const f of files){
+    try{ await attachFile(f); ok++; }catch(err){ toast(`${f.name}: ${err.message}`, false); }
   }
-  toast('Uploaded ✅'); loadMedia();
+  if(ok) toast(`${ok} file(s) uploaded ✅`);
+  loadMedia();
 };
 ['dragover','dragenter'].forEach(ev=>mediaDrop.addEventListener(ev,e=>{e.preventDefault();mediaDrop.classList.add('over')}));
 ['dragleave','drop'].forEach(ev=>mediaDrop.addEventListener(ev,e=>{e.preventDefault();mediaDrop.classList.remove('over')}));
 mediaDrop.addEventListener('drop',async e=>{
   for(const f of e.dataTransfer.files){
-    const fd=new FormData(); fd.append('file',f);
-    try{ await api('/api/media',{method:'POST',body:fd}); }catch(err){ toast(err.message,false); }
+    try{ await attachFile(f); }catch(err){ toast(`${f.name}: ${err.message}`, false); }
   }
-  toast('Uploaded ✅'); loadMedia();
+  loadMedia();
 });
 
 /* ================= sync ================= */

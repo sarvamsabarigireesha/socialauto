@@ -269,12 +269,29 @@ async def publish_due_posts(db, limit: int = 25) -> dict:
 
 
 # ------------------------------------------------------------------ comments
+def _comment_time(item: dict) -> datetime:
+    """When the comment was actually written, not when we fetched it.
+
+    The inbox is sorted by this and the auto-reply watch window depends on it,
+    so falling back to "now" for every fetched comment (the old behaviour) made
+    months-old comments look brand new.
+    """
+    raw = item.get("created_at") or item.get("timestamp") or ""
+    if raw:
+        try:
+            return _aware(datetime.fromisoformat(str(raw).replace("Z", "+00:00")))
+        except (ValueError, TypeError):
+            pass
+    return _now()
+
+
 def _mock_incoming(post: Post) -> list[dict]:
     """Fake follower comments so MOCK_MODE has a live-looking inbox."""
     if not settings.MOCK_MODE:
         return []
-    if post.published_at and _aware(post.published_at) < _now() - timedelta(
-            hours=settings.COMMENT_WATCH_WINDOW_HOURS):
+    watch = settings.COMMENT_WATCH_WINDOW_HOURS
+    if watch > 0 and post.published_at and _aware(post.published_at) < _now() - timedelta(
+            hours=watch):
         return []
     return [
         {"id": f"mock_{post.id}_{uuid.uuid4().hex[:8]}", "author": author, "text": text}
@@ -325,6 +342,7 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
     posts = q.limit(limit).all()
 
     new_comments = auto_replies = 0
+    replied_seen: set[str] = set()
     for post in posts:
         account = post.account
         if account is None:
@@ -342,15 +360,29 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
 
         for item in incoming:
             external_id = str(item.get("id") or item.get("external_comment_id") or "")
+
+            # Dedupe per ACCOUNT, not per post: the same video/post can be
+            # reached through more than one post row (an import plus a manual
+            # post), and deduping per post meant the same comment was stored —
+            # and auto-replied to — twice.
             if external_id and (db.query(Comment)
-                                .filter(Comment.post_id == post.id,
+                                .join(Post, Comment.post_id == Post.id)
+                                .filter(Post.account_id == account.id,
                                         Comment.external_comment_id == external_id)
                                 .first()):
                 continue
+            if external_id and external_id in replied_seen:
+                continue
+
             author = str(item.get("author") or item.get("from") or "someone")[:200]
-            comment = Comment(post_id=post.id, external_comment_id=external_id,
-                              author=author, author_avatar=author[:1].upper(),
-                              text=str(item.get("text") or item.get("message") or ""))
+            posted_at = _comment_time(item)
+            comment = Comment(
+                post_id=post.id, external_comment_id=external_id,
+                author=author, author_avatar=author[:1].upper(),
+                text=str(item.get("text") or item.get("message") or ""),
+                # the platform's real timestamp, so age-based rules work
+                created_at=posted_at,
+            )
             db.add(comment)
             db.flush()
             new_comments += 1
@@ -359,6 +391,18 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
                 continue
             if not comment.text.strip():
                 continue
+            # COMMENT_WATCH_WINDOW_HOURS is the whole point of the setting: an
+            # account connecting for the first time pulls in months of old
+            # comments, and auto-replying to all of them looks like spam. Old
+            # ones still land in the Community inbox for a human to handle.
+            # Set COMMENT_WATCH_WINDOW_HOURS=0 to reply to everything,
+            # including the backlog a first-time connect pulls in.
+            watch = settings.COMMENT_WATCH_WINDOW_HOURS
+            age_hours = (_now() - posted_at).total_seconds() / 3600
+            if watch > 0 and age_hours > watch:
+                continue
+            if external_id:
+                replied_seen.add(external_id)
             reply = generate_reply(comment.text, account)
             try:
                 ok = await client.reply_to_comment(account, post.platform_post_id,
@@ -462,8 +506,9 @@ async def import_channel_content(db, user_id: int, account_id: int) -> dict:
         return result
 
     result["scanned"] = len(items)
+    skipped = 0
     for item in items:
-        external_id = str(item.get("id") or item.get("video_id") or "")
+        external_id = str(item.get("id") or item.get("video_id") or "")[:200]
         if not external_id:
             continue
         exists = (db.query(Post)
@@ -477,27 +522,44 @@ async def import_channel_content(db, user_id: int, account_id: int) -> dict:
         try:
             published = _aware(datetime.fromisoformat(
                 str(raw_date).replace("Z", "+00:00"))) if raw_date else _now()
-        except ValueError:
+        except (ValueError, TypeError):
             published = _now()
 
-        db.add(Post(
+        post = Post(
             user_id=user_id,
             account_id=account.id,
             caption=item.get("title") or item.get("caption") or "(imported post)",
-            media_url=item.get("url") or item.get("media_url") or "",
-            post_type=item.get("post_type") or "video",
+            media_url=(item.get("url") or item.get("media_url") or ""),
+            post_type=(item.get("post_type") or "video")[:12],
             source="scheduled",
             scheduled_at=published,
             status=PostStatus.published,
             platform_post_id=external_id,
             published_at=published,
-        ))
-        result["imported"] += 1
+        )
+        # One unusable row (an over-long CDN URL, an odd date) must not throw
+        # away the whole import — a savepoint keeps the rest of the batch alive.
+        try:
+            with db.begin_nested():
+                db.add(post)
+            result["imported"] += 1
+        except Exception as exc:
+            skipped += 1
+            print(f"import skip ({account.display_name}) {external_id}: "
+                  f"{type(exc).__name__}: {str(exc)[:200]}", flush=True)
 
-    if not items:
+    if skipped:
+        result["skipped"] = skipped
+        result["note"] = f"{skipped} item(s) skipped"
+    elif not items:
         result["note"] = ("connect a real account to import" if settings.MOCK_MODE
                           else "nothing new to import")
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        result["ok"] = False
+        result["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
     return result
 
 

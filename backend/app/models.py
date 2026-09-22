@@ -123,7 +123,10 @@ class Post(Base):
     group_id = Column(String(40), default="", index=True)   # shared by same-post multi-account rows
     platform_post_id = Column(String(200), default="")        # id returned after publishing
     caption = Column(Text, nullable=False)
-    media_url = Column(String(500), default="")               # image/video URL (or local path)
+    # Text, not String(500): Facebook/Instagram CDN URLs carry signed query
+    # strings and routinely exceed 500 chars. A too-narrow column made the whole
+    # content import fail with StringDataRightTruncation.
+    media_url = Column(Text, default="")
     post_type = Column(String(12), default="feed", nullable=False)  # feed | video | short | community
     source = Column(String(12), default="scheduled", nullable=False)  # scheduled | queue | next | draft | now
     scheduled_at = Column(UTCDateTime, nullable=False)
