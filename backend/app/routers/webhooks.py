@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request, HTTPException
 
 from ..config import settings
 from ..database import SessionLocal
-from ..models import Account, Post, Comment, Platform
+from ..models import Post, Comment
 from ..services import platforms, autocomment
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])

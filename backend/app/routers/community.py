@@ -12,7 +12,6 @@ from ..database import get_db
 from ..models import Comment, Post, User, PostStatus
 from ..security import get_current_user
 from ..services import platforms, engine
-from sqlalchemy import func
 
 router = APIRouter(prefix="/api/community", tags=["community"])
 

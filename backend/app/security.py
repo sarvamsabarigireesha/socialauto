@@ -53,8 +53,8 @@ def decode_token(token: str) -> int:
     try:
         data = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
         return int(data["sub"])
-    except Exception:
-        raise HTTPException(401, "Invalid or expired token")
+    except Exception as exc:
+        raise HTTPException(401, "Invalid or expired token") from exc
 
 
 bearer = HTTPBearer(auto_error=False)

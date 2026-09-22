@@ -32,8 +32,9 @@ def update_account(account_id: int, data: AccountUpdate, db: Session = Depends(g
                 hh, mm = (int(x) for x in str(s.get("time", "")).split(":")[:2])
                 if day < 0 or day > 6 or hh < 0 or hh > 23 or mm < 0 or mm > 59:
                     raise ValueError
-            except Exception:
-                raise HTTPException(400, "slots must be [{day:0-6, time:'HH:MM'}]")
+            except Exception as exc:
+                raise HTTPException(
+                    400, "slots must be [{day:0-6, time:'HH:MM'}]") from exc
             slots.append({"day": day, "time": f"{hh:02d}:{mm:02d}"})
         acc.posting_slots = slots
     if data.posting_goal is not None:

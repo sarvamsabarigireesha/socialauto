@@ -6,8 +6,36 @@ from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Boolean, Enum, JSON, ForeignKey, Table
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import TypeDecorator
 
 from .database import Base
+
+
+class UTCDateTime(TypeDecorator):
+    """DateTime column that is always UTC-aware in Python.
+
+    SQLite and Postgres `TIMESTAMP WITHOUT TIME ZONE` both drop the offset on
+    write, so reading a row back used to hand naive datetimes to the API. The
+    browser then parsed "2026-09-22T09:00:00" as *local* time and showed every
+    scheduled post 5:30 off. This stores naive UTC (portable, no migration
+    needed) and re-stamps UTC on the way out.
+    """
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 def utcnow():
@@ -24,8 +52,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     timezone = Column(String(64), default="Asia/Kolkata")  # Buffer-style: user's local timezone
     reset_token = Column(String(120), default="", index=True)
-    reset_token_expires = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    reset_token_expires = Column(UTCDateTime, nullable=True)
+    created_at = Column(UTCDateTime, default=utcnow)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
 
@@ -54,7 +82,7 @@ class Idea(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     text = Column(Text, nullable=False)
     status = Column(Enum(IdeaStatus), default=IdeaStatus.unassigned, nullable=False)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(UTCDateTime, default=utcnow)
 
 
 class PostStatus(str, enum.Enum):
@@ -80,7 +108,7 @@ class Account(Base):
     comment_template = Column(Text, default="")                # optional fixed reply; "" = AI pool
     posting_slots = Column(JSON, default=list)                 # Buffer-style weekly time slots [{day,time}]
     posting_goal = Column(Integer, default=7)                  # posts per week goal for this channel
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(UTCDateTime, default=utcnow)
 
     user = relationship("User", back_populates="accounts")
     posts = relationship("Post", back_populates="account", cascade="all, delete-orphan")
@@ -98,11 +126,11 @@ class Post(Base):
     media_url = Column(String(500), default="")               # image/video URL (or local path)
     post_type = Column(String(12), default="feed", nullable=False)  # feed | video | short | community
     source = Column(String(12), default="scheduled", nullable=False)  # scheduled | queue | next | draft | now
-    scheduled_at = Column(DateTime, nullable=False)
+    scheduled_at = Column(UTCDateTime, nullable=False)
     status = Column(Enum(PostStatus), default=PostStatus.scheduled, nullable=False)
     error = Column(Text, default="")
-    created_at = Column(DateTime, default=utcnow)
-    published_at = Column(DateTime, nullable=True)
+    created_at = Column(UTCDateTime, default=utcnow)
+    published_at = Column(UTCDateTime, nullable=True)
 
     account = relationship("Account", back_populates="posts")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
@@ -126,7 +154,7 @@ class Tag(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(60), nullable=False)
     color = Column(String(9), default="#5b6cff")
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(UTCDateTime, default=utcnow)
 
     posts = relationship("Post", secondary="post_tags", back_populates="tags")
 
@@ -140,7 +168,7 @@ class ShortLink(Base):
     code = Column(String(12), unique=True, nullable=False, index=True)
     long_url = Column(Text, nullable=False)
     clicks = Column(Integer, default=0)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(UTCDateTime, default=utcnow)
 
 
 class Comment(Base):
@@ -157,7 +185,7 @@ class Comment(Base):
     reply_type = Column(String(10), default="auto")     # auto | manual
     replied = Column(Boolean, default=False)
     resolved = Column(Boolean, default=False)           # conversation marked handled
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(UTCDateTime, default=utcnow)
 
     post = relationship("Post", back_populates="comments")
 
@@ -172,7 +200,7 @@ class Template(Base):
     content = Column(Text, nullable=False)
     category = Column(String(50), default="general")
     builtin = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(UTCDateTime, default=utcnow)
 
 
 class Metric(Base):
@@ -186,7 +214,7 @@ class Metric(Base):
     shares = Column(Integer, default=0)
     impressions = Column(Integer, default=0)
     reach = Column(Integer, default=0)
-    fetched_at = Column(DateTime, default=utcnow)
+    fetched_at = Column(UTCDateTime, default=utcnow)
     raw = Column(JSON, default=dict)
 
     post = relationship("Post", back_populates="metrics")

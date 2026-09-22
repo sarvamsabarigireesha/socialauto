@@ -2,7 +2,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from .config import settings
-import os
 
 # FIX: Render free Postgres sleeps -> SSL closed error fix
 connect_args = {}

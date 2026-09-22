@@ -12,7 +12,7 @@ from ..models import Post, PostStatus, Account, User, Tag
 from ..schemas import PostIn, BulkPostIn, PostOut, PostUpdate
 from ..security import get_current_user
 from ..services import engine
-from ..services.engine import _aware, next_slot_for
+from ..services.engine import _aware
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
 
@@ -101,9 +101,8 @@ def create_post(data: PostIn, db: Session = Depends(get_db),
     variants = {v.account_id: v for v in (data.per_account or [])}
     by_aid = {a.id: a for a in accs}
     for aid in data.account_ids:
-        acc = by_aid[aid]
         v = variants.get(aid)
-        p = Post(user_id=user.id, account_id=aid,
+        p = Post(user_id=user.id, account_id=by_aid[aid].id,
                  caption=v.caption if v else data.caption,
                  media_url=v.media_url if v else data.media_url,
                  post_type=_normalize_post_type(v.post_type if v else base_post_type),
@@ -175,8 +174,8 @@ async def bulk_csv(account_ids: str = Query(..., description="comma-separated ac
             continue
         try:
             dt = datetime.fromisoformat(when.replace("Z", "+00:00"))
-        except ValueError:
-            raise HTTPException(400, f"bad scheduled_at: {when}")
+        except ValueError as exc:
+            raise HTTPException(400, f"bad scheduled_at: {when}") from exc
         # CSV rows often omit the UTC offset (e.g. "2026-09-01T09:00:00"), which
         # fromisoformat parses as a naive datetime. Normalize to UTC-aware so it
         # compares correctly against `now` in the publish-due-posts cron job —

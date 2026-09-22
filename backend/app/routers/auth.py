@@ -59,8 +59,8 @@ def update_profile(data: ProfileUpdate, db: Session = Depends(get_db),
         try:
             from zoneinfo import ZoneInfo
             ZoneInfo(data.timezone)
-        except Exception:
-            raise HTTPException(400, "invalid IANA timezone")
+        except Exception as exc:
+            raise HTTPException(400, "invalid IANA timezone") from exc
         user.timezone = data.timezone
     if data.name is not None and data.name.strip():
         user.name = data.name.strip()

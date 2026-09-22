@@ -11,7 +11,7 @@
  *   main = "worker.js"
  *   compatibility_date = "2026-01-01"
  *   [triggers]
- *   crons = ["*/15 * * * *"]
+ *   crons = ["0,15,30,45 * * * *"]   # same as every 15 min
  */
 export default {
   async scheduled(event, env, ctx) {

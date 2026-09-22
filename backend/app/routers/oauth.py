@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from..config import settings
 from..database import get_db
 from..models import Account, Platform, User
-from..security import get_current_user, create_token, decode_token, JWT_ALG, JWT_SECRET
+from..security import get_current_user, JWT_ALG, JWT_SECRET
 import jwt as _pyjwt
 
 def _make_state(user_id: int, platform: str) -> str:
@@ -122,7 +122,7 @@ async def callback(request: Request, code: str | None = None, state: str | None 
         import traceback
         print("OAUTH CALLBACK ERROR:", plat, "\n", traceback.format_exc(), flush=True)
         if ajax == "1":
-            raise HTTPException(502, f"{plat.value} connect failed: {e}")
+            raise HTTPException(502, f"{plat.value} connect failed: {e}") from e
         return RedirectResponse(url="/?oauth_error=" + _ue(f"{plat.value.capitalize()} connect failed: {str(e)[:180]}"))
 
 async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
@@ -263,8 +263,8 @@ async def _real_exchange(plat, code, redirect_uri, db, user, ajax, state=""):
 def _require_platform(p: str) -> Platform:
     try:
         return Platform(p)
-    except ValueError:
-        raise HTTPException(404, f"Unknown platform '{p}'")
+    except ValueError as exc:
+        raise HTTPException(404, f"Unknown platform '{p}'") from exc
 
 def _upsert_account(db: Session, user: User, plat: Platform, external_id: str,
                     token: str, display_name: str, refresh: str = "") -> Account:
@@ -285,14 +285,32 @@ def _upsert_account(db: Session, user: User, plat: Platform, external_id: str,
     db.refresh(acc)
     return acc
 
+async def _background_import(user_id: int, session_factory):
+    """Import content + comments + metrics for a freshly connected account.
+
+    Runs on its own DB session (the request session is already closed) and
+    swallows errors so a background failure never surfaces as an OAuth error.
+    """
+    from..services import engine
+    db = session_factory()
+    try:
+        await engine.auto_import_all(db, user_id, run_sync=True)
+    except Exception:
+        import traceback
+        print("BACKGROUND IMPORT FAILED:", traceback.format_exc(), flush=True)
+    finally:
+        db.close()
+
+
 async def _finish(acc: Account, ajax: str | None, db: Session | None = None):
     if db is not None:
+        # Kick off the "import my existing content" sync in the background.
+        # It must NOT reuse the request-scoped `db` session: `get_db()` closes
+        # that session the moment the response is returned, which would make
+        # the task blow up with a detached/closed session error.
         import asyncio
-        from..services import engine
-        try:
-            asyncio.create_task(engine.auto_import_all(db, acc.user_id))
-        except Exception:
-            pass
+        from..database import SessionLocal
+        asyncio.create_task(_background_import(acc.user_id, SessionLocal))
     if ajax == "1":
         from..schemas import AccountOut
         return AccountOut.model_validate(acc)
