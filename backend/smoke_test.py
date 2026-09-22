@@ -510,6 +510,7 @@ with TestClient(app) as client:
     import asyncio  # noqa: E402
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz  # noqa: E402
     from app.database import SessionLocal  # noqa: E402
+    from app.services.engine import _aware as _aware_dt  # noqa: E402
     from app.models import Comment, Post, PostStatus  # noqa: E402
     from app.services import engine as engine_mod, platforms as platforms_mod  # noqa: E402
 
@@ -597,6 +598,30 @@ with TestClient(app) as client:
     finally:
         platforms_mod.get_client = real_get_client
         cfg.MOCK_MODE = saved_mock_mode
+    # a row written with a fetch-time timestamp gets corrected on re-sync
+    db = SessionLocal()
+    wrong = Comment(post_id=recent_post_id, external_comment_id="cmt_recent",
+                    author="priya", author_avatar="P", text="Rate enti?",
+                    created_at=_now - _td(days=30))
+    db.query(Comment).filter(Comment.post_id == recent_post_id,
+                              Comment.external_comment_id == "cmt_recent").delete()
+    db.add(wrong)
+    db.commit()
+    platforms_mod.get_client = lambda platform: stub
+    cfg.MOCK_MODE = False
+    try:
+        asyncio.run(engine_mod.sync_comments(db, user_id=UID, limit=10))
+    finally:
+        platforms_mod.get_client = real_get_client
+        cfg.MOCK_MODE = saved_mock_mode
+    fixed = (db.query(Comment)
+             .filter(Comment.external_comment_id == "cmt_recent").first())
+    check("re-syncing fixes a stale (fetch-time) comment timestamp",
+          fixed is None or abs((_aware_dt(fixed.created_at)
+                                - (_now - _td(hours=2))).total_seconds()) < 300,
+          str(fixed and fixed.created_at))
+    db.close()
+
     left = db.query(Comment).filter(Comment.external_comment_id == "cmt_stale").count()
     db.close()
     check("comments older than the 7-day window get pruned, not archived",

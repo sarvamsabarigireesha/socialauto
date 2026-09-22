@@ -365,12 +365,22 @@ async def sync_comments(db, user_id: int | None = None, limit: int = 50) -> dict
             # reached through more than one post row (an import plus a manual
             # post), and deduping per post meant the same comment was stored —
             # and auto-replied to — twice.
-            if external_id and (db.query(Comment)
-                                .join(Post, Comment.post_id == Post.id)
-                                .filter(Post.account_id == account.id,
-                                        Comment.external_comment_id == external_id)
-                                .first()):
-                continue
+            if external_id:
+                existing = (db.query(Comment)
+                            .join(Post, Comment.post_id == Post.id)
+                            .filter(Post.account_id == account.id,
+                                    Comment.external_comment_id == external_id)
+                            .first())
+                if existing:
+                    # Rows written by older builds carry the *fetch* time as
+                    # created_at, so they would never age out of the 7-day
+                    # window. Re-syncing corrects them to the platform's own
+                    # timestamp, and the prune below then drops the truly old
+                    # ones instead of archiving them forever.
+                    real_time = _comment_time(item)
+                    if abs((_aware(existing.created_at) - real_time).total_seconds()) > 300:
+                        existing.created_at = real_time
+                    continue
             if external_id and external_id in replied_seen:
                 continue
 
