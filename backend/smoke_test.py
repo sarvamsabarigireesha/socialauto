@@ -388,6 +388,43 @@ with TestClient(app) as client:
     r = client.post("/api/media", files={"file": ("empty.png", b"", "image/png")}, headers=H)
     check("media rejects an empty file", r.status_code == 400)
 
+    # ------------------------------------------------ manual / helper platforms
+    print("\n[manual platforms — Moj / ShareChat / Snapchat]")
+    html = client.get("/").text
+    check("the connect screen offers Snapchat", "prepareManualAccount('snapchat')" in html)
+    check("Snapchat shows up in the platform filters too",
+          html.count('<option value="snapchat">') >= 4, str(html.count('<option value="snapchat">')))
+    check("manual platforms get a real hand-off (open app + download media)",
+          "MANUAL_OPEN" in html and "Download media" in html)
+
+    r = client.post("/api/accounts", json={
+        "platform": "snapchat", "display_name": "@sarvam_snap", "external_id": "snap_1",
+        "auto_comment": True}, headers=H)
+    check("Snapchat can be connected through the manual flow",
+          r.status_code == 201, r.text[:200])
+    snap_id = r.json()["id"]
+
+    r = client.post("/api/posts", json={
+        "account_ids": [snap_id], "caption": "Sabarimala 9:16 clip", "media_url": "",
+        "post_type": "short", "scheduled_at": "2030-02-01T10:00:00Z"}, headers=H)
+    check("a Snapchat post can be queued", r.status_code == 201, r.text[:200])
+    snap_post = r.json()[0]["id"]
+
+    # MOCK_MODE would fake a success here; we want the real manual hand-off
+    _saved_mock = cfg.MOCK_MODE
+    cfg.MOCK_MODE = False
+    try:
+        r = client.post(f"/api/posts/{snap_post}/publish-now", headers=H)
+    finally:
+        cfg.MOCK_MODE = _saved_mock
+    check("publishing to Snapchat is handed over as a manual step, not a crash",
+          r.status_code in (200, 400, 409), r.text[:200])
+    r = client.get("/api/posts", headers=H)
+    snap_row = [p for p in r.json() if p["id"] == snap_post][0]
+    check("the Snapchat post is marked manual with a next step for the user",
+          (snap_row.get("error") or "").startswith("MANUAL:")
+          and "I posted it" in snap_row["error"], str(snap_row.get("error"))[:160])
+
     # ------------------------- upload limit / long URL / comment sync bugs
     print("\n[media upload — the video that silently never attached]")
     from app import media_store  # noqa: E402

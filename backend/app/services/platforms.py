@@ -442,9 +442,25 @@ class _YouTubeClient(Client):
             print(f"list_recent_videos (youtube) failed: {exc}", flush=True)
             return []
 
+_MANUAL_NAMES = {"moj": "Moj", "sharechat": "ShareChat", "snapchat": "Snapchat",
+                 "threads": "Threads"}
+
+
 class _ManualHelperClient(Client):
+    """Platforms we cannot publish to — the app prepares the post instead.
+
+    Moj and ShareChat expose no posting API, and Snapchat's only publishing API
+    (Public Profile, inside the Marketing API) is partner/allowlist gated, so it
+    can't be called from here either. The post is marked manual: copy the
+    caption, download the media, post it in the app, then click "I posted it".
+    """
+
     async def publish(self, account, caption: str, media_url: str, post_type: str = "feed") -> PublishResult:
-        return PublishResult(False, manual=True, error=f"MANUAL: {account.platform.value} no API")
+        name = _MANUAL_NAMES.get(account.platform.value, account.platform.value)
+        return PublishResult(
+            False, manual=True,
+            error=(f"MANUAL: {name} has no posting API we can call — copy the caption, "
+                   f"download the media, post it in the {name} app, then tap 'I posted it'"))
 
 _CLIENTS = {
     Platform.instagram: _MetaClient,
@@ -452,7 +468,8 @@ _CLIENTS = {
     Platform.youtube: _YouTubeClient,
     Platform.threads: _ManualHelperClient,
     Platform.moj: _ManualHelperClient,
-    Platform.sharechat: _ManualHelperClient
+    Platform.sharechat: _ManualHelperClient,
+    Platform.snapchat: _ManualHelperClient
 }
 
 def get_client(platform: Platform):

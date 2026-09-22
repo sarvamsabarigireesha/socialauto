@@ -23,6 +23,15 @@ connect_args = {}
 if "render" in settings.DATABASE_URL or "postgres" in settings.DATABASE_URL:
     connect_args = {"sslmode": "require", "connect_timeout": 10}
 
+# A request killed mid-transaction (deploy, timeout, crash) leaves its connection
+# "idle in transaction", still holding row locks. On Neon that wedged the DB for
+# minutes: an ALTER queued behind it and every statement behind the ALTER. This
+# session setting makes the server close such a transaction after a minute.
+if settings.DATABASE_URL.startswith("postgres"):
+    _opts = connect_args.setdefault("options", "")
+    if "idle_in_transaction_session_timeout" not in _opts:
+        connect_args["options"] = (_opts + " -c idle_in_transaction_session_timeout=60000").strip()
+
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,  # critical fix for SSL closed

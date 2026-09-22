@@ -180,8 +180,21 @@ def _run_migrations(db):
             conn.execute(text("ALTER TABLE accounts ADD COLUMN refresh_token VARCHAR(500) NOT NULL DEFAULT ''"))
         # posts.media_url was VARCHAR(500) — real CDN URLs are longer and made
         # every import fail. Postgres needs an explicit widening.
-        if "posts" in cols and engine.dialect.name == "postgresql":
-            conn.execute(text("ALTER TABLE posts ALTER COLUMN media_url TYPE TEXT"))
+        #
+        # Only when it is still narrow, and with a lock timeout: ALTER TABLE needs
+        # an ACCESS EXCLUSIVE lock on posts, and a single stale transaction is
+        # enough to make this statement queue — which then blocks every read and
+        # write on posts behind it. Failing fast (and retrying next boot) is far
+        # better than wedging the whole app.
+        if ("posts" in cols and engine.dialect.name == "postgresql"
+                and str(cols["posts"]["media_url"].get("type")).upper() != "TEXT"):
+            try:
+                conn.execute(text("SET lock_timeout = '5s'"))
+                conn.execute(text("ALTER TABLE posts ALTER COLUMN media_url TYPE TEXT"))
+                print("[migrate] posts.media_url widened to TEXT", flush=True)
+            except Exception as exc:
+                print(f"[migrate] media_url widening skipped ({type(exc).__name__}); "
+                      f"will retry on next start", flush=True)
         if "posts" in cols and "post_type" not in cols["posts"]:
             conn.execute(text("ALTER TABLE posts ADD COLUMN post_type VARCHAR(12) NOT NULL DEFAULT 'feed'"))
         if "users" in cols and "reset_token" not in cols["users"]:
@@ -191,7 +204,7 @@ def _run_migrations(db):
 
     # Postgres: add new ENUM values that create_all won't add on existing DBs.
     if engine.dialect.name == "postgresql":
-        wanted = ["youtube", "threads", "moj", "sharechat"]
+        wanted = ["youtube", "threads", "moj", "sharechat", "snapchat"]
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             for e in insp.get_enums():
                 labels = e.get("labels") or []

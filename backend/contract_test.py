@@ -316,6 +316,15 @@ async def run():
     mj = acc(Platform.moj, "MJ1")
     res = await platforms.get_client(Platform.moj).publish(mj, "hi", "")
     check("Moj marked manual", (not res.ok) and res.manual)
+    sc = acc(Platform.sharechat, "SC1")
+    res = await platforms.get_client(Platform.sharechat).publish(sc, "hi", "")
+    check("ShareChat marked manual", (not res.ok) and res.manual)
+    sn = acc(Platform.snapchat, "SN1")
+    res = await platforms.get_client(Platform.snapchat).publish(sn, "hi", "")
+    check("Snapchat marked manual (no open organic posting API)",
+          (not res.ok) and res.manual)
+    check("a manual platform explains the next step, not just 'no API'",
+          "I posted it" in res.error and "download the media" in res.error, res.error)
 
 
 def main():
