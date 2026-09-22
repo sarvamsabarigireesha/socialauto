@@ -20,7 +20,7 @@ from .routers import auth as auth_router, oauth as oauth_router, webhooks as web
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.8.0")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -318,7 +318,7 @@ async def _seed_demo_data(demo_user: User):
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     # `version` doubles as a deploy marker — bump it to verify new code is live.
-    return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.8.0"}
+    return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.9.0"}
 
 
 # ---- serve the dashboard (static) ----
