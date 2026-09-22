@@ -5,6 +5,7 @@ import tempfile
 from datetime import datetime, timezone
 import httpx
 from..config import settings
+from..media_store import missing_local_media
 from..models import Platform
 
 class PublishResult:
@@ -59,6 +60,11 @@ class _MetaClient(Client):
                 v = self._v()
                 caption = caption or ""
                 media_url = (media_url or "").strip()
+                gone = missing_local_media(media_url)
+                if gone:
+                    # Don't hand Meta a URL that will 404 — their crawler logs it
+                    # and the post fails with a confusing error.
+                    return PublishResult(False, error=f"media problem: {gone}")
                 if media_url and not media_url.startswith("http"):
                     base_url = (settings.APP_PUBLIC_URL or "").rstrip("/")
                     if media_url.startswith("/"):

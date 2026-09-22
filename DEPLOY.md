@@ -39,8 +39,40 @@ gcloud run deploy socialauto \
 1. https://render.com → New → **Web Service** → connect your GitHub repo
 2. Build command: `pip install -r backend/requirements.txt`
 3. Start command: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Add env vars (`MOCK_MODE`, `CRON_SECRET`, …) → Create
-5. Free URL: `https://socialauto.onrender.com` (sleeps after inactivity on free plan)
+4. Environment variables — **all four matter**:
+   | Key | Value | Why |
+   |-----|-------|-----|
+   | `MOCK_MODE` | `false` | otherwise every "publish" is simulated |
+   | `DATABASE_URL` | Neon Postgres string | **Render's disk is wiped on every deploy**, so SQLite loses all users/posts/comments. Without this you get a blank app after each push. |
+   | `APP_PUBLIC_URL` | `https://socialauto.onrender.com` | Instagram fetches your media from a public https URL; without this, media stays relative and IG publishing always fails |
+   | `CRON_SECRET` | long random string | the app refuses cron calls with the dev default in live mode |
+5. Health check path: `/api/health` (Settings → Health Checks). Render sends **HEAD**; this app answers HEAD on `/` and `/api/health` — before, a HEAD returned `405`, which made the service look unhealthy and trigger restarts.
+6. Free URL: `https://socialauto.onrender.com` (sleeps after inactivity on free plan)
+
+#### ⚠️ The free-plan trap that breaks Instagram posting
+Render's filesystem is **ephemeral**: every deploy and every restart wipes
+`backend/data`. That includes uploaded media — so a URL the composer used at
+10:30 returns **404 at 10:35**, and the failure shows up in the logs as Meta's
+crawler (IPs in `10.26.x` / `10.28.x`) requesting `/media/...`:
+
+```
+GET /media/u3/75bb14f21a47.mp4 404 Not Found
+```
+
+Instagram then rejects the post, usually with a vague media error. Three ways
+out, cheapest first:
+
+1. **Use external media URLs** — paste an `https://` image/video link (Drive,
+   GitHub raw, Cloudinary free tier) into the composer instead of uploading.
+2. **Attach a Render Disk** (paid) — mount it at `/var/data` and set
+   `DATA_DIR=/var/data`. Media and a SQLite DB then survive redeploys.
+3. **Host the media elsewhere** — e.g. Cloudinary/ImageKit free tier, and let
+   the composer store that URL.
+
+Since this release the app also tells you instead of failing silently: a missing
+file returns a `404` whose body explains the cause, and publishing checks local
+media **before** calling Meta, so you get *"the media file /media/... is missing
+on this server … re-upload the file"* rather than an opaque Graph API error.
 
 ### Option 3 — Fly.io
 ```bash

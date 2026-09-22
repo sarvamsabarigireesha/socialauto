@@ -11,6 +11,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 DB = "sqlite:///./data/smoke.db"
 if os.path.exists("data/smoke.db"):
     os.remove("data/smoke.db")
+# uploads persist in data/media between runs — clear them so the listing
+# assertions below are deterministic
+for _u in pathlib.Path("data/media").glob("u*"):
+    if _u.is_dir():
+        for _f in _u.iterdir():
+            _f.unlink()
+        _u.rmdir()
 os.environ["DATABASE_URL"] = DB
 os.environ.setdefault("MOCK_MODE", "true")
 
@@ -46,6 +53,7 @@ with TestClient(app) as client:
 
     r = client.get("/api/auth/me", headers=H)
     check("GET /api/auth/me", r.status_code == 200)
+    UID = r.json()["id"]
 
     r = client.patch("/api/auth/profile", json={"timezone": "Asia/Kolkata"}, headers=H)
     check("PATCH /api/auth/profile", r.status_code == 200, r.text[:200])
@@ -296,9 +304,55 @@ with TestClient(app) as client:
     png = (b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
     r = client.post("/api/media", files={"file": ("pic.png", png, "image/png")}, headers=H)
     check("POST /api/media", r.status_code == 200 and r.json()["url"], r.text[:200])
+    media_path = r.json()["path"]
+    media_url = r.json()["url"]
+    check(f"upload is stored per user (u{UID}/file)",
+          media_path == f"u{UID}/{media_path.split('/')[-1]}", media_path)
+    check("upload URL points at /media/", f"/media/u{UID}/" in media_url, media_url)
+
+    r = client.get("/api/media", headers=H)
+    check("GET /api/media lists the upload", r.status_code == 200 and len(r.json()) == 1
+          and r.json()[0]["url"] == media_url, r.text[:300])
+
+    r = client.get(media_url)
+    check("GET /media/<uploaded> serves the file", r.status_code == 200 and
+          r.content == png, f"{r.status_code} {r.text[:120]}")
+    check("media response allows caching", "max-age" in r.headers.get("cache-control", ""))
+
+    r = client.head(media_url)
+    check("HEAD /media/<uploaded> works (health-checkers use HEAD)", r.status_code == 200)
+
+    # legacy layout: old DB rows point at /media/u3/<file>
+    legacy = pathlib.Path("data/media/u3")
+    legacy.mkdir(parents=True, exist_ok=True)
+    (legacy / "old-clip.mp4").write_bytes(b"\x00" * 32)
+    r = client.get("/media/u3/old-clip.mp4")
+    check("legacy /media/u<id>/<file> URLs still resolve", r.status_code == 200,
+          f"{r.status_code} {r.text[:120]}")
+    r = client.get("/media/anything-at-all/old-clip.mp4")
+    check("a wrong folder still resolves by basename", r.status_code == 200,
+          str(r.status_code))
+    r = client.get("/media/../../etc/passwd")
+    check("path traversal is blocked", r.status_code in (404, 400, 307),
+          str(r.status_code))
+
+    r = client.get("/media/u3/never-uploaded.mp4")
+    check("missing media returns a helpful 404, not a bare one",
+          r.status_code == 404 and "redeploy" in r.json().get("detail", ""), r.text[:250])
+
     r = client.post("/api/media", files={"file": ("bad.exe", b"x", "application/octet")},
                     headers=H)
     check("media rejects bad extension", r.status_code == 400)
+    r = client.post("/api/media", files={"file": ("empty.png", b"", "image/png")}, headers=H)
+    check("media rejects an empty file", r.status_code == 400)
+
+    print("\n[health check compatibility]")
+    r = client.head("/api/health")
+    check("HEAD /api/health returns 200 (Render's health check)", r.status_code == 200,
+          str(r.status_code))
+    r = client.head("/")
+    check("HEAD / returns 200 (was 405 → unhealthy service)", r.status_code == 200,
+          str(r.status_code))
 
     # ------------------------------------------------------------------- ai
     print("\n[ai]")

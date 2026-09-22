@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
@@ -43,7 +43,28 @@ app.include_router(media.router)
 app.include_router(tags.router)
 app.include_router(links.router)
 
-app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+# ---- uploaded media -------------------------------------------------------
+# Served by a handler rather than StaticFiles so that:
+#   * legacy rows pointing at "/media/u3/x.mp4" still resolve (basename fallback)
+#   * a missing file returns a *useful* error instead of a bare 404 — Meta's
+#     crawler logging a 404 is how a wiped disk silently breaks Instagram posts
+#   * HEAD is allowed (Render's health check uses it)
+from .media_store import resolve as _resolve_media  # noqa: E402
+
+
+@app.api_route("/media/{rel_path:path}", methods=["GET", "HEAD"])
+def serve_media(rel_path: str):
+    found = _resolve_media(rel_path)
+    if not found:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": f"media file '{rel_path}' is not on this server. "
+                               f"Free hosts wipe the disk on every deploy, so "
+                               f"uploads do not survive a redeploy — re-upload the "
+                               f"file or use an external https:// URL.",
+                     "media_dir": str(MEDIA_DIR)},
+        )
+    return FileResponse(found, headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ---- public short-link redirect (Buffer-style /l/abc123) ----
@@ -64,12 +85,27 @@ def redirect_short_link(code: str):
 
 @app.on_event("startup")
 async def on_startup():
+    _warn_about_ephemeral_storage()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         _run_migrations(db)
         demo_user = _ensure_demo_user(db)
     if settings.MOCK_MODE:
         await _seed_demo_data(demo_user)
+
+
+def _warn_about_ephemeral_storage():
+    """Shout at startup about the two things a free host silently loses."""
+    from .config import DATA_DIR
+
+    if engine.dialect.name == "sqlite":
+        print(f"WARNING: using SQLite at {settings.DATABASE_URL!r}. On a host with "
+              f"an ephemeral disk (Render/Railway free tiers) every deploy wipes "
+              f"your users, posts and comments. Set DATABASE_URL to a Postgres "
+              f"instance (Neon free tier) to keep data.", flush=True)
+    public = settings.APP_PUBLIC_URL or "unset (platforms cannot fetch your media)"
+    print(f"INFO: uploaded media is stored in {DATA_DIR / 'media'} "
+          f"(APP_PUBLIC_URL={public})", flush=True)
 
 
 def _run_migrations(db):
@@ -259,7 +295,7 @@ async def _seed_demo_data(demo_user: User):
         db.close()
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     # `version` doubles as a deploy marker — bump it to verify new code is live.
     return {"ok": True, "mock_mode": settings.MOCK_MODE, "version": "1.8.0"}
@@ -270,6 +306,8 @@ FRONTEND = Path(__file__).resolve().parent.parent.parent / "frontend"
 if FRONTEND.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
 
-    @app.get("/")
+    # Render's health check issues a HEAD request; a GET-only route answers 405,
+    # which makes the service look unhealthy (and restarts wipe the disk).
+    @app.api_route("/", methods=["GET", "HEAD"])
     def index():
         return FileResponse(FRONTEND / "index.html")

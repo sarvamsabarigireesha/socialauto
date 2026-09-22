@@ -24,5 +24,11 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        # A failed flush/commit leaves the session in a "rolled back" state, so
+        # every later query on it raises PendingRollbackError instead of the real
+        # error. Roll back here so the original exception is what the user sees.
+        db.rollback()
+        raise
     finally:
         db.close()

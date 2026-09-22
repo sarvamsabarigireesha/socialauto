@@ -68,7 +68,8 @@ def graph_handler(request: httpx.Request) -> httpx.Response:
         if "REELS" in body:
             return httpx.Response(200, json={"id": "creation_reel"})
         return httpx.Response(200, json={"id": "creation_img"})
-    if path.endswith("/creation_reel") and method == "GET":
+    if "/creation" in path and method == "GET":
+        # container status poll — say FINISHED straight away so tests stay fast
         return httpx.Response(200, json={"status_code": "FINISHED"})
     if path.endswith("/media_publish"):
         return httpx.Response(200, json={"id": "17890000000000001"})
@@ -264,6 +265,36 @@ async def run():
           any("upload/youtube/v3/videos" in p and m == "POST" for m, p in CALLS) and
           any(p.startswith("/session1") and m == "PUT" for m, p in CALLS), str(CALLS))
     settings.YOUTUBE_AUTO_UPLOAD = False
+
+    print("\n[Meta — missing media]")
+    install(graph_handler)
+    before = len(CALLS)
+    saved_public = settings.APP_PUBLIC_URL
+    settings.APP_PUBLIC_URL = "https://socialauto.onrender.com"
+
+    res = await platforms.get_client(Platform.instagram).publish(
+        ig, "wiped", "/media/u3/75bb14f21a47.mp4")
+    check("a wiped local media file fails fast with an actionable error",
+          (not res.ok) and "missing on this server" in res.error, res.error)
+    check("no HTTP call was made for the dead URL", len(CALLS) == before, str(CALLS))
+    check("the error explains the ephemeral-disk cause",
+          "redeploy" in res.error and "/media/" in res.error, res.error)
+
+    res = await platforms.get_client(Platform.instagram).publish(
+        ig, "wiped", "https://socialauto.onrender.com/media/u3/gone.jpg")
+    check("the same check works for an absolute URL of our own host",
+          (not res.ok) and "missing on this server" in res.error, res.error)
+
+    settings.APP_PUBLIC_URL = ""
+    res = await platforms.get_client(Platform.instagram).publish(
+        ig, "wiped", "/media/u3/75bb14f21a47.mp4")
+    check("without APP_PUBLIC_URL it says exactly that instead",
+          (not res.ok) and "APP_PUBLIC_URL is not set" in res.error, res.error)
+    settings.APP_PUBLIC_URL = saved_public
+
+    res = await platforms.get_client(Platform.instagram).publish(
+        ig, "external", "https://cdn.example/real.jpg")
+    check("an external media URL is not blocked by the local check", res.ok, res.error)
 
     print("\n[Threads / manual platforms]")
     install(graph_handler)
