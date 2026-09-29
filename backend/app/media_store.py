@@ -35,6 +35,10 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 # Photos (and small clips) are also stored in Postgres so a Render redeploy
 # cannot 404 Instagram. Bigger videos stay disk-only — Neon free is ~0.5GB.
 DB_KEEP_BYTES = 12 * 1024 * 1024
+# Leave headroom on Neon's 0.5GB free plan (posts/comments also live there).
+DB_SOFT_CAP_BYTES = 400 * 1024 * 1024
+# After Instagram has copied the file, drop the DB copy. Queue/failed stay.
+KEEP_PUBLISHED_DAYS = 7
 
 # NOTE: deliberately no "any host containing /media/" regex here. Any host can
 # have a /media/ path (https://my-cdn.com/media/pic.jpg), and treating those as
@@ -257,3 +261,119 @@ def list_user_media(user_id: int) -> list[dict]:
         print(f"list_user_media db: {exc}", flush=True)
     rows.sort(key=lambda r: r["uploaded_at"], reverse=True)
     return rows
+
+
+def rel_from_url(url: str) -> str:
+    """`/media/u3/abc.jpg` or `https://host/media/u3/abc.jpg` → `u3/abc.jpg`."""
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    prefix = f"{MEDIA_URL_PREFIX}/"
+    i = raw.find(prefix)
+    if i >= 0:
+        return raw[i + len(prefix):].split("?", 1)[0].lstrip("/")
+    return ""
+
+
+def blob_usage() -> dict:
+    """Cheap Neon-size check — never selects the BYTEA column."""
+    from sqlalchemy import func
+    from .database import SessionLocal
+    from .models import MediaBlob
+    db = SessionLocal()
+    try:
+        n, total = db.query(
+            func.count(MediaBlob.id),
+            func.coalesce(func.sum(MediaBlob.size), 0),
+        ).one()
+        return {"count": int(n or 0), "bytes": int(total or 0)}
+    except Exception as exc:
+        print(f"blob_usage: {exc}", flush=True)
+        return {"count": 0, "bytes": 0}
+    finally:
+        db.close()
+
+
+def prune_blobs() -> dict:
+    """Auto-clear photo bytes Neon no longer needs.
+
+    Keep blobs for drafts / queue / failed (Instagram still has to fetch them).
+    Published posts: Meta already copied the file — drop after 7 days.
+    Orphans (upload never used in a post) drop after 7 days too. If usage is
+    still over DB_SOFT_CAP_BYTES, drop the oldest published-only rows first.
+    """
+    from datetime import datetime, timedelta, timezone
+    from .database import SessionLocal
+    from .models import MediaBlob, Post, PostStatus
+
+    keep_status = {
+        PostStatus.scheduled, PostStatus.publishing,
+        PostStatus.failed, PostStatus.draft,
+    }
+    cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_PUBLISHED_DAYS)
+    db = SessionLocal()
+    try:
+        posts = db.query(Post.media_url, Post.status, Post.published_at).all()
+        needed: set[str] = set()
+        referenced: set[str] = set()
+        for url, status, published_at in posts:
+            rel = rel_from_url(url)
+            if not rel:
+                continue
+            referenced.add(rel)
+            if status in keep_status:
+                needed.add(rel)
+            elif status == PostStatus.published:
+                pub = published_at
+                if pub is not None and pub.tzinfo is None:
+                    pub = pub.replace(tzinfo=timezone.utc)
+                if pub is None or pub >= cutoff:
+                    needed.add(rel)
+
+        rows = (db.query(MediaBlob.id, MediaBlob.rel, MediaBlob.size, MediaBlob.created_at)
+                .order_by(MediaBlob.created_at.asc())
+                .all())
+        drop_ids: list[int] = []
+        drop_sizes: dict[int, int] = {}
+        total = 0
+        for bid, rel, size, created in rows:
+            total += size or 0
+            if rel in needed:
+                continue
+            created_aware = created
+            if created_aware is not None and created_aware.tzinfo is None:
+                created_aware = created_aware.replace(tzinfo=timezone.utc)
+            old_enough = created_aware is None or created_aware < cutoff
+            if rel not in referenced or old_enough:
+                drop_ids.append(bid)
+                drop_sizes[bid] = size or 0
+
+        kept_total = total - sum(drop_sizes.values())
+        if kept_total > DB_SOFT_CAP_BYTES:
+            for bid, rel, size, _created in rows:
+                if bid in drop_sizes or rel in needed:
+                    continue
+                drop_ids.append(bid)
+                drop_sizes[bid] = size or 0
+                kept_total -= size or 0
+                if kept_total <= DB_SOFT_CAP_BYTES:
+                    break
+
+        if drop_ids:
+            (db.query(MediaBlob)
+             .filter(MediaBlob.id.in_(drop_ids))
+             .delete(synchronize_session=False))
+            db.commit()
+        deleted = len(drop_ids)
+        freed = sum(drop_sizes.values())
+        remaining = total - freed
+        print(f"prune_blobs: deleted={deleted} freed={freed} remaining={remaining}",
+              flush=True)
+        return {"deleted": deleted, "freed_bytes": freed,
+                "remaining_bytes": remaining, "count": len(rows) - deleted}
+    except Exception as exc:
+        db.rollback()
+        print(f"prune_blobs failed: {exc}", flush=True)
+        return {"deleted": 0, "freed_bytes": 0, "error": str(exc)[:200]}
+    finally:
+        db.close()

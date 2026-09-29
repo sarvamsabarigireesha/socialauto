@@ -21,7 +21,7 @@ from .routers import auth as auth_router, oauth as oauth_router, webhooks as web
 from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router
 from .routers.media import MEDIA_DIR
 
-app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.8")
+app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.9")
 
 app.add_middleware(GZipMiddleware, minimum_size=400)
 app.add_middleware(
@@ -100,6 +100,11 @@ async def on_startup():
             print(f"ERROR: migrations failed ({type(exc).__name__}: {exc}) — "
                   f"continuing with the existing schema", flush=True)
         demo_user = _ensure_demo_user(db)
+    try:
+        from .media_store import prune_blobs
+        prune_blobs()
+    except Exception as exc:
+        print(f"startup prune_blobs: {exc}", flush=True)
     if settings.MOCK_MODE:
         await _seed_demo_data(demo_user)
 
@@ -343,6 +348,17 @@ async def _seed_demo_data(demo_user: User):
         db.close()
 
 
+def _media_blob_stats() -> dict:
+    """Neon usage of stored photos — never load BYTEA, never fail health."""
+    try:
+        from .media_store import blob_usage
+        u = blob_usage()
+        mb = round((u.get("bytes") or 0) / (1024 * 1024), 2)
+        return {"count": u.get("count", 0), "mb": mb, "cap_mb": 400}
+    except Exception:
+        return {"count": 0, "mb": 0, "cap_mb": 400}
+
+
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     # `version` doubles as a deploy marker — bump it to verify new code is live.
@@ -350,8 +366,9 @@ def health():
     return {
         "ok": True,
         "mock_mode": settings.MOCK_MODE,
-        "version": "1.9.8",
+        "version": "1.9.9",
         "meta_configured": meta_store.meta_configured(),
+        "media_blobs": _media_blob_stats(),
     }
 
 

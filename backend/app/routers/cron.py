@@ -33,8 +33,10 @@ async def tick(x_cron_secret: str | None = Header(default=None),
     published = await engine.publish_due_posts(db)
     comments = await engine.sync_comments(db)
     metrics = await engine.sync_metrics(db)
+    from ..media_store import prune_blobs
+    pruned = prune_blobs()
     return {"ok": True, "imported": imported, "published": published,
-            "comments": comments, "metrics": metrics}
+            "comments": comments, "metrics": metrics, "media_pruned": pruned}
 
 
 @router.post("/publish")
