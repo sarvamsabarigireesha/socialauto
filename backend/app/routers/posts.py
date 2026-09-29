@@ -258,6 +258,11 @@ def mark_done(post_id: int, db: Session = Depends(get_db),
         p.platform_post_id = f"manual_{p.id}"
     db.commit()
     db.refresh(p)
+    try:
+        from ..media_store import drop_blob_if_unused
+        drop_blob_if_unused(p.media_url)
+    except Exception:
+        pass
     return _to_out(p)
 
 
@@ -267,8 +272,14 @@ def delete_post(post_id: int, db: Session = Depends(get_db),
     p = db.get(Post, post_id)
     if not p or p.user_id != user.id:
         raise HTTPException(404, "post not found")
+    media_url = p.media_url
     db.delete(p)
     db.commit()
+    try:
+        from ..media_store import drop_blob_if_unused
+        drop_blob_if_unused(media_url)
+    except Exception:
+        pass
 
 
 @router.get("/csv-template")

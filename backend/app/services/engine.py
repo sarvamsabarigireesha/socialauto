@@ -223,6 +223,12 @@ async def publish_one(db, post_id: int) -> Post | None:
         post.platform_post_id = result.platform_post_id or post.platform_post_id
         post.published_at = _now()
         post.error = ""
+        db.commit()
+        try:
+            from ..media_store import drop_blob_if_unused
+            drop_blob_if_unused(post.media_url)
+        except Exception as exc:
+            print(f"publish drop blob: {exc}", flush=True)
     elif getattr(result, "manual", False):
         # No publishing API for this platform/format (YouTube video, Moj,
         # ShareChat…). Keep it queued with a hint and let the user finish it by

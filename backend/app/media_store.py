@@ -37,8 +37,10 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 DB_KEEP_BYTES = 12 * 1024 * 1024
 # Leave headroom on Neon's 0.5GB free plan (posts/comments also live there).
 DB_SOFT_CAP_BYTES = 400 * 1024 * 1024
-# After Instagram has copied the file, drop the DB copy. Queue/failed stay.
-KEEP_PUBLISHED_DAYS = 7
+# After Instagram has copied the file, drop the DB copy immediately.
+# Queue/failed/draft stay. Unused composer uploads get a 24h grace.
+KEEP_PUBLISHED_DAYS = 0
+KEEP_ORPHAN_HOURS = 24
 
 # NOTE: deliberately no "any host containing /media/" regex here. Any host can
 # have a /media/ path (https://my-cdn.com/media/pic.jpg), and treating those as
@@ -294,13 +296,44 @@ def blob_usage() -> dict:
         db.close()
 
 
+def drop_blob_if_unused(url: str) -> bool:
+    """Delete the Neon copy once no queued/failed/draft post still needs it."""
+    rel = rel_from_url(url)
+    if not rel:
+        return False
+    from .database import SessionLocal
+    from .models import MediaBlob, Post, PostStatus
+    keep_status = {
+        PostStatus.scheduled, PostStatus.publishing,
+        PostStatus.failed, PostStatus.draft,
+    }
+    db = SessionLocal()
+    try:
+        for media_url, status in db.query(Post.media_url, Post.status).all():
+            if rel_from_url(media_url) == rel and status in keep_status:
+                return False
+        deleted = (db.query(MediaBlob)
+                   .filter(MediaBlob.rel == rel)
+                   .delete(synchronize_session=False))
+        db.commit()
+        if deleted:
+            print(f"drop_blob_if_unused: {rel}", flush=True)
+        return bool(deleted)
+    except Exception as exc:
+        db.rollback()
+        print(f"drop_blob_if_unused: {exc}", flush=True)
+        return False
+    finally:
+        db.close()
+
+
 def prune_blobs() -> dict:
     """Auto-clear photo bytes Neon no longer needs.
 
     Keep blobs for drafts / queue / failed (Instagram still has to fetch them).
-    Published posts: Meta already copied the file — drop after 7 days.
-    Orphans (upload never used in a post) drop after 7 days too. If usage is
-    still over DB_SOFT_CAP_BYTES, drop the oldest published-only rows first.
+    Published posts: Meta already copied the file — drop immediately.
+    Orphans (upload never used in a post) drop after 24h. If usage is still
+    over DB_SOFT_CAP_BYTES, drop the oldest published-only rows first.
     """
     from datetime import datetime, timedelta, timezone
     from .database import SessionLocal
@@ -310,25 +343,20 @@ def prune_blobs() -> dict:
         PostStatus.scheduled, PostStatus.publishing,
         PostStatus.failed, PostStatus.draft,
     }
-    cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_PUBLISHED_DAYS)
+    now = datetime.now(timezone.utc)
+    orphan_cutoff = now - timedelta(hours=KEEP_ORPHAN_HOURS)
     db = SessionLocal()
     try:
         posts = db.query(Post.media_url, Post.status, Post.published_at).all()
         needed: set[str] = set()
         referenced: set[str] = set()
-        for url, status, published_at in posts:
+        for url, status, _published_at in posts:
             rel = rel_from_url(url)
             if not rel:
                 continue
             referenced.add(rel)
             if status in keep_status:
                 needed.add(rel)
-            elif status == PostStatus.published:
-                pub = published_at
-                if pub is not None and pub.tzinfo is None:
-                    pub = pub.replace(tzinfo=timezone.utc)
-                if pub is None or pub >= cutoff:
-                    needed.add(rel)
 
         rows = (db.query(MediaBlob.id, MediaBlob.rel, MediaBlob.size, MediaBlob.created_at)
                 .order_by(MediaBlob.created_at.asc())
@@ -343,10 +371,14 @@ def prune_blobs() -> dict:
             created_aware = created
             if created_aware is not None and created_aware.tzinfo is None:
                 created_aware = created_aware.replace(tzinfo=timezone.utc)
-            old_enough = created_aware is None or created_aware < cutoff
-            if rel not in referenced or old_enough:
-                drop_ids.append(bid)
-                drop_sizes[bid] = size or 0
+            if rel not in referenced:
+                if created_aware is None or created_aware < orphan_cutoff:
+                    drop_ids.append(bid)
+                    drop_sizes[bid] = size or 0
+                continue
+            # Only published (or other non-queue) posts point here — drop now.
+            drop_ids.append(bid)
+            drop_sizes[bid] = size or 0
 
         kept_total = total - sum(drop_sizes.values())
         if kept_total > DB_SOFT_CAP_BYTES:
