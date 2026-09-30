@@ -1,24 +1,61 @@
-# Free scheduler: GitHub Actions cron — calls the app's /api/cron/tick every 15 minutes.
-# GitHub free tier: 2,000 Actions minutes/month (private repo); unlimited for public.
+# Free scheduler: GitHub Actions cron — calls /api/cron/tick.
+# Render's free instance sleeps; we wake it first so this job does not
+# fail (and spam Gmail) on a 60s timeout.
 #
-# Repo settings -> Secrets and variables -> Actions, add:
-#   APP_URL      e.g. https://socialauto-xxxx.el.r.appspot.com  (no trailing slash)
+# Repo Settings → Secrets and variables → Actions:
+#   APP_URL      https://socialauto-k5ou.onrender.com  (no trailing slash)
 #   CRON_SECRET  must match the app's CRON_SECRET env var
 name: socialauto-cron
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes — publish posts, auto-reply, refresh analytics
-  workflow_dispatch: {}      # manual trigger button
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: socialauto-cron
+  cancel-in-progress: true
 
 jobs:
   tick:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
-      - name: Ping SocialAuto cron endpoint
+      - name: Wake app then tick
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          echo "Calling ${{ secrets.APP_URL }}/api/cron/tick"
-          curl -fsS -X POST "${{ secrets.APP_URL }}/api/cron/tick" \
-            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json" \
-            --max-time 60
+          set -u
+          APP_URL="${APP_URL%/}"
+          if [ -z "${APP_URL}" ]; then
+            echo "APP_URL secret is empty — set it in repo Settings → Secrets"
+            exit 1
+          fi
+          echo "Waking ${APP_URL}"
+          code="000"
+          for i in 1 2 3 4 5 6 7 8; do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 45 \
+              "${APP_URL}/api/health" || echo "000")
+            echo "health try ${i} -> ${code}"
+            if [ "${code}" = "200" ]; then
+              break
+            fi
+            sleep 12
+          done
+          if [ "${code}" != "200" ]; then
+            echo "app did not wake (last HTTP ${code})"
+            exit 1
+          fi
+          echo "POST /api/cron/tick"
+          code=$(curl -sS -o /tmp/tick.json -w "%{http_code}" --max-time 180 \
+            -X POST "${APP_URL}/api/cron/tick" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json" || echo "000")
+          echo "tick -> ${code}"
+          head -c 800 /tmp/tick.json || true
+          echo
+          if [ "${code}" != "200" ]; then
+            echo "tick failed (HTTP ${code})"
+            exit 1
+          fi
