@@ -820,6 +820,7 @@
 
   <nav class="side-nav">
     <button class="nav-item active" data-view="home">🏠 Home</button>
+    <button class="nav-item" data-view="ytpackage">🚀 YT Viral <span class="new-pill">New</span></button>
     <button class="nav-item" data-view="ideas">💡 Create</button>
     <button class="nav-item" data-view="posts">📅 Publish <span class="side-count" id="publishCountBadge">0</span></button>
     <button class="nav-item" data-view="community">💬 Community <span class="badge" id="inboxBadge" style="display:none">0</span></button>
@@ -915,6 +916,16 @@
         <button class="bubble-btn">💬</button>
         <button class="bubble-btn">💚</button>
       </div>
+    </div>
+
+    <!-- YT VIRAL shortcut (added by the YT Package feature; hidden if the tab is removed) -->
+    <div class="page-card" id="ytViralHomeCard" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;margin-bottom:14px;border:1px solid var(--border2,#e5e1d8);border-radius:14px">
+      <div style="font-size:22px">🚀</div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:700">YT Viral — publish gate + Mandala season planner</div>
+        <div class="muted" id="ytHomeHint" style="font-size:13px;opacity:.75">Title / description / tags ni publish ki mundu check chesukondi.</div>
+      </div>
+      <button class="btn primary" style="padding:9px 14px;border:0;border-radius:10px;background:var(--brand,#111827);color:#fff;cursor:pointer" onclick="switchView('ytpackage')">Open →</button>
     </div>
 
     <div class="home-kpi-strip page-card">
@@ -1166,6 +1177,14 @@
     </div>
     <div id="commSummary" style="margin-bottom:14px;font-size:13.5px;color:var(--muted)"></div>
     <div id="communityThreads"></div>
+  </section>
+
+  <!-- YT PACKAGE — channel packaging rules + season planner -->
+  <section id="view-ytpackage" style="display:none">
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="ytPackageFrame" src="about:blank" data-src="/static/yt-package.html" title="YT Package Tool"
+              style="width:100%;height:calc(100vh - 150px);min-height:640px;border:0;background:#12100e"></iframe>
+    </div>
   </section>
 
   <!-- TEMPLATES -->
@@ -2438,7 +2457,7 @@ const TITLES = {
   analytics:['Analytics','Performance across all platforms'],
   media:['Media Library','Upload once, reuse in any post'],
   accounts:['Accounts','Connect your social profiles'],
-  deploy:['Deploy','100% free-tier production setup'],
+  ytpackage:['YT Viral','Sabarimala packaging gate + Mandala season planner — everything in one app'],
 };
 function switchView(view){
   closeNav();
@@ -2450,7 +2469,7 @@ function switchView(view){
   document.querySelector('.topbar').style.display = 'none';
   document.getElementById('viewTitle').textContent = TITLES[view][0];
   document.getElementById('viewSub').textContent = TITLES[view][1];
-  if (view==='home') loadHome();
+  if (view==='home'){loadHome();initYtHomeCard();}
   if (view==='ideas') loadIdeas();
   if (view==='calendar') renderCalendar();
   if (view==='posts') renderPosts();
@@ -2461,12 +2480,30 @@ function switchView(view){
   if (view==='accounts') loadAccounts();
   if (view==='bulk') renderBulkAccs();
   if (view==='schedule') loadSchedule();
+  if (view==='ytpackage') loadYtPackage();
   if (view==='deploy'){} // static section, no fetch needed
   document.getElementById('avatarMenu').classList.remove('open');
 }
 document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => switchView(b.dataset.view));
 document.querySelectorAll('.av-menu-item[data-view]').forEach(b => b.onclick = () => switchView(b.dataset.view));
 
+function initYtHomeCard(){
+  const hint=document.getElementById('ytHomeHint');
+  if(!hint) return;
+  try{
+    const p=(window.YtRules&&YtRules.trendPlan)?YtRules.trendPlan('2026-11-16',[]):null;
+    const d=p&&!p.error?p.daysOut:null;
+    const gate=(window.YtRules&&YtRules.viralScore)?null:null;
+    hint.textContent = d===null ? 'Packaging gate + season planner — okka app lo anni.'
+      : (d>0 ? `Mandala Pooja opens 16 Nov — inka ${d} rojulu. Gate score 85+ vasthe matrame publish.`
+             : (d===0 ? 'Mandala Pooja opens THIS DAY — live ready aa?'
+                      : 'Mandala season start ayipoyindi — daily episode continue cheyandi.'));
+  }catch(e){}
+}
+function loadYtPackage(){          // lazy iframe: zero cost until the tab is opened
+  const f=document.getElementById('ytPackageFrame');
+  if(f && (!f.src || f.src.endsWith('about:blank'))) f.src=f.dataset.src;
+}
 function toggleAvatarMenu(){
   document.getElementById('avatarMenu').classList.toggle('open');
 }
@@ -3847,5 +3884,6 @@ if(isIos() && !isStandalone()){
   // else: auth overlay stays visible until login
 })();
 </script>
+<script src="/static/yt-rules.js"></script>
 </body>
 </html>

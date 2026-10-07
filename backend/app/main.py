@@ -18,7 +18,7 @@ from .database import Base, engine, SessionLocal
 from .models import Account, MediaBlob, Post, PostStatus, Platform, ShortLink, Tag, User  # noqa: F401
 from .security import hash_password
 from .routers import auth as auth_router, oauth as oauth_router, webhooks as webhooks_router
-from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router
+from .routers import accounts, posts, comments, analytics, cron, media, ai as ai_router, ideas as ideas_router, community, templates, tags, links, settings as settings_router, yt as yt_router
 from .routers.media import MEDIA_DIR
 
 app = FastAPI(title="SocialAuto — free-tier social media automation", version="1.9.9")
@@ -35,6 +35,7 @@ app.include_router(webhooks_router.router)
 app.include_router(settings_router.router)
 app.include_router(ai_router.router)
 app.include_router(ideas_router.router)
+app.include_router(yt_router.router)
 app.include_router(community.router)
 app.include_router(templates.router)
 app.include_router(accounts.router)
