@@ -822,6 +822,7 @@
     <button class="nav-item active" data-view="home">🏠 Home</button>
     <button class="nav-item" data-view="ideas">💡 Create</button>
     <button class="nav-item" data-view="posts">📅 Publish <span class="side-count" id="publishCountBadge">0</span></button>
+    <button class="nav-item" data-view="ytpackage">🪔 YT Package <span class="new-pill">New</span></button>
     <button class="nav-item" data-view="community">💬 Community <span class="badge" id="inboxBadge" style="display:none">0</span></button>
     <button class="nav-item" data-view="analytics">📈 Insights <span class="new-pill">New</span></button>
   </nav>
@@ -1166,6 +1167,14 @@
     </div>
     <div id="commSummary" style="margin-bottom:14px;font-size:13.5px;color:var(--muted)"></div>
     <div id="communityThreads"></div>
+  </section>
+
+  <!-- YT PACKAGE — channel packaging rules + season planner -->
+  <section id="view-ytpackage" style="display:none">
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="ytPackageFrame" src="about:blank" data-src="/static/yt-package.html" title="YT Package Tool"
+              style="width:100%;height:calc(100vh - 150px);min-height:640px;border:0;background:#12100e"></iframe>
+    </div>
   </section>
 
   <!-- TEMPLATES -->
@@ -2438,7 +2447,7 @@ const TITLES = {
   analytics:['Analytics','Performance across all platforms'],
   media:['Media Library','Upload once, reuse in any post'],
   accounts:['Accounts','Connect your social profiles'],
-  deploy:['Deploy','100% free-tier production setup'],
+  ytpackage:['YT Package','Packaging rules + Mandala season planner — titles, descriptions, tags, chapters'],
 };
 function switchView(view){
   closeNav();
@@ -2461,12 +2470,17 @@ function switchView(view){
   if (view==='accounts') loadAccounts();
   if (view==='bulk') renderBulkAccs();
   if (view==='schedule') loadSchedule();
+  if (view==='ytpackage') loadYtPackage();
   if (view==='deploy'){} // static section, no fetch needed
   document.getElementById('avatarMenu').classList.remove('open');
 }
 document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => switchView(b.dataset.view));
 document.querySelectorAll('.av-menu-item[data-view]').forEach(b => b.onclick = () => switchView(b.dataset.view));
 
+function loadYtPackage(){          // lazy iframe: zero cost until the tab is opened
+  const f=document.getElementById('ytPackageFrame');
+  if(f && (!f.src || f.src.endsWith('about:blank'))) f.src=f.dataset.src;
+}
 function toggleAvatarMenu(){
   document.getElementById('avatarMenu').classList.toggle('open');
 }
@@ -3847,5 +3861,6 @@ if(isIos() && !isStandalone()){
   // else: auth overlay stays visible until login
 })();
 </script>
+<script src="/static/yt-rules.js"></script>
 </body>
 </html>

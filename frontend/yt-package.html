@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sarvam Sabarigireesha — YT Packaging Tool</title>
+<style>
+:root{--bg:#12100e;--card:#1c1917;--line:#332e2a;--txt:#f3ede6;--mut:#a89c8c;--saf:#ff9d2e;--ok:#4ade80;--warn:#fbbf24;--err:#f87171;--brand:#7c4a12}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Noto Sans Telugu,sans-serif}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#1c1917,#171513);border-bottom:1px solid var(--line);padding:10px 14px}
+h1{margin:0;font-size:16px;letter-spacing:.2px}
+h1 span{color:var(--saf)}
+.sub{color:var(--mut);font-size:12px;margin-top:3px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+nav button{background:#241f1b;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer}
+nav button.on{background:var(--saf);color:#1a1206;border-color:var(--saf);font-weight:700}
+main{padding:14px;max-width:1080px;margin:0 auto}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px;font-weight:600}
+textarea,input,select{width:100%;background:#141210;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:9px;font:inherit}
+textarea{min-height:110px;resize:vertical}
+input,select{padding:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 150px}
+button.act{flex:0 0 auto;background:var(--saf);color:#1a1206;border:0;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer}
+button.ghost{flex:0 0 auto;background:#241f1b;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer}
+.score{display:flex;align-items:center;gap:12px}
+.dial{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:900;border:6px solid var(--err)}
+.chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+ul.issues{list-style:none;padding:0;margin:8px 0 0}
+ul.issues li{border-left:3px solid var(--warn);background:#221d19;padding:8px 10px;border-radius:0 9px 9px 0;margin-bottom:6px;font-size:13.5px}
+ul.issues li.err{border-color:var(--err)}ul.issues li.warn{border-color:var(--warn)}ul.issues li.info{border-color:#60a5fa}
+ul.issues li b{display:block;margin-bottom:2px}
+pre.preview{background:#141210;border:1px dashed var(--line);border-radius:9px;padding:9px;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,monospace;margin:8px 0 0}
+.ok{color:var(--ok)}.wn{color:var(--warn)}.er{color:var(--err)}.mu{color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.count{font-size:26px;font-weight:900;color:var(--saf)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border-bottom:1px solid var(--line);padding:6px;text-align:left;vertical-align:top}
+th{color:var(--mut);font-size:11px;position:sticky;top:0;background:var(--card)}
+td input{border:0;background:transparent;padding:2px;font-size:12.5px}
+.chk{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.chk input{width:auto;margin-top:3px}
+.small{font-size:12px;color:var(--mut)}
+.h3{font-weight:800;margin:2px 0 6px}
+.tag{font-family:ui-monospace,monospace;font-size:12px;background:#141210;border:1px solid var(--line);border-radius:7px;padding:6px;white-space:pre-wrap}
+@media(max-width:620px){h1{font-size:14px}.count{font-size:22px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🪔 Sarvam Sabarigireesha — <span>YT Packaging Tool</span></h1>
+  <div class="sub">Rules from your own audit: Telugu-first titles · 3 hashtags max · no keyword dumps · tags ≤500 chars. Works offline — data mee phone/PC lo matrame (localStorage).</div>
+  <nav id="nav">
+    <button data-t="check" class="on">1 · Scanner</button>
+    <button data-t="gen">2 · Generator</button>
+    <button data-t="hook">3 · Hook Lab</button>
+    <button data-t="viral">6 · Viral Lab</button>
+    <button data-t="season">4 · Season + Audit</button>
+    <button data-t="rules">5 · Rules</button>
+  </nav>
+</header>
+<main>
+
+<section id="check" class="on">
+  <div class="card">
+    <div class="h3">Publish cheyakamunda ivi 3 fields paste cheyandi</div>
+    <label>Title</label><input id="inTitle" placeholder="18 మెట్ల అసలు అర్థం 🙏 | Pathinettampadi in Telugu">
+    <label>Description</label><textarea id="inDesc" placeholder="First 2 lines = search preview..."></textarea>
+    <div class="row">
+      <div><label>Tags (comma separated)</label><textarea id="inTags" style="min-height:64px" placeholder="sabarimala live darshan, ayyappa, ..."></textarea></div>
+      <div style="flex:0 0 auto"><label>Format</label><select id="inType"><option value="short">Short</option><option value="long">Long-form (8min+)</option><option value="live">Live VOD</option></select></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="act" id="btnClean">✨ Auto-Clean (dump + hashtags fix)</button>
+      <button class="ghost" id="btnLoadBad">Example: nee old Annadanam desc</button>
+      <button class="ghost" id="btnClear">Clear</button>
+    </div>
+  </div>
+  <div class="card" id="outCard">
+    <div class="score"><div class="dial" id="dial">–</div><div><div class="h3" id="verdict">Ready ga paste cheyandi</div><div class="small" id="summary">Title/description rayandi — live ga check avuthundhi.</div></div></div>
+    <ul class="issues" id="issues"></ul>
+    <div class="label" style="margin-top:12px">📱 Search / feed preview (first 125 chars)</div>
+    <pre class="preview" id="prev"></pre>
+    <div id="cleanOut"></div>
+  </div>
+</section>
+
+<section id="gen">
+  <div class="card">
+    <div class="h3">Format ektorunaka title + description + tags ready</div>
+    <label>Format</label>
+    <select id="gFormat">
+      <option value="daily">Darshan daily episode (long-form, narrated)</option>
+      <option value="guide">Panduga / Vratham guide (search evergreen)</option>
+      <option value="seva">Annadanam seva (story + transparency)</option>
+      <option value="story">Ayyappa katha (story + chapters)</option>
+      <option value="short30">Short: darshan + 1 truth</option>
+      <option value="live">Live VOD (pooja archive)</option>
+    </select>
+    <label>Main topic / what happened (Telugu leda English)</label><input id="gTopic" placeholder="ఉష పూజ, 41 రోజుల వ్రతం, 500 మెల">
+    <div class="row">
+      <div><label>Date / number (optional)</label><input id="gDate" placeholder="16 Nov 2026"></div>
+      <div><label>Playlist link (optional)</label><input id="gLink" placeholder="https://youtube.com/playlist?list=..."></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="act" id="gMake">Generate</button><button class="ghost" id="gSend">→ Scanner ki pampu</button></div>
+    <div id="gOut"></div>
+  </div>
+</section>
+
+<section id="hook">
+  <div class="card">
+    <div class="h3">Hook Lab — okka line lo okka variant (0–8s veralsina dialogue)</div>
+    <textarea id="hLines" style="min-height:170px" placeholder="ఒక్కో లైన్‌లో ఒక్కో hook...
+శరణం అంటే కేవలం శరణు కాదు..."></textarea>
+    <button class="act" id="hScore">Score chesthundi (5 variants ni compare)</button>
+    <div id="hOut"></div>
+    <div class="small" style="margin-top:10px">6 bhakti hook formulas: <b>curiosity gap</b> ("మనకే తెలియదు") · <b>warning/loss</b> ("ఈ 3 తప్పులు") · <b>number promise</b> ("41 రోజులు — 9 నియమాలు") · <b>proof/authority</b> ("నేను అక్కడే ఉన్నాను") · <b>emotion/story</b> ("ఆ కళ్ళలో నీళ్ళు") · <b>season urgency</b> ("Nov 16 నుండి"). Prathi video ki 5 variants rayandi, edi score ekkuvo adhi record chesukondi — 2 uploads tharwatha nee winning style telusthundi.</div>
+  </div>
+</section>
+
+<section id="season">
+  <div class="card">
+    <div class="h3">⏳ Mandala season countdown</div>
+    <div class="row" id="cdRow"></div>
+    <div class="small">Temple opens 16 Nov 2026 5PM (Mandala Pooja → 27 Dec) · Thirunadai Thirappu 30 Dec · Makaravilakku 14 Jan 2027. <b>TRC/Devaswom notice tho verify cheskondi.</b></div>
+  </div>
+  <div class="card">
+    <div class="h3">Season checklist (auto-save avutundi)</div>
+    <div id="chkList"></div>
+    <div class="row" style="margin-top:8px"><button class="ghost" id="chkReset">Reset</button><div class="small" id="chkStat"></div></div>
+  </div>
+  <div class="card">
+    <div class="h3">Audit table — Studio numbers ivi petti, perugaka CSV download chey</div>
+    <div class="small">Benchmarks: Browse CTR <b>4–6% baseline, 7%+ strong</b> · retention@30s <b>70%+</b> · AVD <b>&lt;25% weak, 40%+ safe</b>. Green = bagundhi, Red = fix cheyali.</div>
+    <div style="overflow:auto;max-height:340px;border:1px solid var(--line);border-radius:10px;margin-top:8px">
+      <table id="tbl"><thead><tr><th>Video</th><th>CTR%</th><th>Ret30%</th><th>AVD%</th><th>Views</th><th>Fix</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="row" style="margin-top:9px">
+      <button class="ghost" id="tAdd">+ Row</button>
+      <button class="ghost" id="tCsv">⬇ CSV download</button>
+      <button class="ghost" id="tClr">Clear table</button>
+    </div>
+  </div>
+</section>
+
+<section id="viral">
+  <div class="card">
+    <div class="h3">🚨 2026 reality: "Trending" tab ledu — "viral" ante ippudu emi</div>
+    <ol class="small" style="line-height:1.9;font-size:13.5px">
+      <li><b>21 July 2025</b> nunchi YouTube <b>Trending page / "Trending Now" list remove</b> cheseyindi. Stickers: category charts (Trending Music Videos, Weekly Top Podcasts, Trending Movie Trailers) + Explore/personalized feeds. <i>(source: TechCrunch, YouTube blog)</i></li>
+      <li>Ante nee lakshyam "Trending list" kaadu — <b>Browse features (home) + Shorts feed + Search</b> meeda viral reach vasthundi. Okka test: <b>24h lo CTR ≥ 6% + retention@30s ≥ 70%</b> aithe YouTube neeni veru audience clusters ki test chesthundhi.</li>
+      <li><b>Hype</b> — viewers కొత్త videos ni amplify cheyadaniki. Chinn/up-and-coming channels ki design; Studio lo eligibility check cheyandi.</li>
+      <li><b>AI suggestions:</b> Studio Inspiration tab <b>August 2026 nunchi deprecate</b> avutondi — ideas kosam <b>Ask Studio</b> vaado. <i>(source: YouTube Help)</i> Studio AI ippudu: title/thumbnail generation (nee style match), draft "Get Feedback", dynamic thumbnails (3 options), <b>thumbnail performance ni auto-ga monitor chesi perugu thagi swap cheyadaniki</b> ("later this year" ani YouTube 23 Sep 2026 cheppindi).</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <div class="h3">📅 Trend Window Calculator — event ki entha mundu publish cheyalo</div>
+    <div class="row">
+      <div><label>Event (nee calendar)</label><input id="vEvent" value="Mandala Pooja opens"></div>
+      <div style="flex:0 0 150px"><label>Event date</label><input id="vDate" type="date" value="2026-11-16"></div>
+      <div style="flex:0 0 120px"><label>Extra lead days</label><input id="vLead" placeholder="21,14"></div>
+      <div style="flex:0 0 auto"><label>&nbsp;</label><button class="act" id="vGo">Plan ichey</button></div>
+    </div>
+    <div id="vOut"></div>
+    <div class="small" style="margin-top:8px">Dates verified: Mandala opens 16 Nov 2026 → 27 Dec · Thirunadai Thirappu 30 Dec · Makaravilakku 14 Jan 2027 · Thulam pooja 16–21 Oct 2026. <b>TRC/Devaswom notice tho confirm cheyandi.</b></div>
+  </div>
+
+  <div class="card">
+    <div class="h3">✅ Viral Readiness — 12 checks (score 85+ ante publish)</div>
+    <div id="vChk"></div>
+    <div class="row" style="margin-top:10px"><div style="flex:0 0 auto"><div class="dial" id="vDial" style="width:64px;height:64px;font-size:19px">0</div></div><div><div class="h3" id="vVerdict">Items mark cheyandi</div><div class="small" id="vMiss"></div></div></div>
+  </div>
+
+  <div class="card">
+    <div class="h3">🎯 Nee 3 viral shots (ee season lo highest ceiling)</div>
+    <div class="grid">
+      <div><div class="tag">1 · Makara Jyothi (14 Jan 2027)<br>Live 6AM–1PM + 3 Shorts + 12-min recap. Title: "మకర జ్యోతి ఇప్పుడే 🙏 | Makara Jyothi 2027 live — తర్వాత 10 నిమిషాల్లో వివరణ"</div></div>
+      <div><div class="tag">2 · 41 రోజుల వ్రతం (10–16 Nov)<br>Guide + checklist card + 2 Shorts. Save/share ratio ekkuva — family WhatsApp lo pottundi.</div></div>
+      <div><div class="tag">3 · Annadanam transparency (long-form)<br>"ప్రతి రూపాయీ ఇక్కడే" — 5.2K performance ni 8-min episode ki teesukellu. Proof = trust = shares.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="h3">🤖 AI prompt bank — Ask Studio / Get Feedback lo paste cheyandi</div>
+    <div id="vPrompts"></div>
+    <div class="small">Ask Studio (Oct 2025 launch) English-only + select markets lo undi — mee Studio lo lekapote veru AI (Gemini/ChatGPT) lo ivi paste cheyandi. AI suggestions ni <b>verify</b> cheyandi; devotional facts ni temple notices tho match cheskondi.</div>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="card">
+    <div class="h3">Nee channel ki 10 rules (ee tool ivi check chesthundhi)</div>
+    <ol class="small" style="line-height:1.9;font-size:13.5px">
+      <li>Title: main promise <b>first 55 chars</b> lo, Telugu-first. Title lo <b>hashtags kaadu</b>.</li>
+      <li>Title + thumbnail <b>same words</b> repeat avvakudadu — title specificity, thumbnail emotion.</li>
+      <li>Description: <b>first 2 lines</b> lo keyword + promise. "SEO Keywords:" lists <b>kkaddu</b>.</li>
+      <li><b>3 hashtags</b> max, duplicates kaadu.</li>
+      <li>Tags field: <b>8–12</b> phrases, total <b>≤500 chars</b>. No trending/viral/shorts.</li>
+      <li>Long-form ki <b>0:00 nunchi 3+ chapters</b> (10s+ gaps).</li>
+      <li>Prathi seva video lo 2 lines: <b>"మేము డొనేషన్స్ తీసుకోం"</b> + <b>"ఇది అధికారిక ఆలయ కార్యక్రమం కాదు"</b>.</li>
+      <li>Engagement bait kaadu — <b>specific question</b> adagandi (pinned comment).</li>
+      <li>Raw temple visuals ki <b>nee voice narration</b> add cheyali (reused-content risk + reach).</li>
+      <li>Upload time fix: <b>6:30am</b> long-form, <b>7:30pm</b> Short. Prathi week oka element matrame maaru.</li>
+    </ol>
+    <div class="small">Benchmarks = creator-industry published numbers, YouTube official kaadu. Feature availability (Test & Compare, Dynamic Thumbnails, Auto-dubbing, Shorts Series) Studio lo mee account lo untey vaado.</div>
+  </div>
+</section>
+</main>
+<script>
+/*__LOGIC_START__*/
+var HT=/#[\p{L}\p{N}_][\p{L}\p{N}_-]*/gu;
+function tel(s){return /[\u0C00-\u0C7F]/.test(s||'')}
+function cplen(s){return Array.from(s||'').length}
+function uniq(a){var o=[],m={};a.forEach(function(x){if(!m[x]){m[x]=1;o.push(x)}});return o}
+
+var DUMP_HDR=/(?:SEO|Long[- ]?Tail|🔎|🔔\s*Subscribe\s*CTA|#️⃣)\s*.{0,18}(Keywords?|Hashtags?|CTA)|\bKeywords?\s*:$/i;
+var GENERIC_TAGS=/^(?:shorts?|viral|trending|yt|new|video|latest|hot|status|2026|2027)$/i;
+
+function isKeywordLine(l){
+  var s=l.trim();
+  if(!s||tel(s))return false;
+  if(/[.!?]|:/.test(s))return false;
+  var w=s.split(/\s+/);
+  return w.length<=7&&cplen(s)<=44;
+}
+
+function analyze(o){
+  o=o||{};var t=(o.title||'').trim(),d=o.desc||'',g=(o.tags||''),type=o.type||'short';
+  var iss=[];function add(sev,code,head,detail){iss.push({sev:sev,code:code,head:head,detail:detail||''})}
+  var weight={err:14,warn:8,info:3};
+  if(!t)add('err','title_empty','Title khali','Okka line promise rayandi.');
+  var th=t.match(HT)||[];
+  if(th.length)add('warn','title_hashtag','Title lo '+th.length+' hashtags unnayi','Tags title nunchi tgeseyi — CTR padipothundi.');
+  if(/whatsapp\s*status/i.test(t))add('err','title_status','"WhatsApp Status" title lo undi','Repost channel ga kanipisthundi; search intent ledu.');
+  if(/\b(?:trending|viral|must\s*watch|super\s*hit|breaking)\b/i.test(t))add('warn','title_bait','Bait words unnayi (trending/viral...)','Label kaadu, reach ki labam ledu.');
+  if(/^\s*\d{1,2}[\/.\-]\d{1,2}/.test(t))add('warn','title_date_first','Date title start lo undi','Benefit mundu, date chivarilo pettandi.');
+  if(cplen(t)>60)add('info','title_long','Title '+cplen(t)+' chars','Mobile lo trim avuthundi — first 55 chars lo promise.');
+  if(t&&!tel(t))add('warn','title_no_telugu','Title lo Telugu ledu','Mee audience Telugu-first ga search chesthundi.');
+  if(t&&!/\d|[?]|అసలు|ఎందుకు|గోప్యం|రహస్యం|నియమాలు|షెడ్యూల్|time|date|how|why|what/i.test(t))add('info','title_flat','Title lo number/question/curiosity word ledu','Hook formulas (Hook Lab) chudandi.');
+
+  if(!d.trim())add('warn','desc_empty','Description khali','First 2 lines = search snippet. 60 words chalu.');
+  var dlines=d.split(/\r?\n/);
+  var dumpHits=dlines.filter(function(l){return DUMP_HDR.test(l.trim())}).length;
+  var commaRuns=dlines.filter(function(l){return (l.match(/,/g)||[]).length>=5&&!tel(l)}).length;
+  var runs=0,cur=0;
+  dlines.forEach(function(l){if(isKeywordLine(l)){cur++;if(cur>=4)runs=Math.max(runs,cur)}else cur=0});
+  if(dumpHits||commaRuns||runs>=6){
+    var n=dumpHits+commaRuns+runs;
+    add('err','kw_dump','Keyword dump undi ('+(dumpHits?'headers ':'')+(commaRuns?'comma lists ':'')+(runs>=6?runs+' consecutive lines':'')+')','YouTube idi ranking ki vaadadu — spam ga flag avvakuddi. Delete cheyandi.');
+  }
+  var dh=d.match(HT)||[];
+  if(dh.length>3)add('warn','hash_many','Description lo '+dh.length+' hashtags','Max 3. '+(dh.length-3)+' tgeseyi.');
+  var duph=dh.filter(function(x,i){return dh.indexOf(x)!==i});
+  if(duph.length)add('warn','hash_dup','Duplicate hashtags: '+uniq(duph).join(', '),'Deduplicate cheyandi.');
+  var nonEmpty=dlines.filter(function(l){return l.trim()}).length;
+  if(nonEmpty>40)add('warn','desc_long','Description '+nonEmpty+' lines','12–15 lines chalu; human ki rayi, list kaadu.');
+  if(d&&!tel(d))add('warn','desc_no_telugu','Description lo Telugu ledu','Telugu-first rayandi, English keyword lines taggatha.');
+  if(/if you are a true|press the bell|comment\s*["'“][^"'”]{2,40}["'”]\s*(if|to)/i.test(d))add('warn','bait','Engagement-bait phrasing undi','Generic "comment cheyandi" badulu — okka specific prashnam adagandi.');
+  if(/annadanam|\bseva\b|donation|donate|food distribution/i.test(d)&&!/(డొనేషన్స్|donations?\b)/i.test(d))add('warn','no_donation_line','Seva video — "మేము డొనేషన్స్ తీసుకోం" line ledu','Trust + safety: rendu lines add cheyandi.');
+  if(/annadanam|\bseva\b|donation|pooja|alive|live/i.test(d)&&!/official|అధికారిక|Devaswom|తిరుమల/i.test(d)&&/sabarimala|శబరిమల|ఐయ్యప్ప|అయ్యప్ప/i.test(d))add('info','no_official_note','"ఇది అధికారిక ఆలయ చానల్ కాదు" note ledu','Impersonation complaint risk thaggisthundi.');
+  if((type==='long'||type==='live')){
+    var ts=(d.match(/^\s*(?:0|[1-9]\d?):[0-5]\d\s/m)||[]).length;
+    if(!/^\s*0:00/m.test(d))add(type==='long'?'warn':'info','no_chapters','Chapters ledu (0:00 nunchi)','Long-form/VOD lo 3+ timestamps, gaps 10s+. Search key-moments + TV playback.');
+    else if(ts<3)add('info','few_chapters','Chapters '+ts+' matrame unnayi','5–8 best for pooja VOD.');
+  }
+  if(!/https?:\/\/|playlist/i.test(d)&&type!=='short')add('info','no_link','Playlist/next-video link ledu','End screen + session signal ki link pettandi.');
+
+  var tagArr=g.split(',').map(function(x){return x.trim()}).filter(Boolean);
+  var tagLen=tagArr.join(', ').length;
+  if(tagArr.length&&tagLen>500)add('err','tags_len','Tags total '+tagLen+' chars (>500)','Studio limit 500 — 12 tags ki teeyi.');
+  if(tagArr.length>12)add('warn','tags_many',tagArr.length+' tags','8–12 best. Labam ekkuva tag lopaluku perugadu.');
+  var gen=tagArr.filter(function(x){return GENERIC_TAGS.test(x)});
+  if(gen.length)add('warn','tags_generic','Generic tags: '+gen.join(', '),'Idi labam ichche tags kaadu.');
+  var dt=uniq(tagArr.map(function(x){return x.toLowerCase()})).length!==tagArr.length;
+  if(dt)add('info','tags_dup','Duplicate tags unnayi','Dedupe cheyandi.');
+  if(tagArr.length&&!tagArr.some(function(x){return /sarvam\s*sabari/i.test(x)}))add('info','tags_brand','Brand tag ledu','"sarvam sabarigireesha" pettandi — brand search lo mee video rakagalam.');
+  if(!tagArr.length&&type==='long')add('info','tags_none','Tags field khali ga undi','8–12 phrases (Tags list Generator lo undi).');
+  if(d&&tel(d)&&/^[^\n]{40,140}$/m.test(d)&&0)add('info','x','x');
+
+  var pen=0;iss.forEach(function(i){pen+=weight[i.sev]||0});
+  var score=Math.max(0,100-pen);
+  var grade=score>=85?'ready':(score>=70?'minor':'fix');
+  return {score:score,grade:grade,issues:iss,hashtags:dh.length,tagCount:tagArr.length,tagChars:tagLen,titleChars:cplen(t),
+    preview:d.trim().replace(/\s+/g,' ').slice(0,125)};
+}
+
+function autoClean(o){
+  o=o||{};
+  var t=(o.title||'').replace(HT,'').replace(/\s{2,}/g,' ').replace(/[|\-–—•·:,]\s*$/,'').trim();
+  var lead=t.match(/^(\d{1,2}\s*[\/.\-]\s*\d{1,2}(?:\s*[\/.\-]\s*\d{2,4})?)\s*/);
+  if(lead){t=t.slice(lead[1].length).trim()+' | '+lead[1].replace(/\s/g,'');}
+  var lines=(o.desc||'').replace(/\r/g,'').split('\n');
+  var out=[],drop=[],skipTillBlank=false;
+  for(var i=0;i<lines.length;i++){
+    var s=lines[i].trim();
+    if(DUMP_HDR.test(s)){skipTillBlank=true;continue}
+    if(skipTillBlank){if(s==='')skipTillBlank=false;continue}
+    if((s.match(/,/g)||[]).length>=5&&!tel(s))continue;
+    out.push(lines[i]);
+  }
+  // drop runs of >=5 consecutive latin keyword-ish lines
+  var keep=[],j=0;
+  while(j<out.length){
+    if(isKeywordLine(out[j])){
+      var k=j;while(k<out.length&&isKeywordLine(out[k]))k++;
+      if(k-j>=5){j=k;continue}
+    }
+    keep.push(out[j]);j++;
+  }
+  var allTags=uniq((o.desc||'').match(HT)||[]).slice(0,3);
+  var body=keep.map(function(l){return l.replace(HT,'')}).join('\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim().replace(/[|—–\-:,]\s*$/,'').trim();
+  if(allTags.length)body+='\n\n'+allTags.join(' ');
+  var tg=(o.tags||'').split(',').map(function(x){return x.trim()}).filter(Boolean);
+  tg=tg.filter(function(x){return !GENERIC_TAGS.test(x)});
+  tg=uniq(tg.map(function(x){return x.toLowerCase()})).slice(0,12);
+  var removed=(o.desc||'').split('\n').length-keep.length;
+  return {title:t,desc:body,tags:tg.join(', '),removedLines:removed,keptHashtags:allTags};
+}
+
+function scoreHooks(text){
+  var lines=(text||'').split(/\r?\n/).map(function(s){return s.trim()}).filter(Boolean);
+  return lines.map(function(l){
+    var pts=0,why=[];
+    if(cplen(l)>=25&&cplen(l)<=140){pts+=3;why.push('length ok')}else{why.push(cplen(l)<25?'chinga — detail add chey':'pedda — trim chey')}
+    if(/\d/.test(l)){pts+=2;why.push('number undi')}
+    if(/[?]/.test(l)||/ఏమిటి|ఎందుకు|తెలుసా|ఏంటి|what|why|how/i.test(l)){pts+=2;why.push('curiosity')}
+    if(/అసలు|రహస్యం|తప్పు|వద్దు|నిజం|మొదటిసారి|real|secret|never/i.test(l)){pts+=2;why.push('tension word')}
+    if(tel(l)){pts+=1;why.push('Telugu')}
+    if(/subscribe|like చేయండి|share చేయండి/i.test(l)){pts-=3;why.push('⚠ CTAs hook lo addakapu')}
+    return {line:l,chars:cplen(l),score:Math.max(0,Math.min(10,pts)),why:why.join(' · ')};
+  }).sort(function(a,b){return b.score-a.score});
+}
+
+/* ---- Viral Lab: trend window + readiness (pure, testable) ---- */
+var VIRMILE=[{k:'script+ideas',off:10,note:'Script + 5 hook variants + thumbnail 2 concepts lock'},{k:'shoot',off:7,note:'Shoot/bank footage — 2 versions of intro record chey'},{k:'teaser',off:4,note:'Teaser Short + community countdown post'},{k:'pre',off:2,note:'Long-form #1 publish (search demand starts)'},{k:'day',off:0,note:'EVENT DAY — live/premiere + Short #2 (2h comment sprint)'},{k:'recap',off:1,note:'Same-day recap + photo post (velocity tail)'},{k:'tail',off:3,note:'Evergreen "what happened" — 7-rojula search tail'}];
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function trendPlan(eventISO,daysBefore){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(eventISO||''))return{error:'Date format: YYYY-MM-DD'};
+  var ev=new Date(eventISO+'T12:00:00');
+  if(isNaN(ev))return{error:'Date valid kaadu'};
+  var today=new Date();today.setHours(12,0,0,0);
+  var lead=[].concat(daysBefore||[]);
+  var rows=VIRMILE.map(function(m){var d=new Date(ev.getTime());d.setDate(d.getDate()-m.off);
+    return {step:m.k,note:m.note,date:ymd(d),over:d<today}});
+  if(lead.length)rows=rows.concat(lead.map(function(n){return {step:'lead-'+n,note:'Pre-heat Short/quiz: "ee pandugu ki '+n+' rojulu" — poll tho audience test',date:ymd(new Date(ev.getTime()-(+n||0)*864e5)),over:new Date(ev.getTime()-(+n||0)*864e5)<today}}));
+  var daysOut=Math.round((ev-today)/864e5);
+  rows.sort(function(a,b){return a.date<b.date?-1:1});
+  return {event:ymd(ev),daysOut:daysOut,urgent:daysOut<=10&&daysOut>=0,late:daysOut<0,rows:rows};
+}
+var VIRCHK=[
+ 'Season/event window lo unnaya (Nov 16 – Jan 20 = nee peak)',
+ 'Topic ni 10K+ views chesina vere video verify chesara (demand proof)',
+ 'Title lo Telugu promise + English search term rendu unnaya',
+ 'Thumbnail 2 variants → Test & Compare ON',
+ 'First 15s lo darshan/result kanipisthunda (no intro)',
+ 'Nee voice narration unda (reused-content risk clear)',
+ '8+ min unte chapters 0:00 nunchi 3+ unnaya',
+ 'End screen + playlist link → next video sell avutunda',
+ 'Pinned comment lo specific prashnam (answer in 3 seconds)',
+ 'Publish ki 2 ghantalu comments ki reply cheyadaniki free na',
+ 'Auto-dubbing (Malayalam/Hindi/Tamil) available aithe ON',
+ 'Shorts → long-form funnel (tease + link) unda'
+];
+function viralScore(flags){
+  flags=flags||[];var got=VIRCHK.map(function(c,i){return {item:c,on:!!flags[i]}});
+  var n=got.filter(function(x){return x.on}).length,pct=Math.round(n/VIRCHK.length*100);
+  var miss=got.filter(function(x){return !x.on}).map(function(x){return x.item});
+  var verdict=pct>=85?'🚀 Viral window open — publish cheyi':(pct>=60?'🟡 Packaging ready, gaps meeku':(pct>=35?'🟠 Fix munde — reach waste avuthundi':'🔴 Ippudu publish cheyaku'));
+  return {n:n,total:VIRCHK.length,pct:pct,verdict:verdict,miss:miss};
+}
+/*__LOGIC_END__*/
+
+/* ---------------- UI ---------------- */
+function $(s){return document.querySelector(s)}
+function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
+$$('#nav button').forEach(function(b){b.onclick=function(){$$('#nav button').forEach(function(x){x.classList.remove('on')});b.classList.add('on');$$('main section').forEach(function(s){s.classList.remove('on')});$('#'+b.dataset.t).classList.add('on')}});
+
+var LS={chk:'ssg_checklist_v1',tbl:'ssg_table_v1'};
+function read(){return{title:$('#inTitle').value,desc:$('#inDesc').value,tags:$('#inTags').value,type:$('#inType').value}}
+function render(){
+  var r=analyze(read());
+  $('#dial').textContent=r.score;
+  $('#dial').style.borderColor=r.grade==='ready'?'#4ade80':(r.grade==='minor'?'#fbbf24':'#f87171');
+  $('#verdict').innerHTML=r.grade==='ready'?'✅ Publish cheyochu':(r.grade==='minor'?'🟡 Chinn fixes (2 min)':'🔴 Fix cheyaka publish cheyandi');
+  $('#summary').innerHTML='Hashtags: <b>'+r.hashtags+'</b> (max 3) · Tags: <b>'+r.tagCount+'</b> / <b>'+r.tagChars+'</b> chars (≤500) · Title: <b>'+r.titleChars+'</b> chars · Issues: <b>'+r.issues.length+'</b>';
+  $('#issues').innerHTML=r.issues.length?r.issues.map(function(i){return '<li class="'+i.sev+'"><b>'+esc(i.head)+'</b>'+esc(i.detail)+'</li>'}).join(''):'<li class="info" style="border-color:#4ade80">Emitthi problem lekapotundi 🙏</li>';
+  $('#prev').textContent=r.preview?r.preview.slice(0,60)+'…':'';
+  if(!$('#prev').textContent)$('#prev').textContent='(description khali)';
+}
+function esc(s){return (s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+['inTitle','inDesc','inTags','inType'].forEach(function(id){$('#'+id).addEventListener('input',render);$('#'+id).addEventListener('change',render)});
+$('#btnClear').onclick=function(){$('#inTitle').value='';$('#inDesc').value='';$('#inTags').value='';$('#cleanOut').innerHTML='';render()};
+$('#btnClean').onclick=function(){
+  var c=autoClean(read());
+  $('#inTitle').value=c.title;$('#inDesc').value=c.desc;$('#inTags').value=c.tags;render();
+  $('#cleanOut').innerHTML='<div class="h3" style="margin-top:12px">✨ Cleaned ('+c.removedLines+' lines thesivarunu, hashtags: '+c.keptHashtags.length+' maintain)</div>'+
+  '<div class="small">Title</div><div class="tag" id="cT">'+esc(c.title)+'</div>'+
+  '<div class="small" style="margin-top:6px">Description</div><pre class="preview">'+esc(c.desc)+'</pre>'+
+  '<div class="small">Tags</div><div class="tag">'+esc(c.tags)+'</div>'+
+  '<button class="act" style="margin-top:8px" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.querySelector(\'#cleanOut\').innerText)">Copy anni</button>';
+};
+$('#btnLoadBad').onclick=function(){
+  $('#inTitle').value='100 Meals. One Mission | Annadanam | Sarvam Sabarigireesha | Ayyappa’s Blessings, Our Small Seva';
+  $('#inDesc').value="100 Meals. One Mission. One Small Step Towards Humanity. ❤️🙏\n\nWith the divine blessings of Lord Ayyappa Swamy, SARVAM SABARIGIREESHA completed our 2nd Annadanam / Food Drive.\n\n#Annadanam #FoodDrive #FoodDistribution #AyyappaSwamy #SwamiyeSaranamAyyappa #Seva #Humanity #FeedTheHungry #Shorts\n\nAnnadanam\nAnnadanam Mahadanam\nFood Drive\nFood Distribution\nFood Donation\nFeeding 100 People\nFree Food Distribution\nAyyappa / Devotional Keywords:\nAyyappa Swamy\nLord Ayyappa\nSabarimala Ayyappa\nLong-Tail SEO Keywords:\nAnnadanam food distribution\nAyyappa Swamy Annadanam\nFood seva for the needy";
+  $('#inTags').value='annadanam, sabarimala, ayyappa, shorts, viral, trending, food';
+  $('#inType').value='short';render();
+};
+
+var TPL={
+ daily:{t:'శబరిమల ఉష పూజ దర్శనం 🙏 | Sabarimala Live Darshan — {DATE}',d:'శబరిమల {TOPIC} — ఈ రోజు ఏం జరిగింది, దాని అర్థం ఏమిటి 🙏\n{LINE3}\n📌 41 రోజుల వ్రతం guide: {LINK}\n⚠️ ఇది భక్తుని కోణం — అధికారిక ఆలయ చానల్ కాదు.\n#Sabarimala #LiveDarshan #Ayyappa',g:'sabarimala live darshan, sabarimala live today, usha pooja, sabarimala temple telugu, ayyappa darshan, mandala pooja 2026, pathinettampadi, sarvam sabarigireesha'},
+ guide:{t:'41 రోజుల వ్రతం నియమాలు 🙏 {DATE} — Save చేసుకోండి | Sabarimala Vratham Telugu',d:'శబరిమల వ్రతం: {TOPIC} — ఏం చేయాలి, ఏం వద్దు, ఎందుకో వివరంగా 🙏\n📌 ఈ checklist Save చేసుకోండి — కుటుంబంతో Share చేయండి.\n⏱️ అధ్యాయాలు\n0:00 మొదలు\n{CHAPTERS}\n⚠️ నియమాలు/షెడ్యూల్ ఆలయ నోటిసులు బట్టి మారవచ్చు — వెళ్ళకముందే verify చేసుకోండి.\n#Sabarimala #Vratham #Ayyappa',g:'sabarimala vratham rules telugu, 41 days vratham, ayyappa vratham niyamalu, irumudikettu, mandala pooja 2026, sabarimala telugu, ayyappa malasari, sarvam sabarigireesha'},
+ seva:{t:'ఐయ్యప్ప సేవ: {TOPIC} 🙏 | Annadanam Seva — మీ సపోర్టే కారణం',d:'ఈ రోజు {TOPIC} — మీ ప్రతి Like, Share, Support వల్లే. 🍚❤️\nఅన్నదానం కేవలం భోజనం కాదు — మన దగ్గర ఉన్నది అవసరం ఉన్నవారితో పంచుకోవడం.\n⚠️ మేము డొనేషన్స్ తీసుకోం. సేవ చేయాలనుకుంటే మాతో నేరుగా రావచ్చు. ఇది అధికారిక ఆలయ కార్యక్రమం కాదు.\n📌 సేవ playlist: {LINK}\n#Annadanam #AyyappaSeva #SarvamSabarigireesha',g:'annadanam, annadanam seva, ayyappa seva, food distribution telugu, sabarimala seva, seva activity, annadanam mahadanam, sarvam sabarigireesha'},
+ story:{t:'మణికంఠ జన్మ రహస్యం 🙏 {TOPIC} పూర్తిగా | Ayyappa Story Telugu',d:'అయ్యప్ప స్వామి కథ — {TOPIC} — తెలుగులో, పూర్తిగా 🙏\n⏱️ అధ్యాయాలు (meere timeline nunchi time rasi pettandi)\n0:00 మొదలు\n{CHAPTERS}\n⚠️ పురాణాల్లో వ్యత్యాసాలు ఉండవచ్చు — భక్తుని కోణంలో చెప్పిన కథ.\n#Ayyappa #Manikanta #Telugu',g:'manikanta story telugu, ayyappa birth story, harihara putra, dharma sastha, sabarimala katha, ayyappa kadha, swamiye saranam ayyappa, sarvam sabarigireesha'},
+ short30:{t:'18 మెట్ల అసలు అర్థం 🙏 | Pathinettampadi in Telugu | #Shorts',d:'"{HOOK}" — అసలు అర్థం ఈ వీడియోలో 🙏\nస్వామియే శరణం అయ్యప్ప · శబరిమల భక్తుల కోసం రోజువారీ దర్శనం, వ్రతం, సేవ.\n📌 series మొత్తం: {LINK}\n#Pathinettampadi #Sabarimala #Ayyappa',g:'pathinettampadi, sabarimala 18 steps, ayyappa bhakti shorts, swamiye saranam ayyappa meaning, sabarimala telugu, sarvam sabarigireesha'},
+ live:{t:'శబరిమల {TOPIC} 🙏 | Sabarimala Live — {DATE}',d:'శబరిమల {TOPIC} — నేరుగా దర్శనం + వివరణ (నా narratio tho). 🙏\n⏱️ అధ్యాయాలు\n0:00 Opening\n{CHAPTERS}\n📌 playlist: {LINK}\n⚠️ అధికారిక ఆలయ ప్రసారం కాదు; మా narration + మా footage.\n#Sabarimala #LiveDarshan #Ayyappa',g:'sabarimala live, sabarimala live darshan, sabarimala pooja live, mandala pooja live, ayyappa live telugu, sarvam sabarigireesha'}
+};
+$('#gMake').onclick=function(){
+  var f=TPL[$('#gFormat').value],topic=$('#gTopic').value.trim()||'41 రోజుల వ్రతం',dt=$('#gDate').value.trim()||'',link=$('#gLink').value.trim()||'{link}';
+  var t=f.t.replace('{TOPIC}',topic).replace('{DATE}',dt||'').replace(/\s+—\s*$/,'').replace(/\s{2,}/g,' ');
+  var d=f.d.replace(/\{TOPIC\}/g,topic).replace('{DATE}',dt||'').replace('{LINK}',link).replace('{HOOK}','{మీ hook line}').replace('{LINE3}','ఈ రోజు {topic} గురించి ముఖ్యమైన 3 విషయాలు.'.replace('{topic}',topic)).replace('{CHAPTERS}','1:10 {seg1}\n4:00 {seg2}\n7:00 {payoff}');
+  var out='<div class="small" style="margin-top:10px">Title</div><div class="tag">'+esc(t)+'</div><div class="small" style="margin-top:6px">Description</div><pre class="preview">'+esc(d)+'</pre><div class="small">Tags</div><div class="tag">'+esc(f.g)+'</div>';
+  $('#gOut').innerHTML=out;window.__gen={t:t,d:d,g:f.g};render0();
+};
+function render0(){var x=$('#gOut').textContent}
+$('#gSend').onclick=function(){if(!window.__gen){$('#gMake').click()}$('#inTitle').value=window.__gen.t;$('#inDesc').value=window.__gen.d;$('#inTags').value=window.__gen.g;$$('main section').forEach(function(s){s.classList.remove('on')});$('#check').classList.add('on');$$('#nav button').forEach(function(x){x.classList.toggle('on',x.dataset.t==='check')});render()};
+$('#hScore').onclick=function(){
+  var r=scoreHooks($('#hLines').value);
+  $('#hOut').innerHTML='<div class="small" style="margin-top:10px">'+r.map(function(x,i){return '<div class="chk"><b class="'+(x.score>=8?'ok':x.score>=5?'wn':'er')+'">'+(i+1)+' · '+x.score+'/10</b> <span>'+esc(x.line)+'</span></div><div class="small mu">'+esc(x.why)+' · '+x.chars+' chars</div>'}).join('')+'</div>';
+};
+
+var CH=[
+ 'Metta descriptions nunchi keyword dumps + extra hashtags delete',
+ 'Sammakka film-song Short private (done 7 Oct ✅)',
+ 'Last 10 videos titles Telugu-first (date last)',
+ 'Playlists 5: Live Darshan / Vratham Guide / Seva / Kathalu / Yatra',
+ 'Prathi long-form ki end-screen + chapters (0:00, 3+)',
+ 'Studio → Test & Compare ON + 2 thumbnail variants',
+ 'Auto-dubbing: Telugu → Malayalam/Hindi/Tamil ON (unte)',
+ 'Channel About rewrite + "official channel kaadu" disclaimer',
+ '12 evergreen videos bank (season ki mundu)',
+ '16 Oct–21 Oct: Thulam pooja daily narrated episode (first test)',
+ 'Live stream setup test (light + audio) — 15 Oct',
+ '16 Nov: Mandala opening MAIN LIVE + Shorts Series tag',
+ '14 Jan 2027: Makara Jyothi day — 12 Jan ki prep video publish'
+];
+function loadChk(){var s={};try{s=JSON.parse(localStorage.getItem(LS.chk)||'{}')}catch(e){}
+ $('#chkList').innerHTML=CH.map(function(c,i){return '<label class="chk"><input type="checkbox" data-i="'+i+'" '+(s[i]?'checked':'')+'><span>'+esc(c)+'</span></label>'}).join('');
+ $$('#chkList input').forEach(function(el){el.onchange=function(){var v={};$$('#chkList input').forEach(function(x){v[x.dataset.i]=x.checked});localStorage.setItem(LS.chk,JSON.stringify(v));statChk()}});statChk();}
+function statChk(){var a=$$('#chkList input'),d=a.filter(function(x){return x.checked}).length;$('#chkStat').textContent=d+' / '+a.length+' complete';}
+$('#chkReset').onclick=function(){localStorage.removeItem(LS.chk);loadChk()};
+
+var COLS=['video','ctr','ret30','avd','views','fix'];
+function loadTbl(){var r=[];try{r=JSON.parse(localStorage.getItem(LS.tbl)||'[]')}catch(e){}
+ if(!r.length)r=[{video:'RsP7cFSJucw (5.2K Annadanam)',ctr:'',ret30:'',avd:'',views:'5200',fix:'Long-Tail dump inki undi — clean cheyali'},{video:'Xt7yZWOFfjE',ctr:'',ret30:'',avd:'',views:'4800',fix:'Hashtags dup + keyword list'},{video:'6nEqzCAWZik',ctr:'',ret30:'',avd:'',views:'1100',fix:'Title date-first + narration ledu'}];
+ save();draw();}
+function draw(){var r=JSON.parse(localStorage.getItem(LS.tbl)||'[]');
+ $('#tbl tbody').innerHTML=r.map(function(row,i){return '<tr>'+COLS.map(function(c){return '<td><input data-i="'+i+'" data-c="'+c+'" value="'+esc(String(row[c]||''))+'"></td>'}).join('')+
+ '<td>'+num(row.ctr,4,'↑')+num(row.ret30,70,'↑')+num(row.avd,25,'↑')+'</td><td><button class="ghost" data-del="'+i+'">×</button></td></tr>'}).join('');
+ $$('#tbl tbody input').forEach(function(el){el.oninput=function(){var rr=JSON.parse(localStorage.getItem(LS.tbl)||'[]');rr[el.dataset.i][el.dataset.c]=el.value;localStorage.setItem(LS.tbl,JSON.stringify(rr));draw()}});
+ $$('#tbl [data-del]').forEach(function(b){b.onclick=function(){var rr=JSON.parse(localStorage.getItem(LS.tbl)||'[]');rr.splice(b.dataset.del,1);localStorage.setItem(LS.tbl,JSON.stringify(rr));draw()}});}
+function num(v,th,dir){var n=parseFloat(v);if(isNaN(n))return'';var good=dir==='↑'?n>=th:n<th;return '<div class="small '+(good?'ok':'er')+'">'+(good?'✅':'⚠')+'</div>'}
+function save(){}
+$('#tAdd').onclick=function(){var r=JSON.parse(localStorage.getItem(LS.tbl)||'[]');r.push({video:'',ctr:'',ret30:'',avd:'',views:'',fix:''});localStorage.setItem(LS.tbl,JSON.stringify(r));draw()};
+$('#tClr').onclick=function(){localStorage.setItem(LS.tbl,'[]');draw()};
+$('#tCsv').onclick=function(){var r=JSON.parse(localStorage.getItem(LS.tbl)||'[]');
+ var csv='video,ctr_pct,ret30_pct,avd_pct,views,fix\n'+r.map(function(x){return COLS.map(function(c){return '"'+String(x[c]||'').replace(/"/g,'""')+'"'}).join(',')}).join('\n');
+ var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='audit-'+new Date().toISOString().slice(0,10)+'.csv';a.click()};
+
+function cd(){var open=new Date('2026-11-16T17:00:00+05:30'),mak=new Date('2027-01-14T18:00:00+05:30');
+ function pair(lbl,target){var ms=target-Date.now();var d=Math.max(0,Math.floor(ms/864e5)),h=Math.max(0,Math.floor(ms%864e5/36e5));
+  return '<div style="flex:1"><div class="small">'+lbl+'</div><div class="count">'+d+'</div><div class="small">rojulu · '+h+'g remaining</div></div>'}
+ $('#cdRow').innerHTML=pair('Mandala Pooja opens (16 Nov 2026)',open)+pair('Makara Jyothi (14 Jan 2027)',mak);}
+var PROMPTS=[
+ "List my last 20 videos with impressions, CTR and average view duration. Which ones have above-average impressions but CTR under 3%? Suggest a new title and a thumbnail angle for each.",
+ "Read my retention curves. At which timestamp do viewers leave during the first 30 seconds, and what should I change in my openings?",
+ "Group my uploads into topic clusters. Which cluster has the highest returning-viewer rate, and which one should I drop?",
+ "Compare Shorts vs long-form: what share of my Shorts viewers visit the channel within 7 days, and how do I improve that funnel?",
+ "Suggest 3 thumbnail concepts and 5 titles for a video about Sabarimala 41-day vratham rules, for Telugu devotees. Titles under 60 characters, no clickbait, no hashtags.",
+ "My Annadanam seva Short got 5.2K views while raw temple visuals got 1.1K. What exactly should I repeat, and what series should I build around it?",
+ "Which of my older videos still get search impressions and would gain from a title/thumbnail refresh?",
+ "Summarize the top 10 questions asked in comments on my recent videos and turn them into video ideas with titles.",
+ "Draft feedback: review this video's pacing and tell me which section to cut, with timestamps.",
+ "Explain why my views plateaued after 48 hours for this video, using CTR, retention and traffic-source data."
+];
+$('#vPrompts').innerHTML=PROMPTS.map(function(p,i){return '<div class="chk"><span style="flex:1;font-size:13px">'+esc(p)+'</span><button class="ghost" data-p="'+i+'">Copy</button></div>'}).join('');
+$('#vPrompts').onclick=function(e){var b=e.target.closest?e.target.closest('button[data-p]'):null;if(!b)return;
+  var t=PROMPTS[b.dataset.p],done=function(){b.textContent='✓ Copied';setTimeout(function(){b.textContent='Copy'},1400)};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb()})}else fb();
+  function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy')}catch(x){}ta.remove();done()}};
+
+function daysFrom(ds){var d=new Date(ds+'T12:00:00'),t=new Date();t.setHours(12,0,0,0);return Math.round((d-t)/864e5)}
+$('#vGo').onclick=function(){
+  var lead=($('#vLead').value||'').split(',').map(function(x){return x.trim()}).filter(function(x){return /^\d+$/.test(x)});
+  var r=trendPlan($('#vDate').value,lead);
+  if(r.error){$('#vOut').innerHTML='<div class="er" style="margin-top:8px">'+esc(r.error)+'</div>';return}
+  $('#vOut').innerHTML='<div class="small" style="margin-top:9px"><b>'+esc($('#vEvent').value||'Event')+'</b> → '+r.event+' · inka <b>'+r.daysOut+' rojulu</b>'+(r.late?' <span class="er">(date potondi)</span>':'')+(r.urgent?' <span class="wn">⚡ ee window lo prep start cheyali</span>':'')+'</div>'+
+  '<div style="overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:6px"><table><thead><tr><th>Publish/prepare</th><th>Pani</th><th>State</th></tr></thead><tbody>'+
+  r.rows.map(function(x){var dd=daysFrom(x.date);return '<tr><td><b>'+x.date+'</b></td><td class="small">'+esc(x.step)+' — '+esc(x.note)+'</td><td class="small '+(dd<0?'er':'ok')+'">'+(dd<0?'potondi — today chey':dd+' rojulu')+'</td></tr>'}).join('')+
+  '</tbody></table></div>'};
+function vChk(){var s={};try{s=JSON.parse(localStorage.getItem('ssg_vir_v1')||'{}')}catch(e){}
+ $('#vChk').innerHTML=VIRCHK.map(function(c,i){return '<label class="chk"><input type="checkbox" data-v="'+i+'" '+(s[i]?'checked':'')+'><span>'+esc(c)+'</span></label>'}).join('');
+ $$('#vChk input').forEach(function(el){el.onchange=function(){var v={};$$('#vChk input').forEach(function(x){v[x.dataset.v]=x.checked});localStorage.setItem('ssg_vir_v1',JSON.stringify(v));vScore()}});vScore()}
+function vScore(){var flags=[];$$('#vChk input').forEach(function(el){flags[el.dataset.v]=el.checked});
+ var r=viralScore(flags);$('#vDial').textContent=r.pct;
+ $('#vDial').style.borderColor=r.pct>=85?'#4ade80':(r.pct>=60?'#fbbf24':'#f87171');
+ $('#vVerdict').textContent=r.verdict;
+ $('#vMiss').innerHTML=r.miss.length?'Inka fix: '+esc(r.miss.slice(0,3).join(' · ')):'Anni ready 🙏 publish cheyi';}
+vChk();
+loadChk();loadTbl();cd();setInterval(cd,6e4);render();
+</script>
+</body>
+</html>

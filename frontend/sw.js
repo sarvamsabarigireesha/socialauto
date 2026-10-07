@@ -1,9 +1,11 @@
 /* SocialAuto service worker — cache the shell so the phone app opens offline. */
-const CACHE = "socialauto-shell-v1.9.8";
+const CACHE = "socialauto-shell-v1.9.9";
 const PRECACHE = [
   "/",
   "/offline",
   "/manifest.webmanifest",
+  "/static/yt-package.html",
+  "/static/yt-rules.js",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
