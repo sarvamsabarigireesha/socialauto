@@ -7,7 +7,7 @@ zero new dependencies, zero DB tables, no secrets.
 ## What you get
 | Piece | Path | What it does |
 |---|---|---|
-| Dashboard tab | `frontend/index.html` (nav item + `view-ytpackage` section) | 🪔 **YT Package** in the side-nav; iframe lazy-loads on first click |
+| Dashboard tab | `frontend/index.html` (nav item + `view-ytpackage` section + Home shortcut card) | **🚀 YT Viral** sits directly under 🏠 Home; iframe lazy-loads on first click |
 | Tool UI | `frontend/yt-package.html` | Scanner · Generator · Hook Lab · Viral Lab · Season/Audit · Rules |
 | Shared rules (JS) | `frontend/yt-rules.js` | `window.YtRules` — same ruleset, callable from the composer |
 | Rules engine (Py) | `backend/app/services/ytrules.py` | `analyze / auto_clean / viral_score / trend_plan` — stdlib only |
@@ -59,6 +59,9 @@ Or server-side (blocks the API too, useful for bulk CSV): in `backend/app/router
 `create_post`, when `platform == Platform.youtube`, call
 `ytrules.analyze(...)` and reject with `HTTPException(422, detail=json.dumps(report["issues"]))`
 only when `grade == "fix"` — keep it a warning if you'd rather not block publishing.
+
+## Placement (decided on 7 Oct, after the first PR commit)
+The tab is **second in the sidebar, right under 🏠 Home** (`home → ytpackage → ideas → posts → community → analytics`) because everything for the channel should be reachable in one app. Label is **🚀 YT Viral**; the internal view id stays `ytpackage` (renaming ids would churn `switchView`, the PWA precache list and any saved links for no benefit). Home also gets a `#ytViralHomeCard` shortcut whose hint line shows the live countdown to 16 Nov via `YtRules.trendPlan` — it is filled from `initYtHomeCard()`, which is called from `switchView('home')` instead of editing `loadHome()`.
 
 ## Notes / gotchas found while wiring this up
 1. **Static paths.** SocialAuto mounts `frontend/` at **`/static`** and serves `index.html`,
